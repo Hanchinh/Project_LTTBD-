@@ -81,6 +81,24 @@ const swaggerDocument = {
         responses: { 200: { description: 'Lưu vị trí thành công' } },
       },
     },
+    '/customers/by-phone/{phoneNumber}/location': {
+      get: {
+        summary: 'Tra cứu hồ sơ vị trí khách hàng bằng số điện thoại',
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: 'phoneNumber', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          200: { description: 'Thông tin khách hàng và hồ sơ vị trí đã lưu' },
+          404: { description: 'Chưa có hồ sơ hoặc không tìm thấy khách hàng' },
+        },
+      },
+    },
+    '/photos/{filename}': {
+      get: {
+        summary: 'Truy cập ảnh mặt tiền cổng nhà an toàn',
+        parameters: [{ name: 'filename', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: { 200: { description: 'Dữ liệu ảnh nhị phân' } },
+      },
+    },
     '/admin/stats/coverage': {
       get: {
         summary: 'Thống kê tỷ lệ phủ vị trí theo từng khu vực',

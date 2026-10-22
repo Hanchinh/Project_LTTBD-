@@ -58,30 +58,34 @@ Hệ thống được thiết kế theo mô hình **Client-Server 3 tầng phân
 ├── README.md                 # Tài liệu hướng dẫn sử dụng nhanh
 ├── docker-compose.yml        # Điều phối các container: postgres, backend, admin_web
 ├── init-db/
-│   └── 01-init-db.sql        # Script tạo extension, bảng, trigger, index và nạp seed data
+│   ├── 01-init-db.sql        # Script tạo extension, bảng, trigger, index và nạp seed data
+│   └── 02-add-photo-and-fix-history.sql # Migration bổ sung ảnh mặt tiền và sửa cascade delete
 ├── backend/                  # RESTful API Service (Express + TypeScript)
 │   ├── Dockerfile            # Container build cho Node.js backend
 │   ├── package.json          # Cấu hình dependency & npm scripts
 │   ├── tsconfig.json         # Cấu hình biên dịch TypeScript
 │   ├── jest.config.js        # Cấu hình Jest test runner
 │   ├── .env                  # Biến môi trường cục bộ
+│   ├── uploads/photos/       # Thư mục lưu trữ ảnh mặt tiền/cổng nhà bền vững
 │   ├── src/
 │   │   ├── index.ts          # Server entry point (app.listen)
-│   │   ├── app.ts            # Khởi tạo Express, gán middleware và router
+│   │   ├── app.ts            # Khởi tạo Express, gán middleware và router (13 endpoints)
 │   │   ├── db.ts             # Khởi tạo PostgreSQL connection pool (pg.Pool)
 │   │   ├── swagger.ts        # Cấu hình Swagger UI OpenAPI document
 │   │   ├── middlewares/
 │   │   │   ├── auth.middleware.ts   # Xác thực Bearer JWT & phân quyền Role
 │   │   │   └── area.middleware.ts   # Kiểm tra quyền truy cập theo khu vực (Area Scope)
 │   │   └── controllers/
-│   │       ├── auth.controller.ts      # Đăng nhập & sinh JWT token
-│   │       ├── orders.controller.ts    # Lấy danh sách đơn trong ca của shipper
-│   │       ├── locations.controller.ts # Lưu/cập nhật vị trí PostGIS & xem lịch sử
-│   │       └── admin.controller.ts     # Thống kê coverage, quản lý user, area, location
+│   │       ├── auth.controller.ts      # Đăng nhập & sinh JWT token (Bcrypt chuẩn)
+│   │       ├── orders.controller.ts    # Lấy danh sách đơn trong ca của shipper (kèm ảnh)
+│   │       ├── locations.controller.ts # Lưu/cập nhật vị trí, lưu ảnh base64, tra cứu SĐT, phục vụ ảnh
+│   │       └── admin.controller.ts     # Thống kê coverage, quản lý user, area, xóa vị trí an toàn
 │   └── test/
-│       └── location.spec.ts  # Unit test tính khoảng cách Haversine & kiểm tra scope
+│       ├── auth.spec.ts      # Kiểm thử đăng nhập bảo mật và chống password bypass
+│       └── location.spec.ts  # Kiểm thử Haversine, Area Scope, chuẩn hóa SĐT và an toàn tên file ảnh
 ├── admin_web/                # Ứng dụng Web Quản trị (React + Vite + Tailwind CSS)
 │   ├── Dockerfile            # Multi-stage build (Node build -> Nginx Alpine)
+│   ├── nginx.conf            # Cấu hình Nginx try_files cho SPA HTML5 History
 │   ├── package.json          # Dependency frontend
 │   ├── vite.config.ts        # Cấu hình Vite bundler
 │   ├── index.html            # Single Page HTML entry
@@ -89,36 +93,37 @@ Hệ thống được thiết kế theo mô hình **Client-Server 3 tầng phân
 │       ├── main.tsx          # React DOM entry point
 │       ├── App.tsx           # Router chính & ProtectedLayout kiểm tra token
 │       ├── api/
-│       │   └── client.ts     # Cấu hình Axios instance + request interceptor gắn Bearer token
+│       │   └── client.ts     # Cấu hình Axios instance + VITE_API_BASE_URL động
 │       ├── components/
 │       │   └── Sidebar.tsx   # Thanh điều hướng trái
 │       └── pages/
 │           ├── Login.tsx     # Giao diện đăng nhập quản trị
 │           ├── Dashboard.tsx # Thống kê tổng quan & bảng tỷ lệ phủ theo khu vực
-│           ├── Locations.tsx # Bản đồ Leaflet xem vị trí khách hàng + ảnh vệ tinh
-│           ├── Users.tsx     # Danh sách nhân viên & modal bàn giao khu vực
+│           ├── Locations.tsx # Bản đồ Leaflet xem vị trí khách hàng + ảnh mặt tiền
+│           ├── Users.tsx     # Danh sách nhân viên, modal bàn giao khu vực & modal tạo user mới
 │           ├── Areas.tsx     # Danh mục khu vực & modal tạo khu vực mới
 │           └── AuditLogs.tsx # Bảng nhật ký thao tác hệ thống
 └── mobile_app/               # Ứng dụng di động Shipper (Flutter)
-    ├── pubspec.yaml          # Flutter dependencies (flutter_map, geolocator, sqflite, ...)
-    ├── android/              # Native Android wrapper (đã có ACCESS_FINE_LOCATION)
-    ├── ios/                  # Native iOS wrapper (Cần bổ sung NSLocation descriptions)
+    ├── pubspec.yaml          # Flutter dependencies (flutter_map, geolocator, image_picker, sqflite, ...)
+    ├── android/              # Native Android wrapper (ACCESS_FINE_LOCATION, CAMERA, INTERNET)
+    ├── ios/                  # Native iOS wrapper (NSLocation, NSCamera, NSPhotoLibrary usage descriptions)
     ├── test/
-    │   └── widget_test.dart  # Test widget (hiện đang là template mặc định bị fail)
+    │   └── widget_test.dart  # Test AuthSplashScreen, LoginView validation, OrderModel & SavedLocationModel
     └── lib/
-        ├── main.dart         # Entry point hiện hành (Đang chạy prototype MapMarkerCloneApp)
+        ├── main.dart         # Entry point chính thức: DeliveryLocationMarkerApp (AuthSplashScreen)
         ├── models/
         │   ├── user_model.dart       # Model UserModel (id, fullName, role, assignedAreaIds, token)
         │   ├── order_model.dart      # Model OrderModel (chi tiết đơn, khách, trạng thái vị trí)
-        │   └── location_model.dart   # Model SavedLocationModel (lat, lng, accuracy, notes)
+        │   └── location_model.dart   # Model SavedLocationModel (lat, lng, accuracy, notes, imageUrl)
         ├── services/
-        │   ├── api_service.dart      # HTTP Client giao tiếp Backend & Deep-link Google Maps
-        │   └── offline_storage_service.dart # SQLite Database (cached_orders, offline_sync_queue)
+        │   ├── api_service.dart      # HTTP Client, phát hiện host động, tra cứu SĐT, đồng bộ queue
+        │   └── offline_storage_service.dart # SQLite Database v2 (cached_orders, queue kèm ảnh & retry)
         └── views/
-            ├── login_view.dart          # Màn hình đăng nhập tài khoản Shipper
-            ├── order_list_view.dart     # Danh sách đơn hàng trong ca, hiển thị badge vị trí
-            ├── order_detail_view.dart   # Chi tiết đơn, bản đồ mini, nút dẫn đường ngoài
-            └── save_location_view.dart  # Quy trình lưu vị trí 3 bước (GPS, Map Pin, Notes)
+            ├── prototype_map_marker_view.dart # Bản prototype cũ độc lập được bảo tồn an toàn
+            ├── login_view.dart          # Màn hình đăng nhập tài khoản Shipper (validation form chuẩn)
+            ├── order_list_view.dart     # Danh sách đơn hàng trong ca, hiển thị badge vị trí & sync queue
+            ├── order_detail_view.dart   # Chi tiết đơn, hiển thị ảnh nhà, tra cứu SĐT & dẫn đường
+            └── save_location_view.dart  # Chụp ảnh mặt tiền, cảnh báo sai số GPS, ghim bản đồ & xác nhận
 ```
 
 ---
@@ -130,7 +135,7 @@ Hệ thống được thiết kế theo mô hình **Client-Server 3 tầng phân
 | **Database** | [01-init-db.sql](file:///d:/flutter create delivery_marker_app/init-db/01-init-db.sql) | Nạp qua Docker entrypoint khi container Postgres khởi chạy lần đầu |
 | **Backend** | [backend/src/index.ts](file:///d:/flutter create delivery_marker_app/backend/src/index.ts) | Nạp dotenv, khởi tạo `createApp()`, lắng nghe cổng `process.env.PORT || 3000` |
 | **Admin Web** | [admin_web/src/main.tsx](file:///d:/flutter create delivery_marker_app/admin_web/src/main.tsx) | Render `<App />` vào DOM node `#root`, bọc trong `React.StrictMode` |
-| **Mobile App** | [mobile_app/lib/main.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/main.dart) | Gọi `runApp(const MapMarkerCloneApp())`. *(Lưu ý: Entry point này đang bị tách rời khỏi các view trong `lib/views/`, xem Mục 6)* |
+| **Mobile App** | [mobile_app/lib/main.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/main.dart) | Khởi động `DeliveryLocationMarkerApp` -> `AuthSplashScreen` kiểm tra token SharedPreferences -> `LoginView` (chưa đăng nhập) hoặc `OrderListView` (có phiên hợp lệ) |
 
 ---
 

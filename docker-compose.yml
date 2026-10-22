@@ -36,6 +36,8 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       JWT_SECRET: super_secret_delivery_jwt_key_2026_xyz
+    volumes:
+      - backend_uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,5 +55,6 @@ services:
 
 volumes:
   postgres_data:
+  backend_uploads:
 
 

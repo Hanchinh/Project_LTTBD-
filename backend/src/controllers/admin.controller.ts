@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
-import { query } from '../db';
+import { pool, query } from '../db';
 import bcrypt from 'bcrypt';
 
 // AREAS MANAGEMENT
@@ -115,6 +115,7 @@ export const getAllLocations = async (req: AuthenticatedRequest, res: Response) 
         sl.longitude,
         sl.gps_accuracy,
         sl.identification_notes,
+        sl.image_url,
         sl.created_at,
         sl.updated_at,
         c.id as customer_id,
@@ -167,6 +168,7 @@ export const getAllLocations = async (req: AuthenticatedRequest, res: Response) 
         longitude: parseFloat(row.longitude),
         gpsAccuracy: parseFloat(row.gps_accuracy),
         identificationNotes: row.identification_notes,
+        imageUrl: row.image_url,
         updatedBy: row.updated_by_name,
         updatedAt: row.updated_at,
       })),
@@ -180,16 +182,42 @@ export const deleteLocation = async (req: AuthenticatedRequest, res: Response) =
   const { locationId } = req.params;
   const userId = req.user?.userId;
 
+  const client = await pool.connect();
   try {
-    await query('DELETE FROM saved_locations WHERE id = $1', [locationId]);
-    await query(
-      'INSERT INTO audit_logs (user_id, action, entity, entity_id) VALUES ($1, $2, $3, $4)',
-      [userId, 'DELETE_LOCATION', 'SAVED_LOCATION', locationId]
+    await client.query('BEGIN');
+
+    const locCheck = await client.query('SELECT id, customer_id, image_url FROM saved_locations WHERE id = $1', [locationId]);
+    if (locCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Không tìm thấy vị trí cần xóa' });
+    }
+    const location = locCheck.rows[0];
+
+    // Preserve audit integrity: detach location_history references so audit records are not lost
+    await client.query('UPDATE location_history SET saved_location_id = NULL WHERE saved_location_id = $1', [locationId]);
+    await client.query('DELETE FROM saved_locations WHERE id = $1', [locationId]);
+
+    // Record audit log with previous details
+    await client.query(
+      'INSERT INTO audit_logs (user_id, action, entity, entity_id, details) VALUES ($1, $2, $3, $4, $5)',
+      [
+        userId,
+        'DELETE_LOCATION',
+        'SAVED_LOCATION',
+        locationId,
+        JSON.stringify({ customerId: location.customer_id, imageUrl: location.image_url }),
+      ]
     );
 
-    return res.json({ success: true, message: 'Xóa vị trí khách hàng thành công' });
+    await client.query('COMMIT');
+
+    // Note: Do not delete photo file from disk because location_history or audit logs still reference it.
+    return res.json({ success: true, message: 'Xóa vị trí khách hàng thành công (lịch sử đối soát được bảo toàn)' });
   } catch (error: any) {
+    await client.query('ROLLBACK');
     return res.status(500).json({ success: false, message: 'Lỗi xóa vị trí', error: error.message });
+  } finally {
+    client.release();
   }
 };
 

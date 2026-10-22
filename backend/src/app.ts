@@ -7,6 +7,8 @@ import {
   getCustomerLocation,
   saveOrUpdateCustomerLocation,
   getLocationHistory,
+  lookupCustomerByPhone,
+  servePhoto,
 } from './controllers/locations.controller';
 import {
   getAreas,
@@ -26,7 +28,7 @@ export const createApp = (): Express => {
   const app = express();
 
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
 
   // Swagger Documentation
   setupSwagger(app);
@@ -38,6 +40,11 @@ export const createApp = (): Express => {
 
   // SHIPPER MOBILE ROUTES
   router.get('/orders/my-shift', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), getMyShiftOrders);
+  router.get(
+    '/customers/by-phone/:phoneNumber/location',
+    authenticateJwt,
+    lookupCustomerByPhone
+  );
   router.get(
     '/customers/:customerId/location',
     authenticateJwt,
@@ -55,6 +62,11 @@ export const createApp = (): Express => {
     authenticateJwt,
     checkCustomerAreaScope,
     getLocationHistory
+  );
+  router.get(
+    '/photos/:filename',
+    authenticateJwt,
+    servePhoto
   );
 
   // ADMIN ROUTES

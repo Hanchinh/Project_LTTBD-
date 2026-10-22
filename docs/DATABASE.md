@@ -195,6 +195,7 @@ erDiagram
 | `longitude`| NUMERIC(10, 7)| NOT NULL | Tọa độ kinh độ (WGS 84) |
 | `gps_accuracy`| FLOAT | NOT NULL DEFAULT 0.0 | Sai số định vị GPS tại thời điểm đo (±m) |
 | `identification_notes`| TEXT | NOT NULL | Ghi chú nhận diện thực tế (cổng, ngõ, nhà kế bên) |
+| `image_url` | TEXT | NULLABLE | Đường dẫn ảnh mặt tiền/cổng nhà nhận diện |
 | `created_by` | UUID | NULLABLE, REFERENCES users(id) | Nhân viên đầu tiên lưu vị trí |
 | `updated_by` | UUID | NULLABLE, REFERENCES users(id) | Nhân viên cập nhật vị trí gần nhất |
 | `created_at` | TIMESTAMPTZ | DEFAULT CURRENT_TIMESTAMP | Ngày lưu đầu tiên |
@@ -204,13 +205,14 @@ erDiagram
 | Cột | Kiểu Dữ Liệu | Ràng Buộc | Ý Nghĩa Nghiệp Vụ |
 | :--- | :--- | :--- | :--- |
 | `id` | UUID | PRIMARY KEY, DEFAULT uuid_generate_v4() | Khóa chính bản ghi lịch sử |
-| `saved_location_id` | UUID | NOT NULL, REFERENCES saved_locations(id) ON DELETE CASCADE | Liên kết vị trí gốc |
+| `saved_location_id` | UUID | NULLABLE, REFERENCES saved_locations(id) ON DELETE SET NULL | Liên kết vị trí gốc (bảo toàn lịch sử khi xóa vị trí) |
 | `customer_id` | UUID | NOT NULL, REFERENCES customers(id) | Khách hàng liên quan |
 | `geom` | GEOMETRY(Point, 4326) | NOT NULL | Tọa độ cũ trước khi bị thay đổi |
 | `latitude` | NUMERIC(10, 7)| NOT NULL | Vĩ độ cũ |
 | `longitude`| NUMERIC(10, 7)| NOT NULL | Kinh độ cũ |
 | `gps_accuracy`| FLOAT | NOT NULL | Sai số GPS cũ |
 | `identification_notes`| TEXT | NOT NULL | Ghi chú nhận diện cũ |
+| `image_url` | TEXT | NULLABLE | Ảnh nhận diện cũ trước khi cập nhật |
 | `changed_by` | UUID | NULLABLE, REFERENCES users(id) | Người thực hiện cập nhật |
 | `change_reason` | VARCHAR(255) | DEFAULT 'Cập nhật vị trí' | Lý do thay đổi |
 | `created_at` | TIMESTAMPTZ | DEFAULT CURRENT_TIMESTAMP | Thời điểm ghi nhận lịch sử |
@@ -284,8 +286,8 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_saved_locations_history
 AFTER UPDATE ON saved_locations
 FOR EACH ROW
-WHEN (OLD.latitude IS DISTINCT FROM NEW.latitude OR 
-      OLD.longitude IS DISTINCT FROM NEW.longitude OR 
+WHEN (OLD.latitude IS DISTINCT FROM NEW.latitude OR
+      OLD.longitude IS DISTINCT FROM NEW.longitude OR
       OLD.identification_notes IS DISTINCT FROM NEW.identification_notes)
 EXECUTE FUNCTION fn_log_location_history();
 ```
@@ -299,3 +301,74 @@ EXECUTE FUNCTION fn_log_location_history();
     `saved_location_id UUID NOT NULL REFERENCES saved_locations(id) ON DELETE CASCADE`
   - Khi Admin gọi API `DELETE /admin/locations/:id` ([admin.controller.ts:L184](file:///d:/flutter create delivery_marker_app/backend/src/controllers/admin.controller.ts#L184)), cơ chế cascade sẽ **xóa sạch toàn bộ lịch sử vị trí cũ** trong `location_history`.
   - **Khuyến nghị cho Architect:** Thay đổi sang cơ chế **Soft Delete** (thêm cột `deleted_at TIMESTAMPTZ` vào `saved_locations`) hoặc chuyển khóa ngoại `saved_location_id` trong `location_history` sang `ON DELETE SET NULL` / giữ nguyên bản ghi lịch sử độc lập.
+
+---
+
+## 7. Cấu Trúc CSDL SQLite Ngoại Tuyến Mobile (Offline Storage & Quarantine Schema)
+
+Trên ứng dụng Flutter Mobile (`delivery_offline_v2.db`), dữ liệu ngoại tuyến và quá trình chuyển đổi từ v1 được quản lý qua 4 bảng chính:
+
+### 7.1. Bảng `cached_orders`
+- `orderId TEXT PRIMARY KEY`: Mã đơn hàng được cache.
+- `jsonData TEXT`: Chuỗi JSON đối tượng đơn hàng đầy đủ.
+
+### 7.2. Bảng `offline_sync_queue`
+- `id INTEGER PRIMARY KEY AUTOINCREMENT`: Khóa chính cục bộ.
+- `customerId TEXT NOT NULL`: Khóa định danh khách hàng (bắt buộc).
+- `latitude REAL NOT NULL`: Tọa độ vĩ độ WGS 84 [-90, 90].
+- `longitude REAL NOT NULL`: Tọa độ kinh độ WGS 84 [-180, 180].
+- `gpsAccuracy REAL NOT NULL`: Độ chính xác đo lường GPS.
+- `identificationNotes TEXT NOT NULL`: Ghi chú nhận diện.
+- `imageUrl TEXT`, `imageBase64 TEXT`: Ảnh đính kèm.
+- `syncStatus TEXT DEFAULT 'PENDING'`: Trạng thái chờ đồng bộ (`PENDING`, `FAILED`).
+- `retryCount INTEGER DEFAULT 0`: Số lần đã thử đồng bộ.
+- `createdAt TEXT NOT NULL`: Thời điểm tạo bản ghi.
+
+### 7.3. Bảng `_v1_migration_tracking` (Bảo toàn định danh nguồn)
+- `v1_source_id INTEGER PRIMARY KEY`: Khóa chính bản ghi nguồn từ v1.
+- `v2_queue_id INTEGER NULLABLE`: Khóa ID tương ứng trên v2 (NULL nếu bản ghi bị cách ly).
+- `migrated_at TEXT NOT NULL`: Thời điểm xử lý di chuyển.
+
+### 7.4. Bảng `_v1_quarantine_records` (Cơ chế cách ly & đối soát bản ghi lỗi)
+Bảo toàn 100% dữ liệu gốc bị lỗi từ v1 mà không xóa dữ liệu, đồng thời hỗ trợ quy trình sửa lỗi, phê duyệt và đưa trở lại hàng đợi đồng bộ:
+- `id INTEGER PRIMARY KEY AUTOINCREMENT`: Khóa chính bản ghi cách ly.
+- `source_table TEXT NOT NULL DEFAULT 'offline_sync_queue'`: Bảng nguồn v1.
+- `v1_source_id INTEGER NULLABLE`: ID bản ghi nguồn v1.
+- `raw_data TEXT NOT NULL`: Chuỗi JSON nguyên bản của bản ghi lỗi (bảo toàn nguyên vẹn).
+- `error_reason TEXT NOT NULL`: Lý do không thể chuyển đổi (VD: thiếu `customerId`, tọa độ ngoài phạm vi, kiểu dữ liệu sai).
+- `quarantined_at TEXT NOT NULL`: Thời điểm phát hiện và đưa vào vùng cách ly.
+- `status TEXT NOT NULL DEFAULT 'QUARANTINED'`: Vòng đời bản ghi:
+  - `QUARANTINED`: Đang chờ đối soát/hiệu chỉnh.
+  - `RESOLVED`: Đã sửa dữ liệu và chuyển thành công sang `offline_sync_queue`.
+  - `DISCARDED`: Đã xác nhận loại bỏ (dữ liệu thử nghiệm rác) kèm lý do đối soát.
+- `v2_queue_id INTEGER NULLABLE`: ID bản ghi mới được sinh ra trong `offline_sync_queue` sau khi đối soát thành công.
+- `resolved_at TEXT NULLABLE`: Thời điểm hoàn tất xử lý đối soát hoặc loại bỏ.
+- `resolution_notes TEXT NULLABLE`: Ghi chú phương án xử lý, căn cứ xác minh (số điện thoại, hóa đơn...).
+- `resolved_data TEXT NULLABLE`: Chuỗi JSON chứa dữ liệu đã được người dùng/shipper chuẩn hóa và lưu lại.
+
+### 7.5. Quy Tắc Toàn Vẹn Giữa Các Bảng SQLite (Quarantine Integrity Rules)
+1. **Không xóa bản ghi cách ly:** Khi sửa lỗi qua `resolveQuarantinedRecord()`, bản ghi chuyển sang trạng thái `RESOLVED` thay vì bị xóa (`DELETE`), đảm bảo lịch sử đối soát và bằng chứng dữ liệu gốc luôn tồn tại.
+2. **Giao dịch nguyên tử (Atomic Transaction):** Thao tác đưa dữ liệu vào `offline_sync_queue`, cập nhật `_v1_migration_tracking.v2_queue_id` và cập nhật `_v1_quarantine_records.status = 'RESOLVED'` thực thi trong 1 transaction SQLite duy nhất. Bất kỳ sự cố nào sẽ rollback toàn bộ.
+3. **Chống lặp Idempotent:** Khi gọi lại hàm resolve trên bản ghi đã xử lý, hệ thống trả về ngay `v2_queue_id` hiện tại mà không tạo thêm bản ghi mới trong hàng đợi.
+4. **An toàn Migration v1:** File CSDL `delivery_offline.db` (v1) luôn được mở với cờ `readOnly: true`, tuyệt đối không ghi hoặc xóa tệp nguồn. Cờ hoàn tất migration chỉ được bật khi toàn bộ bản ghi nguồn đã được chuyển đổi hoặc có trạng thái đối soát bảo toàn (`RESOLVED`/`DISCARDED`).
+
+---
+
+## 8. Quy Chuẩn Seed Dữ Liệu & Khóa Chính UUID (Seed & UUID Conventions)
+
+### 8.1. Quy chuẩn Cú pháp UUID trong PostgreSQL
+- PostgreSQL yêu cầu các giá trị kiểu `UUID` phải là chuỗi 32 chữ số hệ thập lục phân (hexadecimal: `0-9`, `a-f`, `A-F`), phân cách bởi 4 dấu gạch nối: `8-4-4-4-12`.
+- **Nghiêm cấm** sử dụng các tiền tố ký tự ngoài hệ hex (như `s`, `l`, `o` để chỉ shipper, location, order) vì PostgreSQL sẽ ném lỗi `invalid input syntax for type uuid` và dừng toàn bộ script.
+- Các tiền tố demo hợp lệ quy ước:
+  - Admin: `a0000000-...`
+  - Khu vực (Areas): `c0000000-...`
+  - Shippers: `d0000000-...`
+  - Vị trí đã lưu (Saved locations): `e0000000-...`
+  - Đơn hàng (Orders): `f0000000-...`
+
+### 8.2. Kịch bản Khởi tạo & Bổ sung Dữ liệu Demo
+1. [init-db/01-init-db.sql](file:///d:/flutter create delivery_marker_app/init-db/01-init-db.sql): File khởi tạo schema và seed ban đầu khi container PostgreSQL được tạo mới lần đầu tiên (`/docker-entrypoint-initdb.d/`).
+2. [init-db/02-add-photo-and-fix-history.sql](file:///d:/flutter create delivery_marker_app/init-db/02-add-photo-and-fix-history.sql): Migration bổ sung các cột ảnh và trigger toàn vẹn.
+3. [init-db/03-seed-demo-data.sql](file:///d:/flutter create delivery_marker_app/init-db/03-seed-demo-data.sql): Script lũy kế (idempotent) dùng để bổ sung dữ liệu demo vào CSDL đang chạy (`delivery_db`) mà không xóa hoặc ghi đè dữ liệu người dùng:
+   - Sử dụng `ON CONFLICT DO NOTHING` trên các unique constraint (`phone_number`, `code`, `customer_code`, `tracking_number`).
+   - Sử dụng dynamic foreign key resolution (truy vấn lồng theo mã nghiệp vụ duy nhất) thay vì gán cứng UUID phụ thuộc.

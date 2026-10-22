@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import api from '../api/client';
 import { Search, MapPin, Trash2, Layers } from 'lucide-react';
+import { AuthenticatedImage } from '../components/AuthenticatedImage';
 
 // Custom Leaflet Red Pin Icon
 const markerIcon = new L.Icon({
@@ -31,6 +32,7 @@ interface SavedLocationItem {
   longitude: number;
   gpsAccuracy: number;
   identificationNotes: string;
+  imageUrl?: string;
   updatedBy?: string;
   updatedAt: string;
 }
@@ -123,6 +125,15 @@ export const Locations: React.FC = () => {
                 <div className="p-1 space-y-1">
                   <h3 className="font-bold text-sm text-blue-600">{loc.customer.name} ({loc.customer.phone})</h3>
                   <p className="text-xs text-gray-600"><b>Hóa đơn:</b> {loc.customer.address}</p>
+                  {loc.imageUrl && (
+                    <div className="my-1">
+                      <AuthenticatedImage
+                        src={loc.imageUrl}
+                        alt="Cổng nhà"
+                        className="w-full h-24 object-cover rounded border border-gray-200"
+                      />
+                    </div>
+                  )}
                   <div className="bg-amber-50 p-2 rounded border border-amber-200 text-xs text-amber-900 my-1">
                     <b>Ghi chú:</b> {loc.identificationNotes}
                   </div>
@@ -144,6 +155,7 @@ export const Locations: React.FC = () => {
           <thead>
             <tr className="bg-gray-50 text-gray-600 text-xs uppercase font-semibold border-b border-gray-200">
               <th className="p-3">Khách hàng</th>
+              <th className="p-3">Ảnh nhận diện</th>
               <th className="p-3">Khu vực</th>
               <th className="p-3">Tọa độ (Lat, Lng)</th>
               <th className="p-3">Ghi chú nhận diện</th>
@@ -157,6 +169,13 @@ export const Locations: React.FC = () => {
                 <td className="p-3">
                   <div className="font-semibold text-gray-900">{loc.customer.name}</div>
                   <div className="text-xs text-gray-500">{loc.customer.phone}</div>
+                </td>
+                <td className="p-3">
+                  <AuthenticatedImage
+                    src={loc.imageUrl}
+                    alt="Ảnh nhà"
+                    className="w-12 h-12 object-cover rounded border border-gray-200 hover:scale-105 transition"
+                  />
                 </td>
                 <td className="p-3 text-gray-600">{loc.area.name}</td>
                 <td className="p-3 font-mono text-xs text-blue-600">

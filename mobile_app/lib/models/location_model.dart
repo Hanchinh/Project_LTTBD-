@@ -5,6 +5,7 @@ class SavedLocationModel {
   final double longitude;
   final double gpsAccuracy;
   final String identificationNotes;
+  final String? imageUrl;
   final String? updatedAt;
 
   SavedLocationModel({
@@ -14,6 +15,7 @@ class SavedLocationModel {
     required this.longitude,
     required this.gpsAccuracy,
     required this.identificationNotes,
+    this.imageUrl,
     this.updatedAt,
   });
 
@@ -25,6 +27,7 @@ class SavedLocationModel {
       longitude: (json['longitude'] as num).toDouble(),
       gpsAccuracy: (json['gpsAccuracy'] as num).toDouble(),
       identificationNotes: json['identificationNotes'] ?? '',
+      imageUrl: json['imageUrl'],
       updatedAt: json['updatedAt'],
     );
   }
@@ -37,6 +40,7 @@ class SavedLocationModel {
       'longitude': longitude,
       'gpsAccuracy': gpsAccuracy,
       'identificationNotes': identificationNotes,
+      'imageUrl': imageUrl,
       'updatedAt': updatedAt,
     };
   }

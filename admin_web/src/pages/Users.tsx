@@ -23,6 +23,12 @@ export const Users: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
   const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newFullName, setNewFullName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newRoleId, setNewRoleId] = useState(2); // 2: SHIPPER, 1: ADMIN
+  const [createLoading, setCreateLoading] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -63,6 +69,33 @@ export const Users: React.FC = () => {
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFullName || !newPhone || !newPassword) {
+      alert('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+    setCreateLoading(true);
+    try {
+      await api.post('/admin/users', {
+        fullName: newFullName,
+        phoneNumber: newPhone,
+        password: newPassword,
+        roleId: newRoleId,
+      });
+      alert('Tạo người dùng mới thành công!');
+      setShowCreateModal(false);
+      setNewFullName('');
+      setNewPhone('');
+      setNewPassword('');
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Không thể tạo người dùng');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -70,6 +103,14 @@ export const Users: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">Quản Lý Nhân Viên & Phân Công Khu Vực</h1>
           <p className="text-gray-500 text-sm">Gán, đổi và bàn giao khu vực giao hàng cho nhân viên shipper</p>
         </div>
+
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition text-sm font-semibold shadow"
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>Thêm Nhân Viên Mới</span>
+        </button>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -179,6 +220,81 @@ export const Users: React.FC = () => {
                 Lưu Phân Công
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-900">Thêm Người Dùng Mới</h2>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Họ và Tên</label>
+                <input
+                  type="text"
+                  required
+                  value={newFullName}
+                  onChange={(e) => setNewFullName(e.target.value)}
+                  placeholder="VD: Nguyễn Văn Shipper"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Số Điện Thoại</label>
+                <input
+                  type="text"
+                  required
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  placeholder="VD: 0903333333"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Mật Khẩu Ban Đầu</label>
+                <input
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Nhập mật khẩu an toàn"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Vai Trò</label>
+                <select
+                  value={newRoleId}
+                  onChange={(e) => setNewRoleId(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-blue-500"
+                >
+                  <option value={2}>Nhân viên Giao hàng (SHIPPER)</option>
+                  <option value={1}>Quản trị viên (ADMIN)</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={createLoading}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-500 shadow disabled:opacity-50"
+                >
+                  {createLoading ? 'Đang tạo...' : 'Tạo Tài Khoản'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

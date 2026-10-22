@@ -1,7 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/location_model.dart';
 import '../services/api_service.dart';
 
@@ -11,11 +14,11 @@ class SaveLocationView extends StatefulWidget {
   final SavedLocationModel? existingLocation;
 
   const SaveLocationView({
-    Key? key,
+    super.key,
     required this.customerId,
     required this.customerName,
     this.existingLocation,
-  }) : super(key: key);
+  });
 
   @override
   State<SaveLocationView> createState() => _SaveLocationViewState();
@@ -28,6 +31,11 @@ class _SaveLocationViewState extends State<SaveLocationView> {
   bool _isSaving = false;
   final _notesController = TextEditingController();
   final MapController _mapController = MapController();
+  final ImagePicker _picker = ImagePicker();
+
+  XFile? _capturedImage;
+  String? _existingImageUrl;
+  String? _base64Image;
 
   @override
   void initState() {
@@ -36,22 +44,71 @@ class _SaveLocationViewState extends State<SaveLocationView> {
       _selectedLatLng = LatLng(widget.existingLocation!.latitude, widget.existingLocation!.longitude);
       _gpsAccuracy = widget.existingLocation!.gpsAccuracy;
       _notesController.text = widget.existingLocation!.identificationNotes;
+      _existingImageUrl = widget.existingLocation!.imageUrl;
       _isLoadingGps = false;
     } else {
       _getCurrentGpsLocation();
     }
   }
 
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
   Future<void> _getCurrentGpsLocation() async {
     setState(() => _isLoadingGps = true);
     try {
+      final isServiceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!isServiceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Dịch vụ định vị GPS trên thiết bị đang tắt. Vui lòng bật GPS để lấy vị trí.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        setState(() => _isLoadingGps = false);
+        return;
+      }
+
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Quyền truy cập vị trí bị từ chối. Bạn có thể chọn điểm ghim thủ công.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          setState(() => _isLoadingGps = false);
+          return;
+        }
       }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Quyền vị trí bị từ chối vĩnh viễn. Vui lòng cấp quyền trong cài đặt máy.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        setState(() => _isLoadingGps = false);
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
       );
 
       setState(() {
@@ -60,24 +117,146 @@ class _SaveLocationViewState extends State<SaveLocationView> {
         _isLoadingGps = false;
       });
 
-      _mapController.move(_selectedLatLng, 17.0);
+      _mapController.move(_selectedLatLng, 17.5);
     } catch (e) {
       setState(() => _isLoadingGps = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể lấy GPS hiện tại, dùng tọa độ mặc định: $e')),
+          SnackBar(content: Text('Không thể lấy GPS hiện tại: $e')),
         );
       }
     }
   }
 
-  void _handleSave() async {
-    if (_notesController.text.trim().isEmpty) {
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final pickedFile = await _picker.pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 80,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await File(pickedFile.path).readAsBytes();
+        // Check file size (limit: max 5MB)
+        if (bytes.lengthInBytes > 5 * 1024 * 1024) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Kích thước ảnh vượt quá 5MB. Vui lòng chụp lại.'), backgroundColor: Colors.red),
+          );
+          return;
+        }
+
+        final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        setState(() {
+          _capturedImage = pickedFile;
+          _base64Image = base64String;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập ghi chú nhận diện vị trí (ví dụ: cổng xanh, cạnh tạp hóa)')),
+        SnackBar(content: Text('Lỗi truy cập camera hoặc thư viện ảnh: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _removeCapturedImage() {
+    setState(() {
+      _capturedImage = null;
+      _base64Image = null;
+    });
+  }
+
+  void _showImageSourceDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Color(0xFF1E88E5)),
+              title: const Text('Chụp ảnh cổng/mặt tiền nhà (Camera)'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Color(0xFF2E7D32)),
+              title: const Text('Chọn ảnh từ thư viện thiết bị'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickImage(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showConfirmationAndSave() async {
+    final notes = _notesController.text.trim();
+    if (notes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Vui lòng nhập ghi chú nhận diện vị trí (VD: Cổng màu xanh, cạnh tiệm tạp hóa...)'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
+
+    final isGpsLowAccuracy = _gpsAccuracy > 20.0;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận thông tin vị trí'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Khách hàng: ${widget.customerName}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text('Tọa độ: ${_selectedLatLng.latitude.toStringAsFixed(6)}, ${_selectedLatLng.longitude.toStringAsFixed(6)}'),
+              Text('Độ sai số GPS: ±${_gpsAccuracy.toStringAsFixed(1)} m'),
+              if (isGpsLowAccuracy)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.only(top: 6),
+                  decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(6)),
+                  child: const Text(
+                    'Lưu ý: Độ sai số GPS lớn (> 20m). Đảm bảo bạn đã kéo điểm ghim đúng vị trí cổng nhà.',
+                    style: TextStyle(fontSize: 12, color: Colors.brown, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Text('Ghi chú: $notes', style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic)),
+              const SizedBox(height: 8),
+              Text(
+                _capturedImage != null ? 'Ảnh: Đã chụp ảnh mặt tiền đính kèm' : (_existingImageUrl != null ? 'Ảnh: Sử dụng ảnh cũ đã lưu' : 'Ảnh: Chưa đính kèm ảnh'),
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Xem lại')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E88E5), foregroundColor: Colors.white),
+            child: const Text('Xác nhận lưu'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
 
     setState(() => _isSaving = true);
     try {
@@ -86,15 +265,33 @@ class _SaveLocationViewState extends State<SaveLocationView> {
         latitude: _selectedLatLng.latitude,
         longitude: _selectedLatLng.longitude,
         gpsAccuracy: _gpsAccuracy,
-        identificationNotes: _notesController.text.trim(),
+        identificationNotes: notes,
+        imageUrl: _existingImageUrl,
       );
 
-      await ApiService.saveCustomerLocation(location);
+      final isSavedToServer = await ApiService.saveCustomerLocation(
+        location,
+        imageBase64: _base64Image,
+      );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã lưu vị trí khách hàng thành công!'), backgroundColor: Colors.green),
-      );
+
+      if (isSavedToServer) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã lưu vị trí khách hàng thành công trên máy chủ!'),
+            backgroundColor: Color(0xFF2E7D32),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã lưu cục bộ offline. Dữ liệu sẽ tự động đồng bộ khi có kết nối mạng.'),
+            backgroundColor: Colors.amber,
+          ),
+        );
+      }
+
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
@@ -108,6 +305,8 @@ class _SaveLocationViewState extends State<SaveLocationView> {
 
   @override
   Widget build(BuildContext context) {
+    final isGpsLowAccuracy = _gpsAccuracy > 20.0;
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Lưu Vị Trí: ${widget.customerName}'),
@@ -116,35 +315,53 @@ class _SaveLocationViewState extends State<SaveLocationView> {
       ),
       body: SingleChildScrollView(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Step 1: GPS Accuracy Header
+            // STEP 1: GPS Accuracy & Controls
             Container(
-              padding: const EdgeInsets.all(12),
-              color: Colors.blue.shade50,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: isGpsLowAccuracy ? Colors.amber.shade50 : Colors.blue.shade50,
               child: Row(
                 children: [
-                  const Icon(Icons.gps_fixed, color: Colors.blue),
+                  Icon(
+                    isGpsLowAccuracy ? Icons.warning_amber_rounded : Icons.gps_fixed,
+                    color: isGpsLowAccuracy ? Colors.orange.shade800 : Colors.blue,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      _isLoadingGps
-                          ? 'Đang đo tọa độ GPS...'
-                          : 'Độ chính xác GPS hiện tại: ±${_gpsAccuracy.toStringAsFixed(1)} m',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isLoadingGps
+                              ? 'Đang đo tọa độ GPS...'
+                              : 'Sai số GPS: ±${_gpsAccuracy.toStringAsFixed(1)} m',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isGpsLowAccuracy ? Colors.orange.shade900 : Colors.black87,
+                          ),
+                        ),
+                        if (isGpsLowAccuracy && !_isLoadingGps)
+                          const Text(
+                            'Sai số lớn. Chạm trên bản đồ để kéo ghim vào đúng cổng.',
+                            style: TextStyle(fontSize: 11, color: Colors.brown),
+                          ),
+                      ],
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.my_location),
-                    tooltip: 'Cập nhật lại GPS',
+                    tooltip: 'Đo lại GPS hiện tại',
                     onPressed: _getCurrentGpsLocation,
                   ),
                 ],
               ),
             ),
 
-            // Step 2: Interactive Map with Pin adjustment
+            // STEP 2: Interactive Map with Pin adjustment
             SizedBox(
-              height: 280,
+              height: 260,
               child: Stack(
                 children: [
                   FlutterMap(
@@ -181,7 +398,7 @@ class _SaveLocationViewState extends State<SaveLocationView> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.black54,
+                        color: const Color.fromRGBO(0, 0, 0, 0.75),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
@@ -194,7 +411,6 @@ class _SaveLocationViewState extends State<SaveLocationView> {
               ),
             ),
 
-            // Step 3: Input Identification Notes
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -202,29 +418,99 @@ class _SaveLocationViewState extends State<SaveLocationView> {
                 children: [
                   Text(
                     'Tọa độ chọn: ${_selectedLatLng.latitude.toStringAsFixed(6)}, ${_selectedLatLng.longitude.toStringAsFixed(6)}',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w500),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+
+                  // STEP 3: House photo capture section
+                  const Text(
+                    'Ảnh nhận diện mặt tiền/cổng nhà:',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+
+                  if (_capturedImage != null) ...[
+                    Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.file(
+                            File(_capturedImage!.path),
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: Colors.black54,
+                                child: IconButton(
+                                  icon: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                                  onPressed: _showImageSourceDialog,
+                                  tooltip: 'Chụp lại',
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              CircleAvatar(
+                                backgroundColor: Colors.black54,
+                                child: IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20),
+                                  onPressed: _removeCapturedImage,
+                                  tooltip: 'Xóa ảnh',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    OutlinedButton.icon(
+                      onPressed: _showImageSourceDialog,
+                      icon: const Icon(Icons.add_a_photo, color: Color(0xFF1E88E5)),
+                      label: const Text('Chụp hoặc chọn ảnh mặt tiền/cổng nhà'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+
+                  // STEP 4: Identification Notes
                   TextField(
                     controller: _notesController,
                     maxLines: 3,
                     decoration: InputDecoration(
                       labelText: 'Ghi chú nhận diện vị trí *',
-                      hintText: 'VD: Hẻm cạnh tạp hóa Hai Thu, cổng sắt xanh da trời...',
+                      hintText: 'VD: Hẻm cạnh tạp hóa Hai Thu, cổng sắt xanh da trời, số nhà 124/5...',
                       alignLabelWithHint: true,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                   const SizedBox(height: 20),
+
+                  // SUBMIT BUTTON
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton.icon(
-                      onPressed: _isSaving ? null : _handleSave,
-                      icon: const Icon(Icons.save_rounded, color: Colors.white),
+                      onPressed: _isSaving ? null : _showConfirmationAndSave,
+                      icon: const Icon(Icons.check_circle_outline, color: Colors.white),
                       label: _isSaving
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text('XÁC NHẬN LƯU VỊ TRÍ (3 BƯỚC)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : const Text(
+                              'KIỂM TRA & XÁC NHẬN LƯU VỊ TRÍ',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                            ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1E88E5),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

@@ -24,6 +24,7 @@ export const getMyShiftOrders = async (req: AuthenticatedRequest, res: Response)
         sl.longitude,
         sl.gps_accuracy,
         sl.identification_notes,
+        sl.image_url,
         sl.updated_at as location_updated_at
        FROM orders o
        JOIN customers c ON c.id = o.customer_id
@@ -57,6 +58,7 @@ export const getMyShiftOrders = async (req: AuthenticatedRequest, res: Response)
               longitude: parseFloat(row.longitude),
               gpsAccuracy: parseFloat(row.gps_accuracy),
               identificationNotes: row.identification_notes,
+              imageUrl: row.image_url,
               updatedAt: row.location_updated_at,
             }
           : null,

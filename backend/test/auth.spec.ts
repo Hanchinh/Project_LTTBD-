@@ -192,7 +192,7 @@ describe('Authentication & Password Verification Security Tests', () => {
         .mockResolvedValueOnce({
           rows: [
             {
-              id: 's0000000-0000-0000-0000-000000000001',
+              id: 'd0000000-0000-0000-0000-000000000001',
               full_name: 'Trần Văn Giao (Shipper A)',
               phone_number: '0901111111',
               password_hash: SEED_HASH,

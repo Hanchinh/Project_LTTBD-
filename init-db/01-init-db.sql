@@ -90,6 +90,7 @@ CREATE TABLE saved_locations (
     longitude NUMERIC(10, 7) NOT NULL,
     gps_accuracy FLOAT NOT NULL DEFAULT 0.0,
     identification_notes TEXT NOT NULL,
+    image_url TEXT,
     created_by UUID REFERENCES users(id),
     updated_by UUID REFERENCES users(id),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -99,13 +100,14 @@ CREATE TABLE saved_locations (
 -- LOCATION_HISTORY (Lịch sử cập nhật/chỉnh sửa vị trí)
 CREATE TABLE location_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    saved_location_id UUID NOT NULL REFERENCES saved_locations(id) ON DELETE CASCADE,
+    saved_location_id UUID REFERENCES saved_locations(id) ON DELETE SET NULL,
     customer_id UUID NOT NULL REFERENCES customers(id),
     geom GEOMETRY(Point, 4326) NOT NULL,
     latitude NUMERIC(10, 7) NOT NULL,
     longitude NUMERIC(10, 7) NOT NULL,
     gps_accuracy FLOAT NOT NULL,
     identification_notes TEXT NOT NULL,
+    image_url TEXT,
     changed_by UUID REFERENCES users(id),
     change_reason VARCHAR(255) DEFAULT 'Cập nhật vị trí',
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
@@ -154,6 +156,7 @@ BEGIN
         longitude,
         gps_accuracy,
         identification_notes,
+        image_url,
         changed_by,
         change_reason,
         created_at
@@ -165,6 +168,7 @@ BEGIN
         OLD.longitude,
         OLD.gps_accuracy,
         OLD.identification_notes,
+        OLD.image_url,
         NEW.updated_by,
         'Cập nhật thông tin vị trí cũ sang vị trí mới',
         CURRENT_TIMESTAMP
@@ -176,9 +180,10 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_saved_locations_history
 AFTER UPDATE ON saved_locations
 FOR EACH ROW
-WHEN (OLD.latitude IS DISTINCT FROM NEW.latitude OR 
-      OLD.longitude IS DISTINCT FROM NEW.longitude OR 
-      OLD.identification_notes IS DISTINCT FROM NEW.identification_notes)
+WHEN (OLD.latitude IS DISTINCT FROM NEW.latitude OR
+      OLD.longitude IS DISTINCT FROM NEW.longitude OR
+      OLD.identification_notes IS DISTINCT FROM NEW.identification_notes OR
+      OLD.image_url IS DISTINCT FROM NEW.image_url)
 EXECUTE FUNCTION fn_log_location_history();
 
 -- =============================================================================
@@ -198,8 +203,8 @@ INSERT INTO roles (id, name, description) VALUES
 -- Shipper 2: 0902222222 / password123 (Phụ trách Q.9 - Tân Phú)
 INSERT INTO users (id, full_name, phone_number, password_hash, role_id) VALUES
 ('a0000000-0000-0000-0000-000000000001', 'Nguyễn Văn Quản Lý', '0900000001', '$2b$10$gtZVjpsj7RCMMyj2TbODL.RvTuTF/cO0BCsFhSLiCZkt/jCJdqMC.', 1),
-('s0000000-0000-0000-0000-000000000001', 'Trần Văn Giao (Shipper A)', '0901111111', '$2b$10$gtZVjpsj7RCMMyj2TbODL.RvTuTF/cO0BCsFhSLiCZkt/jCJdqMC.', 2),
-('s0000000-0000-0000-0000-000000000002', 'Lê Thị Tốc Độ (Shipper B)', '0902222222', '$2b$10$gtZVjpsj7RCMMyj2TbODL.RvTuTF/cO0BCsFhSLiCZkt/jCJdqMC.', 2);
+('d0000000-0000-0000-0000-000000000001', 'Trần Văn Giao (Shipper A)', '0901111111', '$2b$10$gtZVjpsj7RCMMyj2TbODL.RvTuTF/cO0BCsFhSLiCZkt/jCJdqMC.', 2),
+('d0000000-0000-0000-0000-000000000002', 'Lê Thị Tốc Độ (Shipper B)', '0902222222', '$2b$10$gtZVjpsj7RCMMyj2TbODL.RvTuTF/cO0BCsFhSLiCZkt/jCJdqMC.', 2);
 
 -- AREAS
 INSERT INTO areas (id, code, name) VALUES
@@ -208,8 +213,8 @@ INSERT INTO areas (id, code, name) VALUES
 
 -- USER_AREAS ASSIGNMENTS
 INSERT INTO user_areas (user_id, area_id) VALUES
-('s0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001'), -- Shipper A -> Long Thạnh Mỹ
-('s0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002'); -- Shipper B -> Tân Phú
+('d0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001'), -- Shipper A -> Long Thạnh Mỹ
+('d0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002'); -- Shipper B -> Tân Phú
 
 -- CUSTOMERS
 INSERT INTO customers (id, customer_code, full_name, phone_number, address_text, area_id) VALUES
@@ -224,37 +229,37 @@ INSERT INTO customers (id, customer_code, full_name, phone_number, address_text,
 -- SAVED_LOCATIONS (Vị trí đã lưu cho KH_001 và KH_004, các khách khác chưa lưu vị trí để test giao diện "Chưa có vị trí")
 -- KH_001: Tọa độ Long Thạnh Mỹ (10.8422, 106.8181)
 INSERT INTO saved_locations (id, customer_id, geom, latitude, longitude, gps_accuracy, identification_notes, created_by, updated_by) VALUES
-('l0000000-0000-0000-0000-000000000001', 
- 'c0000000-0000-0000-0000-000000000001', 
- ST_SetSRID(ST_MakePoint(106.8181230, 10.8422150), 4326), 
- 10.8422150, 
- 106.8181230, 
- 4.5, 
- 'Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân.', 
- 's0000000-0000-0000-0000-000000000001', 
- 's0000000-0000-0000-0000-000000000001'),
+('e0000000-0000-0000-0000-000000000001',
+ 'c0000000-0000-0000-0000-000000000001',
+ ST_SetSRID(ST_MakePoint(106.8181230, 10.8422150), 4326),
+ 10.8422150,
+ 106.8181230,
+ 4.5,
+ 'Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân.',
+ 'd0000000-0000-0000-0000-000000000001',
+ 'd0000000-0000-0000-0000-000000000001'),
 
 -- KH_004: Tọa độ Tân Phú (10.8510, 106.8020)
-('l0000000-0000-0000-0000-000000000004', 
- 'c0000000-0000-0000-0000-000000000004', 
- ST_SetSRID(ST_MakePoint(106.8020500, 10.8510200), 4326), 
- 10.8510200, 
- 106.8020500, 
- 6.0, 
- 'Rẽ trái ở cột điện hạ thế thứ 2, nhà 3 tầng mái thái gỗ đỏ.', 
- 's0000000-0000-0000-0000-000000000002', 
- 's0000000-0000-0000-0000-000000000002');
+('e0000000-0000-0000-0000-000000000004',
+ 'c0000000-0000-0000-0000-000000000004',
+ ST_SetSRID(ST_MakePoint(106.8020500, 10.8510200), 4326),
+ 10.8510200,
+ 106.8020500,
+ 6.0,
+ 'Rẽ trái ở cột điện hạ thế thứ 2, nhà 3 tầng mái thái gỗ đỏ.',
+ 'd0000000-0000-0000-0000-000000000002',
+ 'd0000000-0000-0000-0000-000000000002');
 
 -- ORDERS (Đơn hàng trong ca)
 INSERT INTO orders (id, order_code, customer_id, shipper_id, area_id, status) VALUES
 -- Đơn hàng cho Shipper A (Khu vực 1)
-('o0000000-0000-0000-0000-000000000001', 'ORD-20261004-01', 'c0000000-0000-0000-0000-000000000001', 's0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'PENDING'),
-('o0000000-0000-0000-0000-000000000002', 'ORD-20261004-02', 'c0000000-0000-0000-0000-000000000002', 's0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'PENDING'),
-('o0000000-0000-0000-0000-000000000003', 'ORD-20261004-03', 'c0000000-0000-0000-0000-000000000003', 's0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'PENDING'),
+('f0000000-0000-0000-0000-000000000001', 'ORD-20261004-01', 'c0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'PENDING'),
+('f0000000-0000-0000-0000-000000000002', 'ORD-20261004-02', 'c0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'PENDING'),
+('f0000000-0000-0000-0000-000000000003', 'ORD-20261004-03', 'c0000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001', 'PENDING'),
 
 -- Đơn hàng cho Shipper B (Khu vực 2)
-('o0000000-0000-0000-0000-000000000004', 'ORD-20261004-04', 'c0000000-0000-0000-0000-000000000004', 's0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002', 'PENDING'),
-('o0000000-0000-0000-0000-000000000005', 'ORD-20261004-05', 'c0000000-0000-0000-0000-000000000005', 's0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002', 'PENDING');
+('f0000000-0000-0000-0000-000000000004', 'ORD-20261004-04', 'c0000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002', 'PENDING'),
+('f0000000-0000-0000-0000-000000000005', 'ORD-20261004-05', 'c0000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000002', 'PENDING');
 
 -- AUDIT LOGS BAN ĐẦU
 INSERT INTO audit_logs (user_id, action, entity, entity_id, details) VALUES
