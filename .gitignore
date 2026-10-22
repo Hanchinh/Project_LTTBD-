@@ -1,0 +1,73 @@
+# =============================================================================
+# Root .gitignore for Delivery Location Marker System
+# =============================================================================
+
+# Operating System & Artifacts
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+[Dd]esktop.ini
+
+# IDE & Editor Files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/settings.json
+
+# Environment & Credentials (NEVER commit secrets, tokens, credentials, private keys)
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+*.cert
+*.p12
+*.jks
+*.keystore
+
+# Node.js & Web Packages / Build Artifacts (Backend & Admin Web)
+node_modules/
+dist/
+admin_web/dist/
+.vite/
+admin_web/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Logs, Cache & Test Reports
+logs/
+*.log
+coverage/
+.nyc_output/
+
+# Build & Ephemeral Directories
+build/
+**/build/
+.gradle/
+**/.gradle/
+
+# Flutter Mobile Build & Cache Artifacts
+mobile_app/.dart_tool/
+mobile_app/.pub/
+mobile_app/.pub-cache/
+mobile_app/build/
+mobile_app/.flutter-plugins
+mobile_app/.flutter-plugins-dependencies
+mobile_app/ios/Flutter/.last_build_id
+mobile_app/ios/Flutter/ephemeral/
+mobile_app/macos/Flutter/ephemeral/
+mobile_app/android/app/debug
+mobile_app/android/app/profile
+mobile_app/android/app/release
+mobile_app/.widget_preview/
+
+# NOTE: Lockfiles (package-lock.json, mobile_app/pubspec.lock) are deliberately TRACKED.
