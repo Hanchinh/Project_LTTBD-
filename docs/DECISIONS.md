@@ -50,6 +50,18 @@
 - **Quyết định:** Sử dụng thư viện `sqflite` lưu bảng `cached_orders` và `offline_sync_queue`. Khi mất mạng, lưu vị trí vào hàng đợi cục bộ; khi có mạng lại, hệ thống sẽ đẩy đồng bộ lên server.
 - **Hệ quả:** Ứng dụng hoạt động mượt mà trong điều kiện mạng chập chờn.
 
+### ADR-007: Loại Bỏ Cơ Chế Bypass Mật Khẩu Tĩnh & Chuẩn Hóa Bcrypt Hash
+- **Trạng thái:** `ACCEPTED` (Thực thi theo [TASK-002](file:///d:/flutter create delivery_marker_app/docs/tasks/TASK-002.md))
+- **Bối cảnh:** Đoạn mã fallback `if (!isMatch && password === 'password123') { isMatch = true; }` trong [auth.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/auth.controller.ts) tạo ra backdoor cho phép truy cập trái phép bất kỳ tài khoản nào nếu biết số điện thoại. Nguyên nhân gốc là chuỗi seed hash trong [01-init-db.sql](file:///d:/flutter create delivery_marker_app/init-db/01-init-db.sql) trước đây là chuỗi giả lập khiến `bcrypt.compare` thất bại.
+- **Quyết định:**
+  1. Loại bỏ 100% logic so sánh chuỗi tĩnh `password === 'password123'` trong Backend.
+  2. Bắt buộc mọi lượt xác thực mật khẩu phải thông qua `await bcrypt.compare(password, user.password_hash)`.
+  3. Cập nhật hash seed data trong `01-init-db.sql` thành chuỗi Bcrypt chuẩn (salt rounds 10) tương thích với mật khẩu mặc định `password123`.
+  4. Bổ sung bộ kiểm thử hồi quy tự động [auth.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/auth.spec.ts) ngăn chặn mọi hình thức bypass trong tương lai.
+- **Hệ quả:**
+  - Bịt kín lỗ hổng bảo mật nghiêm trọng của hệ thống.
+  - Các tài khoản thử nghiệm seed sẵn vẫn đăng nhập bình thường qua cơ chế Bcrypt tiêu chuẩn.
+
 ---
 
 ## 2. Các Đề Xuất Kỹ Thuật Đang Chờ Duyệt (Pending Decisions)
@@ -61,11 +73,6 @@
     - Nếu chưa có token -> Điều hướng vào [LoginView](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/login_view.dart).
     - Nếu đã có token -> Điều hướng thẳng vào [OrderListView](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/order_list_view.dart).
   - Di chuyển mã nguồn cũ của "Map Marker Clone" vào thư mục lưu trữ mẫu hoặc xóa bỏ nếu không còn sử dụng.
-- **Trạng thái:** `NEEDS_VERIFICATION` (Chờ người dùng xác nhận).
-
-### PENDING-002: Xử Lý Cửa Hậu Mật Khẩu (Password Bypass)
-- **Vấn đề:** Đoạn mã `if (!isMatch && password === 'password123') { isMatch = true; }` trong [auth.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/auth.controller.ts) là lỗ hổng bảo mật nghiêm trọng.
-- **Phương án đề xuất:** Gỡ bỏ hoàn toàn điều kiện so sánh chuỗi tĩnh `password123`. Tất cả tài khoản bắt buộc phải xác thực thông qua `bcrypt.compare(password, user.password_hash)`.
 - **Trạng thái:** `NEEDS_VERIFICATION` (Chờ người dùng xác nhận).
 
 ### PENDING-003: Chuyển Đổi Sang Cơ Chế Xóa Mềm (Soft Delete) Cho `saved_locations`

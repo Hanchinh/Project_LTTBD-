@@ -186,7 +186,7 @@ EXECUTE FUNCTION fn_log_location_history();
 -- =============================================================================
 
 -- Mật khẩu mặc định cho tất cả tài khoản test: "password123"
--- Bcrypt Hash của "password123": $2b$10$6C0pZbJ5yDk6/x2zX4kL6.H9T5q5D5f8S2z6A5B4C3D2E1F0G1H2I
+-- Bcrypt Hash chuẩn (salt rounds 10) của "password123": $2b$10$gtZVjpsj7RCMMyj2TbODL.RvTuTF/cO0BCsFhSLiCZkt/jCJdqMC.
 
 INSERT INTO roles (id, name, description) VALUES
 (1, 'ADMIN', 'Quản lý vận hành hệ thống'),
@@ -197,9 +197,9 @@ INSERT INTO roles (id, name, description) VALUES
 -- Shipper 1: 0901111111 / password123 (Phụ trách Q.9 - Long Thạnh Mỹ)
 -- Shipper 2: 0902222222 / password123 (Phụ trách Q.9 - Tân Phú)
 INSERT INTO users (id, full_name, phone_number, password_hash, role_id) VALUES
-('a0000000-0000-0000-0000-000000000001', 'Nguyễn Văn Quản Lý', '0900000001', '$2b$10$6C0pZbJ5yDk6/x2zX4kL6.H9T5q5D5f8S2z6A5B4C3D2E1F0G1H2I', 1),
-('s0000000-0000-0000-0000-000000000001', 'Trần Văn Giao (Shipper A)', '0901111111', '$2b$10$6C0pZbJ5yDk6/x2zX4kL6.H9T5q5D5f8S2z6A5B4C3D2E1F0G1H2I', 2),
-('s0000000-0000-0000-0000-000000000002', 'Lê Thị Tốc Độ (Shipper B)', '0902222222', '$2b$10$6C0pZbJ5yDk6/x2zX4kL6.H9T5q5D5f8S2z6A5B4C3D2E1F0G1H2I', 2);
+('a0000000-0000-0000-0000-000000000001', 'Nguyễn Văn Quản Lý', '0900000001', '$2b$10$gtZVjpsj7RCMMyj2TbODL.RvTuTF/cO0BCsFhSLiCZkt/jCJdqMC.', 1),
+('s0000000-0000-0000-0000-000000000001', 'Trần Văn Giao (Shipper A)', '0901111111', '$2b$10$gtZVjpsj7RCMMyj2TbODL.RvTuTF/cO0BCsFhSLiCZkt/jCJdqMC.', 2),
+('s0000000-0000-0000-0000-000000000002', 'Lê Thị Tốc Độ (Shipper B)', '0902222222', '$2b$10$gtZVjpsj7RCMMyj2TbODL.RvTuTF/cO0BCsFhSLiCZkt/jCJdqMC.', 2);
 
 -- AREAS
 INSERT INTO areas (id, code, name) VALUES

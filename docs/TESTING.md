@@ -42,25 +42,38 @@
 Tất cả các lệnh dưới đây đã được thực thi trực tiếp trên máy chủ trong đợt khảo sát ngày **22/10/2026**:
 
 ### 3.1. Backend Unit Tests
-- **Lệnh thực thi:** `npm test` trong thư mục `backend`
+- **Lệnh thực thi:** `npm test -- --verbose` trong thư mục `backend`
 - **Trạng thái:** **PASSED (Exit Code: 0)**
-- **Thời gian thực thi:** 1.213 s
+- **Thời gian thực thi:** 1.875 s
 - **Log chi tiết:**
   ```text
   > delivery-marker-backend@1.0.0 test
-  > jest --detectOpenHandles
+  > jest --detectOpenHandles --verbose
+
+  PASS test/auth.spec.ts
+    Authentication & Password Verification Security Tests
+      1. Bcrypt Cryptographic Verification Logic
+        √ should successfully verify when password matches valid bcrypt hash (103 ms)
+        √ should reject verification when password does not match bcrypt hash (95 ms)
+        √ should strictly reject "password123" when user has a different password hash (95 ms)
+        √ should verify that seed data hash correctly resolves default test password (231 ms)
+      2. Auth Controller Login Endpoint Security & Regression
+        √ should return 401 when user enters wrong password (AC-3) (97 ms)
+        √ should strictly return 401 when attempting to bypass with "password123" on an account with different password (AC-4) (95 ms)
+        √ should return 403 when user account is inactive (48 ms)
+        √ should successfully log in with valid credentials matching seed hash (48 ms)
 
   PASS test/location.spec.ts
     Core Unit Tests - Delivery Marker System
       GPS Spatial Accuracy Calculation
-        √ should calculate distance within 20m tolerance for close points (4 ms)
+        √ should calculate distance within 20m tolerance for close points (1 ms)
         √ should detect deviation when distance exceeds 20 meters (1 ms)
       Area Access Control Logic
-        √ should allow access if shipper has assigned area ID (15 ms)
+        √ should allow access if shipper has assigned area ID
         √ should deny access if customer belongs to unassigned area (1 ms)
 
-  Test Suites: 1 passed, 1 total
-  Tests:       4 passed, 4 total
+  Test Suites: 2 passed, 2 total
+  Tests:       12 passed, 12 total
   Snapshots:   0 total
   Ran all test suites.
   ```

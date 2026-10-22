@@ -29,11 +29,8 @@ export const login = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị khóa' });
     }
 
-    // Passwords match check (supports plaintext 'password123' fallback for quick dev test or bcrypt)
-    let isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch && password === 'password123') {
-      isMatch = true;
-    }
+    // Passwords match check using Bcrypt
+    const isMatch = await bcrypt.compare(password, user.password_hash);
 
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Số điện thoại hoặc mật khẩu không chính xác' });

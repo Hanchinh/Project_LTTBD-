@@ -10,7 +10,7 @@
 | Thành Phần | Trạng Thái Biên Dịch | Trạng Thái Kiểm Thử (Unit Test) | Trạng Thái Tích Hợp |
 | :--- | :--- | :--- | :--- |
 | **Database (PostGIS)** | Đạt (`01-init-db.sql`) | Đạt (Kiểm tra qua Docker Compose script) | Đã nạp Schema, Trigger, Index & Seed Data |
-| **Backend API** | Đạt (`tsc --noEmit`: 0 lỗi) | **Đạt** (`npm test`: 4/4 passed) | Hoạt động đầy đủ 11 endpoints nghiệp vụ |
+| **Backend API** | Đạt (`tsc --noEmit`: 0 lỗi) | **Đạt** (`npm test`: 12/12 passed across 2 suites) | Hoạt động đầy đủ 11 endpoints nghiệp vụ |
 | **Admin Web** | Đạt (`tsc --noEmit`: 0 lỗi) | Chưa có bộ unit test tự động | Hoạt động 5 trang giao diện chính |
 | **Mobile App (Flutter)** | Đạt cú pháp (15 warnings/info) | **Không đạt** (`flutter test`: 1 fail) | **Ngắt kết nối:** Entry point chưa gắn view giao hàng |
 
@@ -28,7 +28,7 @@
 | :--- | :--- | :--- | :--- |
 | **Backend** | Công thức Haversine đo độ lệch GPS (<20m) | [XÁC MINH - ĐÃ TEST] | [location.spec.ts:L21-L32](file:///d:/flutter create delivery_marker_app/backend/test/location.spec.ts#L21-L32) |
 | **Backend** | Kiểm tra quyền truy cập theo khu vực (Area Scope) | [XÁC MINH - ĐÃ TEST] | [location.spec.ts:L35-L51](file:///d:/flutter create delivery_marker_app/backend/test/location.spec.ts#L35-L51) |
-| **Backend** | Đăng nhập & cấp JWT token | [XÁC MINH - ĐÃ CODE] | [auth.controller.ts:L6-L85](file:///d:/flutter create delivery_marker_app/backend/src/controllers/auth.controller.ts#L6-L85) |
+| **Backend** | Đăng nhập, bảo mật mật khẩu & cấp JWT token | [XÁC MINH - ĐÃ TEST] | [auth.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/auth.controller.ts), [auth.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/auth.spec.ts) |
 | **Backend** | Lấy danh sách đơn trong ca của Shipper | [XÁC MINH - ĐÃ CODE] | [orders.controller.ts:L5-L73](file:///d:/flutter create delivery_marker_app/backend/src/controllers/orders.controller.ts#L5-L73) |
 | **Backend** | Lưu mới/Cập nhật tọa độ PostGIS & ghi chú | [XÁC MINH - ĐÃ CODE] | [locations.controller.ts:L58-L132](file:///d:/flutter create delivery_marker_app/backend/src/controllers/locations.controller.ts#L58-L132) |
 | **Backend** | Xem lịch sử cập nhật vị trí khách hàng | [XÁC MINH - ĐÃ CODE] | [locations.controller.ts:L134-L171](file:///d:/flutter create delivery_marker_app/backend/src/controllers/locations.controller.ts#L134-L171) |
@@ -58,8 +58,10 @@
 ### 3.1. Mức độ Nghiêm Trọng: CAO (High Severity)
 1. **Mobile App Entry Point bị lệch:**
    - [mobile_app/lib/main.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/main.dart) không khởi động `LoginView()` hay `OrderListView()`. Chạy `flutter run` sẽ ra một ứng dụng prototype lưu mốc cục bộ không liên quan đến backend.
-2. **Cửa hậu kiểm tra mật khẩu (Password Bypass) trong Backend:**
-   - [auth.controller.ts:L33-L36](file:///d:/flutter create delivery_marker_app/backend/src/controllers/auth.controller.ts#L33-L36) chấp nhận chuỗi mật khẩu `password123` cho mọi tài khoản bất kể giá trị băm trong CSDL.
+2. **[ĐÃ GIẢI QUYẾT - TASK-002] Cửa hậu kiểm tra mật khẩu (Password Bypass) trong Backend:**
+   - Đã loại bỏ hoàn toàn cơ chế `if (!isMatch && password === 'password123')` tại [auth.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/auth.controller.ts).
+   - Đã cập nhật chuỗi băm Bcrypt chuẩn xác (salt 10) trong [01-init-db.sql](file:///d:/flutter create delivery_marker_app/init-db/01-init-db.sql).
+   - Đã bổ sung 8 ca kiểm thử bảo mật chống hồi quy và xác thực endpoint trong [auth.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/auth.spec.ts).
 3. **Thiếu quyền vị trí trên nền tảng iOS:**
    - [Info.plist](file:///d:/flutter create delivery_marker_app/mobile_app/ios/Runner/Info.plist) thiếu `NSLocationWhenInUseUsageDescription` và `NSLocationAlwaysAndWhenInUseUsageDescription`. Ứng dụng sẽ crash lập tức khi chạy trên thiết bị iOS thật.
 4. **Hardcode Địa chỉ mạng của Backend:**
@@ -86,7 +88,7 @@
   └── Task 1.4: Khởi tạo Git repository toàn dự án (git init + .gitignore)
 
 [Sprint 2: Bảo mật & Chuẩn hóa môi trường]
-  ├── Task 2.1: Gỡ bỏ bypass password123 trong auth.controller.ts
+  ├── Task 2.1: [HOÀN THÀNH - TASK-002] Gỡ bỏ bypass password123 trong auth.controller.ts & chuẩn hóa Bcrypt hash
   ├── Task 2.2: Chuyển baseURL trong Admin Web sang biến môi trường VITE_API_BASE_URL
   ├── Task 2.3: Xây dựng cơ chế phát hiện môi trường động cho baseURL của Mobile App
   └── Task 2.4: Bổ sung nginx.conf hỗ trợ SPA routing cho Docker Admin Web
