@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import fs from 'fs';
 import path from 'path';
+import jwt from 'jsonwebtoken';
 import { Request, Response } from 'express';
 import { login } from '../src/controllers/auth.controller';
 import * as db from '../src/db';
@@ -230,6 +231,103 @@ describe('Authentication & Password Verification Security Tests', () => {
               role: 'SHIPPER',
             }),
           }),
+        })
+      );
+    });
+  });
+
+  describe('3. JWT Authentication Middleware (Bearer Header & Query Param for Web Images)', () => {
+    const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_delivery_jwt_key_2026_xyz';
+    const validPayload = {
+      userId: 'u-123',
+      fullName: 'Test User',
+      phoneNumber: '0901234567',
+      roleId: 2,
+      roleName: 'SHIPPER',
+      assignedAreaIds: ['area-01'],
+    };
+
+    let mockReq: any;
+    let mockRes: any;
+    let nextFn: jest.Mock;
+    let statusMock: jest.Mock;
+    let jsonMock: jest.Mock;
+
+    beforeEach(() => {
+      jsonMock = jest.fn();
+      statusMock = jest.fn().mockReturnValue({ json: jsonMock });
+      mockRes = { status: statusMock, json: jsonMock };
+      nextFn = jest.fn();
+    });
+
+    it('should authenticate successfully with Bearer token in headers', () => {
+      const { authenticateJwt } = require('../src/middlewares/auth.middleware');
+      const token = jwt.sign(validPayload, JWT_SECRET);
+
+      mockReq = {
+        headers: { authorization: `Bearer ${token}` },
+        query: {},
+      };
+
+      authenticateJwt(mockReq, mockRes, nextFn);
+
+      expect(nextFn).toHaveBeenCalled();
+      expect(mockReq.user).toBeDefined();
+      expect(mockReq.user.userId).toBe('u-123');
+      expect(statusMock).not.toHaveBeenCalled();
+    });
+
+    it('should authenticate successfully with query param ?token= (essential for Web <img> tags)', () => {
+      const { authenticateJwt } = require('../src/middlewares/auth.middleware');
+      const token = jwt.sign(validPayload, JWT_SECRET);
+
+      mockReq = {
+        headers: {},
+        query: { token },
+      };
+
+      authenticateJwt(mockReq, mockRes, nextFn);
+
+      expect(nextFn).toHaveBeenCalled();
+      expect(mockReq.user).toBeDefined();
+      expect(mockReq.user.userId).toBe('u-123');
+      expect(statusMock).not.toHaveBeenCalled();
+    });
+
+    it('should reject with 401 when token is absent in both header and query', () => {
+      const { authenticateJwt } = require('../src/middlewares/auth.middleware');
+      mockReq = {
+        headers: {},
+        query: {},
+      };
+
+      authenticateJwt(mockReq, mockRes, nextFn);
+
+      expect(nextFn).not.toHaveBeenCalled();
+      expect(statusMock).toHaveBeenCalledWith(401);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: expect.stringContaining('Thiếu hoặc sai định dạng Token'),
+        })
+      );
+    });
+
+    it('should reject with 401 when token is invalid or corrupted', () => {
+      const { authenticateJwt } = require('../src/middlewares/auth.middleware');
+      mockReq = {
+        headers: {},
+        query: { token: 'invalid_signature_xyz' },
+      };
+
+      authenticateJwt(mockReq, mockRes, nextFn);
+
+      expect(nextFn).not.toHaveBeenCalled();
+      expect(statusMock).toHaveBeenCalledWith(401);
+      expect(jsonMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          message: expect.stringContaining('không hợp lệ hoặc đã hết hạn'),
         })
       );
     });

@@ -8,6 +8,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/user_model.dart';
 import '../models/order_model.dart';
 import '../models/location_model.dart';
+import '../models/shift_model.dart';
+import '../models/customer_model.dart';
 import 'offline_storage_service.dart';
 
 class ApiService {
@@ -47,7 +49,17 @@ class ApiService {
     await prefs.remove('user_profile');
   }
 
-  static Future<Map<String, String>> getPhotoAuthInfo(String photoPath) async {
+  static Future<String?> getLastActiveShiftId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('last_active_shift_id');
+  }
+
+  static Future<void> saveLastActiveShiftId(String shiftId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('last_active_shift_id', shiftId);
+  }
+
+  static Future<Map<String, String>> getPhotoAuthInfo(String photoPath, {int? cacheVersion, bool bustCache = false}) async {
     final token = await getToken();
     final baseUrl = await getBaseUrl();
 
@@ -60,6 +72,19 @@ class ApiService {
           '${uri.scheme}://${uri.host}${uri.hasPort ? ':${uri.port}' : ''}';
       final cleanPath = photoPath.startsWith('/') ? photoPath : '/$photoPath';
       fullUrl = '$origin$cleanPath';
+    }
+
+    if (cacheVersion != null) {
+      fullUrl += fullUrl.contains('?') ? '&v=$cacheVersion' : '?v=$cacheVersion';
+    } else if (bustCache) {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      fullUrl += fullUrl.contains('?') ? '&v=$now' : '?v=$now';
+    }
+
+    if (token != null && token.isNotEmpty) {
+      fullUrl += fullUrl.contains('?')
+          ? '&token=${Uri.encodeComponent(token)}'
+          : '?token=${Uri.encodeComponent(token)}';
     }
 
     return {
@@ -270,30 +295,91 @@ class ApiService {
   /// Tra cứu vị trí khách hàng bằng số điện thoại
   static Future<Map<String, dynamic>?> lookupCustomerLocationByPhone(
       String phoneNumber) async {
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity == ConnectivityResult.none) {
+      throw Exception(
+          'Không có kết nối mạng. Bác tài vui lòng kiểm tra kết nối WiFi/4G.');
+    }
+
     final token = await getToken();
     if (token == null) {
-      throw Exception('Phiên đăng nhập đã hết hạn');
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
     }
 
     final cleanPhone = phoneNumber.replaceAll(RegExp(r'\D'), '');
     final baseUrl = await getBaseUrl();
-    final response = await http.get(
-      Uri.parse('$baseUrl/customers/by-phone/$cleanPhone/location'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/customers/by-phone/$cleanPhone/location'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+          )
+          .timeout(const Duration(seconds: 10));
 
-    if (response.statusCode == 200) {
-      final body = jsonDecode(response.body);
-      return body['data'];
-    } else if (response.statusCode == 404) {
-      return null; // Khách hàng chưa có vị trí hoặc chưa đăng ký
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        return body['data'];
+      } else if (response.statusCode == 404) {
+        return null; // Khách hàng chưa đăng ký trong hệ thống
+      }
+
+      final err = jsonDecode(response.body);
+      throw Exception(err['message'] ?? 'Lỗi tra cứu vị trí');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+    }
+  }
+
+  /// Thêm đơn hàng mới (điểm giao mới) vào ca của shipper
+  static Future<Map<String, dynamic>> addOrderToShift({
+    required String customerId,
+    bool allowMultiple = false,
+    String? idempotencyKey,
+  }) async {
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity == ConnectivityResult.none) {
+      throw Exception(
+          'Không có kết nối mạng. Bác tài vui lòng kiểm tra kết nối WiFi/4G.');
     }
 
-    final err = jsonDecode(response.body);
-    throw Exception(err['message'] ?? 'Lỗi tra cứu vị trí');
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/orders/my-shift'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'customerId': customerId,
+              'allowMultiple': allowMultiple,
+              if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
+            }),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'isExisting': body['isExisting'] ?? false,
+          'message': body['message'] ?? 'Thành công',
+          'order': OrderModel.fromJson(body['data']),
+        };
+      }
+
+      throw Exception(body['message'] ?? 'Không thể thêm điểm giao vào ca');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+    }
   }
 
   static Future<void> openExternalNavigation(double lat, double lng) async {
@@ -314,5 +400,600 @@ class ApiService {
       // Fallback to web directly
       await launchUrl(webUrl, mode: LaunchMode.externalApplication);
     }
+  }
+
+  // ==========================================
+  // QUẢN LÝ CA LÀM VIỆC (SHIFTS & DELIVERY POINTS)
+  // ==========================================
+
+  /// Lấy danh sách ca làm việc của shipper
+  static Future<List<ShiftModel>> getShifts() async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/shifts'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 12));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        final List list = body['data'] ?? [];
+        return list.map((item) => ShiftModel.fromJson(item as Map<String, dynamic>)).toList();
+      }
+
+      throw Exception(body['message'] ?? 'Không thể tải danh sách ca làm');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+    }
+  }
+
+  /// Tạo ca làm việc mới
+  static Future<ShiftModel> createShift({String? shiftDate, String? notes}) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/shifts'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          if (shiftDate != null) 'shiftDate': shiftDate,
+          if (notes != null) 'notes': notes,
+        }),
+      ).timeout(const Duration(seconds: 12));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 201 && body['success'] == true) {
+        return ShiftModel.fromJson(body['data']);
+      }
+
+      throw Exception(body['message'] ?? 'Không thể tạo ca làm mới');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+    }
+  }
+
+  /// Lấy chi tiết ca làm việc (kèm danh sách điểm giao và thống kê)
+  static Future<ShiftModel> getShiftDetail(String shiftId) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/shifts/$shiftId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 12));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return ShiftModel.fromJson(body['data']);
+      }
+
+      throw Exception(body['message'] ?? 'Không thể tải chi tiết ca làm');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+    }
+  }
+
+  /// Cập nhật trạng thái ca làm việc (PREPARING -> IN_PROGRESS -> COMPLETED)
+  static Future<ShiftModel> updateShiftStatus(String shiftId, ShiftStatus status) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/shifts/$shiftId/status'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'status': status.toApiString(),
+        }),
+      ).timeout(const Duration(seconds: 12));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return ShiftModel.fromJson(body['data']);
+      }
+
+      throw Exception(body['message'] ?? 'Không thể cập nhật trạng thái ca làm');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+    }
+  }
+
+  /// Thêm điểm giao vào ca làm (hỗ trợ cả customerId hoặc SĐT kèm cờ tạo mới)
+  static Future<Map<String, dynamic>> addPointToShift(
+    String shiftId, {
+    String? customerId,
+    String? phoneNumber,
+    bool createIfNotFound = false,
+    String? fullName,
+    String? addressText,
+    String? orderId,
+    int? sequenceNumber,
+    String? deliveryNotes,
+    String? areaId,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/shifts/$shiftId/points'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          if (customerId != null) 'customerId': customerId,
+          if (phoneNumber != null) 'phoneNumber': phoneNumber,
+          if (createIfNotFound) 'createIfNotFound': true,
+          if (fullName != null && fullName.isNotEmpty) 'fullName': fullName,
+          if (addressText != null && addressText.isNotEmpty) 'addressText': addressText,
+          if (orderId != null) 'orderId': orderId,
+          if (sequenceNumber != null) 'sequenceNumber': sequenceNumber,
+          if (deliveryNotes != null) 'deliveryNotes': deliveryNotes,
+          if (areaId != null) 'areaId': areaId,
+        }),
+      ).timeout(const Duration(seconds: 12));
+
+      final body = jsonDecode(response.body);
+      if ((response.statusCode == 200 || response.statusCode == 201) && body['success'] == true) {
+        return {
+          'isExisting': body['isExisting'] ?? false,
+          'message': body['message'] ?? 'Thành công',
+          'point': ShiftDeliveryPointModel.fromJson(body['data']),
+          'summary': ShiftSummaryModel.fromJson(body['summary'] as Map<String, dynamic>?),
+        };
+      }
+
+      throw Exception(body['message'] ?? 'Không thể thêm điểm giao vào ca');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+    }
+  }
+
+  /// Tạo nhanh khách hàng mới và tự động thêm vào ca làm (Giai đoạn B)
+  static Future<Map<String, dynamic>> quickCreateCustomerAndAddToShift({
+    required String shiftId,
+    required String phoneNumber,
+    String? fullName,
+    String? addressText,
+    String? deliveryNotes,
+    String? areaId,
+  }) async {
+    return addPointToShift(
+      shiftId,
+      phoneNumber: phoneNumber,
+      createIfNotFound: true,
+      fullName: fullName,
+      addressText: addressText,
+      deliveryNotes: deliveryNotes,
+      areaId: areaId,
+    );
+  }
+
+  /// Tra cứu địa chỉ sang tọa độ WGS84 qua API Geocoding (Giai đoạn C)
+  static Future<List<AddressSearchResult>> searchAddress(String query) async {
+    if (query.trim().length < 2) return [];
+
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final encodedQuery = Uri.encodeComponent(query.trim());
+      final response = await http.get(
+        Uri.parse('$baseUrl/geocoding/search?q=$encodedQuery'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 8));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        final List list = body['data'] ?? [];
+        return list.map((item) => AddressSearchResult.fromJson(item as Map<String, dynamic>)).toList();
+      }
+
+      throw Exception(body['message'] ?? 'Không thể tìm kiếm địa chỉ');
+    } on http.ClientException catch (_) {
+      throw Exception('Lỗi kết nối máy chủ khi tìm kiếm địa chỉ');
+    }
+  }
+
+  /// Xóa điểm giao khỏi ca làm
+  static Future<void> removePointFromShift(String shiftId, String pointId) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/shifts/$shiftId/points/$pointId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 12));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return;
+      }
+
+      throw Exception(body['message'] ?? 'Không thể xóa điểm giao');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+    }
+  }
+
+  /// Cập nhật vị trí tạm (TEMPORARY) từ bộ chọn tâm ngắm
+  static Future<ShiftDeliveryPointModel> updateTemporaryLocation(
+    String shiftId,
+    String pointId, {
+    required double latitude,
+    required double longitude,
+    String? locationNotes,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/shifts/$shiftId/points/$pointId/temporary-location'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'latitude': latitude,
+          'longitude': longitude,
+          if (locationNotes != null) 'locationNotes': locationNotes,
+        }),
+      ).timeout(const Duration(seconds: 12));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return ShiftDeliveryPointModel.fromJson(body['data']);
+      }
+
+      throw Exception(body['message'] ?? 'Không thể lưu vị trí tạm');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+    }
+  }
+
+  /// Xác minh vị trí tại nhà (VERIFIED) kèm ảnh và ghi chú
+  static Future<ShiftDeliveryPointModel> verifyShiftLocation(
+    String shiftId,
+    String pointId, {
+    required double latitude,
+    required double longitude,
+    String? locationType,
+    String? locationNotes,
+    String? photoUrl,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/shifts/$shiftId/points/$pointId/verify-location'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'latitude': latitude,
+          'longitude': longitude,
+          'locationType': locationType ?? 'GATE',
+          if (locationNotes != null) 'locationNotes': locationNotes,
+          if (photoUrl != null) 'photoUrl': photoUrl,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return ShiftDeliveryPointModel.fromJson(body['data']);
+      }
+
+      throw Exception(body['message'] ?? 'Không thể xác minh vị trí');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng thử lại.');
+    }
+  }
+
+  // =========================================================================
+  // CUSTOMER DIRECTORY API (MAP-FIRST-ARCHITECTURE-005)
+  // =========================================================================
+
+  /// 1. Lấy danh sách khách hàng & vị trí độc lập từ danh bạ
+  static Future<List<CustomerDirectoryModel>> getCustomers({
+    String? query,
+    String? status,
+    bool? hasPhoto,
+  }) async {
+    final token = await getToken();
+    final baseUrl = await getBaseUrl();
+
+    final queryParams = <String, String>{};
+    if (query != null && query.trim().isNotEmpty) {
+      queryParams['q'] = query.trim();
+    }
+    if (status != null && status != 'ALL') {
+      queryParams['status'] = status;
+    }
+    if (hasPhoto != null) {
+      queryParams['hasPhoto'] = hasPhoto ? 'true' : 'false';
+    }
+
+    final uri = Uri.parse('$baseUrl/customers').replace(
+      queryParameters: queryParams.isNotEmpty ? queryParams : null,
+    );
+
+    try {
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 12));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        final List data = body['data'] as List? ?? [];
+        return data.map((json) => CustomerDirectoryModel.fromJson(json)).toList();
+      }
+
+      throw Exception(body['message'] ?? 'Không thể tải danh bạ khách hàng');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng.');
+    }
+  }
+
+  /// 2. Lấy chi tiết khách hàng và vị trí từ danh bạ
+  static Future<CustomerDirectoryModel> getCustomerDetail(String customerId) async {
+    final token = await getToken();
+    final baseUrl = await getBaseUrl();
+    final url = Uri.parse('$baseUrl/customers/$customerId');
+
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        final cust = body['data']['customer'];
+        final loc = body['data']['savedLocation'];
+        final statusStr = body['data']['locationStatus']?.toString() ??
+            (loc != null ? (loc['status']?.toString() ?? 'VERIFIED') : 'NO_LOCATION');
+        LocationStatus status;
+        if (statusStr == 'VERIFIED') {
+          status = LocationStatus.verified;
+        } else if (statusStr == 'TEMPORARY') {
+          status = LocationStatus.temporary;
+        } else {
+          status = LocationStatus.noLocation;
+        }
+
+        return CustomerDirectoryModel(
+          id: cust['id'],
+          customerCode: cust['customerCode'] ?? '',
+          fullName: cust['fullName'] ?? '',
+          phoneNumber: cust['phoneNumber'] ?? '',
+          addressText: cust['addressText'] ?? '',
+          areaId: cust['areaId'],
+          areaName: cust['areaName'],
+          locationStatus: status,
+          hasLocation: loc != null && loc['latitude'] != null && loc['longitude'] != null,
+          latitude: loc != null ? (loc['latitude'] as num?)?.toDouble() : null,
+          longitude: loc != null ? (loc['longitude'] as num?)?.toDouble() : null,
+          identificationNotes: loc?['identificationNotes'],
+          imageUrl: loc?['imageUrl'],
+          savedLocationId: loc?['id'],
+          createdAt: cust['createdAt'] != null ? DateTime.tryParse(cust['createdAt']) : null,
+          updatedAt: cust['updatedAt'] != null ? DateTime.tryParse(cust['updatedAt']) : null,
+        );
+      }
+
+      throw Exception(body['message'] ?? 'Không thể lấy thông tin chi tiết khách hàng');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ.');
+    }
+  }
+
+  /// 3. Tạo mới khách hàng trực tiếp từ Danh bạ
+  static Future<CustomerDirectoryModel> createCustomer({
+    required String phoneNumber,
+    String? fullName,
+    String? addressText,
+    String? areaId,
+    double? latitude,
+    double? longitude,
+    double? gpsAccuracy,
+    String? identificationNotes,
+    String? imageBase64,
+  }) async {
+    final token = await getToken();
+    final baseUrl = await getBaseUrl();
+    final url = Uri.parse('$baseUrl/customers');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'phoneNumber': phoneNumber.trim(),
+          if (fullName != null) 'fullName': fullName.trim(),
+          if (addressText != null) 'addressText': addressText.trim(),
+          if (areaId != null) 'areaId': areaId,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          if (gpsAccuracy != null) 'gpsAccuracy': gpsAccuracy,
+          if (identificationNotes != null) 'identificationNotes': identificationNotes.trim(),
+          if (imageBase64 != null) 'imageBase64': imageBase64,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 201 && body['success'] == true) {
+        return CustomerDirectoryModel.fromJson(body['data']);
+      }
+
+      throw Exception(body['message'] ?? 'Không thể tạo hồ sơ khách hàng mới');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ.');
+    }
+  }
+
+  /// 4. Cập nhật thông tin khách hàng (Tên, SĐT, Địa chỉ)
+  static Future<Map<String, dynamic>> updateCustomer({
+    required String customerId,
+    required String fullName,
+    required String phoneNumber,
+    String? addressText,
+  }) async {
+    final token = await getToken();
+    final baseUrl = await getBaseUrl();
+    final url = Uri.parse('$baseUrl/customers/$customerId');
+
+    try {
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'fullName': fullName.trim(),
+          'phoneNumber': phoneNumber.trim(),
+          if (addressText != null) 'addressText': addressText.trim(),
+        }),
+      ).timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return body['data'] as Map<String, dynamic>;
+      }
+
+      throw Exception(body['message'] ?? 'Không thể cập nhật khách hàng');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ.');
+    }
+  }
+
+  /// 5. Cập nhật vị trí, ghi chú và quản lý ảnh (thêm, thay, xóa) của khách hàng
+  static Future<Map<String, dynamic>> updateCustomerLocationAndPhoto({
+    required String customerId,
+    required double latitude,
+    required double longitude,
+    double? gpsAccuracy,
+    required String identificationNotes,
+    String? imageBase64,
+    bool? deletePhoto,
+  }) async {
+    final token = await getToken();
+    final baseUrl = await getBaseUrl();
+    final url = Uri.parse('$baseUrl/customers/$customerId/location');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'latitude': latitude,
+          'longitude': longitude,
+          'gpsAccuracy': gpsAccuracy ?? 0.0,
+          'identificationNotes': identificationNotes.trim(),
+          if (imageBase64 != null) 'imageBase64': imageBase64,
+          if (deletePhoto == true) 'deletePhoto': true,
+        }),
+      ).timeout(const Duration(seconds: 20));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return body['data'] as Map<String, dynamic>;
+      }
+
+      throw Exception(body['message'] ?? 'Không thể cập nhật vị trí khách hàng');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ.');
+    }
+  }
+}
+
+/// Mô hình kết quả tìm kiếm địa chỉ (Geocoding Result)
+class AddressSearchResult {
+  final String displayName;
+  final double latitude;
+  final double longitude;
+  final String? source;
+
+  AddressSearchResult({
+    required this.displayName,
+    required this.latitude,
+    required this.longitude,
+    this.source,
+  });
+
+  factory AddressSearchResult.fromJson(Map<String, dynamic> json) {
+    return AddressSearchResult(
+      displayName: json['displayName'] as String? ?? '',
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      source: json['source'] as String?,
+    );
   }
 }

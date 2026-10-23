@@ -15,12 +15,19 @@ export interface AuthenticatedRequest extends Request {
 }
 
 export const authenticateJwt = (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  let token: string | undefined;
+
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query && req.query.token && typeof req.query.token === 'string') {
+    token = req.query.token;
+  }
+
+  if (!token) {
     return res.status(401).json({ success: false, message: 'Thiếu hoặc sai định dạng Token xác thực' });
   }
 
-  const token = authHeader.split(' ')[1];
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_delivery_jwt_key_2026_xyz') as UserPayload;
     req.user = decoded;

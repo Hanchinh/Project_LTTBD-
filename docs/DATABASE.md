@@ -372,3 +372,41 @@ Bảo toàn 100% dữ liệu gốc bị lỗi từ v1 mà không xóa dữ liệ
 3. [init-db/03-seed-demo-data.sql](file:///d:/flutter create delivery_marker_app/init-db/03-seed-demo-data.sql): Script lũy kế (idempotent) dùng để bổ sung dữ liệu demo vào CSDL đang chạy (`delivery_db`) mà không xóa hoặc ghi đè dữ liệu người dùng:
    - Sử dụng `ON CONFLICT DO NOTHING` trên các unique constraint (`phone_number`, `code`, `customer_code`, `tracking_number`).
    - Sử dụng dynamic foreign key resolution (truy vấn lồng theo mã nghiệp vụ duy nhất) thay vì gán cứng UUID phụ thuộc.
+4. [init-db/04-create-shifts-and-delivery-points.sql](file:///d:/flutter create delivery_marker_app/init-db/04-create-shifts-and-delivery-points.sql): Migration bổ sung bảng Ca làm việc (`shifts`) và Điểm giao (`shift_delivery_points`), thiết lập trạng thái vị trí (`VERIFIED`, `TEMPORARY`, `NO_LOCATION`) và chỉ mục PostGIS.
+
+---
+
+## 9. Đặc Tả Bảng Ca Làm Việc & Điểm Giao (FEATURE-SHIFT-001)
+
+### 9.1. Bảng `shifts` (Quản lý Ca làm việc Shipper)
+- `id UUID PRIMARY KEY DEFAULT uuid_generate_v4()`
+- `shift_code VARCHAR(50) UNIQUE NOT NULL`: Mã ca theo định dạng `SHF-YYYYMMDD-XXX` (tính theo giờ Việt Nam `Asia/Ho_Chi_Minh`).
+- `shift_date DATE NOT NULL DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')::DATE`
+- `shipper_id UUID NOT NULL REFERENCES users(id)`: Khóa ngoại đến người dùng shipper.
+- `status VARCHAR(20) NOT NULL DEFAULT 'PREPARING'`: Trạng thái ca:
+  - `PREPARING`: Đang chuẩn bị (nhập danh sách điểm giao bằng SĐT tại kho).
+  - `IN_PROGRESS`: Đang thực hiện giao hàng.
+  - `COMPLETED`: Ca làm việc đã hoàn thành.
+- `started_at TIMESTAMPTZ NULLABLE`
+- `completed_at TIMESTAMPTZ NULLABLE`
+- `notes TEXT NULLABLE`
+- `created_at / updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP`
+
+### 9.2. Bảng `shift_delivery_points` (Điểm giao hàng trong Ca)
+- `id UUID PRIMARY KEY DEFAULT uuid_generate_v4()`
+- `shift_id UUID NOT NULL REFERENCES shifts(id) ON DELETE CASCADE`
+- `customer_id UUID NOT NULL REFERENCES customers(id)`: Liên kết khách hàng bằng `customer_id` (không lưu SĐT làm khóa ngoại).
+- `order_id UUID NULLABLE REFERENCES orders(id) ON DELETE SET NULL`: Đơn hàng liên kết nếu có.
+- `sequence_number INT NOT NULL DEFAULT 1`: Thứ tự giao hàng trong ca.
+- `delivery_status VARCHAR(20) NOT NULL DEFAULT 'PENDING'`: `PENDING`, `DELIVERED`, `FAILED`.
+- `location_status VARCHAR(20) NOT NULL DEFAULT 'NO_LOCATION'`: 3 trạng thái vị trí độc lập:
+  - `NO_LOCATION`: Chưa có tọa độ (không tạo marker giả trên bản đồ).
+  - `TEMPORARY`: Vị trí tạm ghim trước khi giao (Marker màu Cam).
+  - `VERIFIED`: Vị trí nhà đã được xác minh tại hiện trường kèm ảnh/cổng nhà (Marker màu Xanh lá).
+- `temporary_coordinates GEOMETRY(Point, 4326) NULLABLE`: Tọa độ tạm thời khi ghim bằng tâm ngắm trước khi giao (`ST_SetSRID(ST_MakePoint(lng, lat), 4326)`).
+- `delivery_notes TEXT NULLABLE`
+- `CONSTRAINT uq_shift_customer UNIQUE(shift_id, customer_id)`: Chống thêm trùng lặp cùng một khách hàng vào cùng một ca làm việc (Idempotent).
+
+### 4.6. Migration [05-add-customers-updated-at.sql](file:///d:/flutter create delivery_marker_app/init-db/05-add-customers-updated-at.sql)
+- Bổ sung an toàn cột `updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP` cho bảng `customers` (sử dụng `ADD COLUMN IF NOT EXISTS`).
+- Đảm bảo lưu vết chính xác thời điểm cập nhật thông tin tên, số điện thoại, địa chỉ khách hàng từ Danh bạ độc lập.

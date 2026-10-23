@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../models/order_model.dart';
+import 'delivery_map_view.dart';
 import 'order_detail_view.dart';
 import 'login_view.dart';
 
@@ -96,6 +97,16 @@ class _OrderListViewState extends State<OrderListView> {
                 ),
               ),
             ),
+          IconButton(
+            icon: const Icon(Icons.map_outlined),
+            tooltip: 'Xem bản đồ giao hàng',
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const DeliveryMapView()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Làm mới',

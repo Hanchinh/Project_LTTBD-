@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'services/api_service.dart';
+import 'views/home_shell_view.dart';
 import 'views/login_view.dart';
-import 'views/order_list_view.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,14 +18,16 @@ class DeliveryLocationMarkerApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1E88E5),
-          primary: const Color(0xFF1E88E5),
-          secondary: const Color(0xFF2E7D32),
+          seedColor: const Color(0xFF0F172A),
+          primary: const Color(0xFF0F172A),
+          secondary: const Color(0xFF2563EB),
         ),
         appBarTheme: const AppBarTheme(
           centerTitle: false,
-          elevation: 2,
+          elevation: 0,
+          scrolledUnderElevation: 0,
         ),
       ),
       home: const AuthSplashScreen(),
@@ -54,7 +56,7 @@ class _AuthSplashScreenState extends State<AuthSplashScreen> {
     if (token != null && token.isNotEmpty) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const OrderListView()),
+        MaterialPageRoute(builder: (context) => const HomeShellView()),
       );
     } else {
       Navigator.pushReplacement(

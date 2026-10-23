@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
-import 'order_list_view.dart';
+import 'home_shell_view.dart';
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -50,7 +50,7 @@ class _LoginViewState extends State<LoginView> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const OrderListView()),
+        MaterialPageRoute(builder: (context) => const HomeShellView()),
       );
     } catch (e) {
       if (!mounted) return;

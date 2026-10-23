@@ -11,12 +11,20 @@ import '../services/api_service.dart';
 class SaveLocationView extends StatefulWidget {
   final String customerId;
   final String customerName;
+  final String? customerPhone;
+  final String? customerAddress;
+  final double? initialLat;
+  final double? initialLng;
   final SavedLocationModel? existingLocation;
 
   const SaveLocationView({
     super.key,
     required this.customerId,
     required this.customerName,
+    this.customerPhone,
+    this.customerAddress,
+    this.initialLat,
+    this.initialLng,
     this.existingLocation,
   });
 
@@ -45,6 +53,10 @@ class _SaveLocationViewState extends State<SaveLocationView> {
       _gpsAccuracy = widget.existingLocation!.gpsAccuracy;
       _notesController.text = widget.existingLocation!.identificationNotes;
       _existingImageUrl = widget.existingLocation!.imageUrl;
+      _isLoadingGps = false;
+    } else if (widget.initialLat != null && widget.initialLng != null) {
+      _selectedLatLng = LatLng(widget.initialLat!, widget.initialLng!);
+      _gpsAccuracy = 5.0; // Tọa độ được người dùng căn chỉnh thủ công
       _isLoadingGps = false;
     } else {
       _getCurrentGpsLocation();
@@ -138,7 +150,7 @@ class _SaveLocationViewState extends State<SaveLocationView> {
       );
 
       if (pickedFile != null) {
-        final bytes = await File(pickedFile.path).readAsBytes();
+        final bytes = await pickedFile.readAsBytes();
         // Check file size (limit: max 5MB)
         if (bytes.lengthInBytes > 5 * 1024 * 1024) {
           if (!mounted) return;

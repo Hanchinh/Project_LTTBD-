@@ -20,6 +20,8 @@ export function normalizePhoneNumber(raw: string): string {
   let clean = raw.replace(/\D/g, '');
   if (clean.startsWith('84') && clean.length === 11) {
     clean = '0' + clean.substring(2);
+  } else if (clean.length === 9 && !clean.startsWith('0')) {
+    clean = '0' + clean;
   }
   return clean;
 }

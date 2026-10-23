@@ -135,7 +135,7 @@ Hệ thống được thiết kế theo mô hình **Client-Server 3 tầng phân
 | **Database** | [01-init-db.sql](file:///d:/flutter create delivery_marker_app/init-db/01-init-db.sql) | Nạp qua Docker entrypoint khi container Postgres khởi chạy lần đầu |
 | **Backend** | [backend/src/index.ts](file:///d:/flutter create delivery_marker_app/backend/src/index.ts) | Nạp dotenv, khởi tạo `createApp()`, lắng nghe cổng `process.env.PORT || 3000` |
 | **Admin Web** | [admin_web/src/main.tsx](file:///d:/flutter create delivery_marker_app/admin_web/src/main.tsx) | Render `<App />` vào DOM node `#root`, bọc trong `React.StrictMode` |
-| **Mobile App** | [mobile_app/lib/main.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/main.dart) | Khởi động `DeliveryLocationMarkerApp` -> `AuthSplashScreen` kiểm tra token SharedPreferences -> `LoginView` (chưa đăng nhập) hoặc `OrderListView` (có phiên hợp lệ) |
+| **Mobile App** | [mobile_app/lib/main.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/main.dart) | Khởi động `DeliveryLocationMarkerApp` -> `AuthSplashScreen` kiểm tra token SharedPreferences -> `LoginView` (chưa đăng nhập) hoặc `HomeShellView` (có phiên hợp lệ, mở thẳng Bản đồ chính làm trung tâm) |
 
 ---
 
