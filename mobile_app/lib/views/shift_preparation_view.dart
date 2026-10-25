@@ -3,6 +3,8 @@ import '../models/shift_model.dart';
 import '../services/api_service.dart';
 import 'crosshair_location_picker_view.dart';
 import 'shift_map_view.dart';
+import '../widgets/quick_add_customer_sheet.dart';
+import '../widgets/bulk_paste_phone_sheet.dart';
 
 class ShiftPreparationView extends StatefulWidget {
   final ShiftModel shift;
@@ -25,6 +27,9 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
 
   // Bộ lọc danh sách điểm giao: 'ALL', 'VERIFIED', 'TEMPORARY', 'NO_LOCATION'
   String _selectedFilter = 'ALL';
+
+  // Kết quả sau khi nhập hàng loạt SĐT vừa xong (TASK: PHOTO-SYNC-SHIFT-PICKER-BULK-016 - Mục C)
+  BulkAddPointsResult? _lastBulkResult;
 
   @override
   void initState() {
@@ -165,321 +170,78 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
     }
   }
 
-  void _showQuickCreateCustomerBottomSheet(String phone) {
-    final nameCtrl = TextEditingController();
-    final addressCtrl = TextEditingController();
-    final notesCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController(text: phone);
-    bool isSubmitting = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (bSheetCtx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Header
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEF3C7),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.person_add_alt_1_rounded, color: Color(0xFFD97706), size: 22),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Chưa có hồ sơ khách hàng',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0F172A),
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Tạo nhanh hồ sơ để thêm vào ca làm ngay',
-                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
-                          onPressed: () => Navigator.pop(bSheetCtx),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 24, color: Color(0xFFE2E8F0)),
-
-                    // Số điện thoại (bắt buộc, điền sẵn)
-                    const Text(
-                      'SỐ ĐIỆN THOẠI KHÁCH HÀNG *',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: phoneCtrl,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        prefixIcon: const Icon(Icons.phone_rounded, size: 20, color: Color(0xFF64748B)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Tên khách hàng (cho phép nhập)
-                    const Text(
-                      'TÊN KHÁCH HÀNG',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: nameCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Ví dụ: Anh Nam, Chị Linh...',
-                        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        prefixIcon: const Icon(Icons.person_outline_rounded, size: 20, color: Color(0xFF64748B)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Địa chỉ giao hàng (cho phép nhập nếu đã biết)
-                    const Text(
-                      'ĐỊA CHỈ GIAO HÀNG',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: addressCtrl,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        hintText: 'Ví dụ: 123 Đường số 7, Long Thạnh Mỹ...',
-                        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        prefixIcon: const Icon(Icons.location_on_outlined, size: 20, color: Color(0xFF64748B)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-
-                    // Ghi chú giao hàng (không bắt buộc)
-                    const Text(
-                      'GHI CHÚ GIAO HÀNG (TÙY CHỌN)',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: notesCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Giao giờ hành chính, gọi trước khi đến...',
-                        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        prefixIcon: const Icon(Icons.notes_rounded, size: 20, color: Color(0xFF64748B)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Action buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 1,
-                          child: SizedBox(
-                            height: 48,
-                            child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              onPressed: isSubmitting ? null : () => Navigator.pop(bSheetCtx),
-                              child: const Text(
-                                'HỦY',
-                                style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: SizedBox(
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0F172A),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                              icon: isSubmitting
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                    )
-                                  : const Icon(Icons.add_task_rounded, size: 20),
-                              label: Text(
-                                isSubmitting ? 'ĐANG TẠO...' : 'TẠO & THÊM VÀO CA',
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                              ),
-                              onPressed: isSubmitting
-                                  ? null
-                                  : () async {
-                                      final targetPhone = phoneCtrl.text.trim();
-                                      if (targetPhone.isEmpty) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Vui lòng nhập số điện thoại'),
-                                            backgroundColor: Color(0xFFEF4444),
-                                          ),
-                                        );
-                                        return;
-                                      }
-
-                                      setModalState(() => isSubmitting = true);
-                                      try {
-                                        final addResult = await ApiService.quickCreateCustomerAndAddToShift(
-                                          shiftId: _currentShift.id,
-                                          phoneNumber: targetPhone,
-                                          fullName: nameCtrl.text.trim(),
-                                          addressText: addressCtrl.text.trim(),
-                                          deliveryNotes: notesCtrl.text.trim(),
-                                        );
-
-                                        final isExisting = addResult['isExisting'] == true;
-                                        final point = addResult['point'] as ShiftDeliveryPointModel;
-                                        final apiSummary = addResult['summary'] as ShiftSummaryModel?;
-
-                                        if (!mounted || !bSheetCtx.mounted) return;
-                                        Navigator.pop(bSheetCtx);
-
-                                        setState(() {
-                                          _phoneController.clear();
-                                          List<ShiftDeliveryPointModel> updatedPoints = List.from(_currentShift.deliveryPoints);
-                                          final existingIndex = updatedPoints.indexWhere((p) => p.id == point.id || p.customerId == point.customerId);
-                                          if (existingIndex >= 0) {
-                                            updatedPoints[existingIndex] = point;
-                                          } else {
-                                            updatedPoints.insert(0, point);
-                                          }
-
-                                          final vCount = updatedPoints.where((p) => p.locationStatus == LocationStatus.verified).length;
-                                          final tCount = updatedPoints.where((p) => p.locationStatus == LocationStatus.temporary).length;
-                                          final nCount = updatedPoints.where((p) => p.locationStatus == LocationStatus.noLocation).length;
-                                          final fallbackSummary = ShiftSummaryModel(
-                                            totalPoints: updatedPoints.length,
-                                            verifiedCount: vCount,
-                                            temporaryCount: tCount,
-                                            noLocationCount: nCount,
-                                          );
-
-                                          _currentShift = _currentShift.copyWith(
-                                            deliveryPoints: updatedPoints,
-                                            summary: apiSummary ?? fallbackSummary,
-                                            updatedAt: DateTime.now(),
-                                          );
-                                        });
-
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              isExisting
-                                                  ? 'Khách hàng ${point.customerName} đã có trong ca làm này!'
-                                                  : 'Đã tạo hồ sơ và thêm ${point.customerName} vào ca!',
-                                            ),
-                                            backgroundColor: isExisting ? const Color(0xFF2563EB) : const Color(0xFF10B981),
-                                          ),
-                                        );
-                                      } catch (e) {
-                                        if (bSheetCtx.mounted) {
-                                          setModalState(() => isSubmitting = false);
-                                        }
-                                        if (!mounted) return;
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Lỗi tạo khách hàng: $e'),
-                                            backgroundColor: const Color(0xFFEF4444),
-                                          ),
-                                        );
-                                      }
-                                    },
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+  Future<void> _showQuickCreateCustomerBottomSheet(String phone) async {
+    final customer = await showQuickAddCustomerBottomSheet(
+      context,
+      initialPhone: phone,
     );
+    if (customer == null) return;
+
+    if (!mounted) return;
+    setState(() => _isAddingPoint = true);
+
+    try {
+      final addResult = await ApiService.addPointToShift(
+        _currentShift.id,
+        customerId: customer.id,
+        deliveryNotes: 'Thêm khách hàng qua hồ sơ',
+      );
+
+      final isExisting = addResult['isExisting'] == true;
+      final point = addResult['point'] as ShiftDeliveryPointModel;
+      final apiSummary = addResult['summary'] as ShiftSummaryModel?;
+
+      if (!mounted) return;
+
+      setState(() {
+        _phoneController.clear();
+        List<ShiftDeliveryPointModel> updatedPoints = List.from(_currentShift.deliveryPoints);
+        final existingIndex = updatedPoints.indexWhere((p) => p.id == point.id || p.customerId == point.customerId);
+        if (existingIndex >= 0) {
+          updatedPoints[existingIndex] = point;
+        } else {
+          updatedPoints.insert(0, point);
+        }
+
+        final vCount = updatedPoints.where((p) => p.locationStatus == LocationStatus.verified).length;
+        final tCount = updatedPoints.where((p) => p.locationStatus == LocationStatus.temporary).length;
+        final nCount = updatedPoints.where((p) => p.locationStatus == LocationStatus.noLocation).length;
+        final fallbackSummary = ShiftSummaryModel(
+          totalPoints: updatedPoints.length,
+          verifiedCount: vCount,
+          temporaryCount: tCount,
+          noLocationCount: nCount,
+        );
+
+        _currentShift = _currentShift.copyWith(
+          deliveryPoints: updatedPoints,
+          summary: apiSummary ?? fallbackSummary,
+          updatedAt: DateTime.now(),
+        );
+        _isAddingPoint = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isExisting
+                ? 'Khách hàng  đã có trong ca làm này!'
+                : 'Đã tạo hồ sơ và thêm  vào ca!',
+          ),
+          backgroundColor: isExisting ? const Color(0xFF2563EB) : const Color(0xFF10B981),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isAddingPoint = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi thêm khách vào ca: ${e.toString().replaceAll('Exception: ', '')}'),
+            backgroundColor: const Color(0xFFEF4444),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _removePoint(ShiftDeliveryPointModel point) async {
@@ -585,6 +347,121 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
     ).then((_) => _refreshShiftDetail());
   }
 
+  /// Mở bottom sheet nhập hàng loạt SĐT vào ca (TASK: PHOTO-SYNC-SHIFT-PICKER-BULK-016 - Mục C)
+  Future<void> _openBulkPasteSheet() async {
+    await BulkPastePhoneSheet.show(
+      context: context,
+      shiftId: _currentShift.id,
+      onPointsAdded: (result) async {
+        setState(() {
+          _lastBulkResult = result;
+        });
+        await _refreshShiftDetail();
+      },
+      onPinPointRequested: (point) {
+        _openCrosshairPicker(point);
+      },
+    );
+  }
+
+  /// Banner hiển thị kết quả thêm hàng loạt SĐT vừa xong (2 nhóm vị trí + số bị từ chối)
+  Widget _buildBulkResultBanner() {
+    if (_lastBulkResult == null) return const SizedBox.shrink();
+
+    final result = _lastBulkResult!;
+    final verifiedAndTemp = result.added.where((p) => p.locationStatus != LocationStatus.noLocation).toList();
+    final noLocation = result.added.where((p) => p.locationStatus == LocationStatus.noLocation).toList();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF86EFAC)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Kết quả nhập hàng loạt vừa xong',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF166534)),
+                ),
+              ),
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF166534)),
+                onPressed: () => setState(() => _lastBulkResult = null),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '✓ Đã có vị trí: ${verifiedAndTemp.length}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '! Chưa có vị trí: ${noLocation.length}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
+                ),
+              ),
+              if (result.rejected.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '✕ Bị từ chối: ${result.rejected.length}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFB91C1C)),
+                  ),
+                ),
+            ],
+          ),
+          if (result.rejected.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...result.rejected.take(3).map((r) => Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    '• ${r.phone}: ${r.message}',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFFDC2626)),
+                  ),
+                )),
+            if (result.rejected.length > 3)
+              Text(
+                'và ${result.rejected.length - 3} số khác bị từ chối',
+                style: const TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontStyle: FontStyle.italic),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
   List<ShiftDeliveryPointModel> get _filteredPoints {
     if (_selectedFilter == 'VERIFIED') {
       return _currentShift.deliveryPoints.where((p) => p.locationStatus == LocationStatus.verified).toList();
@@ -647,22 +524,53 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
       ),
       body: Column(
         children: [
-          // 1. Cụm nhập số điện thoại khách hàng (thiết kế gọn gàng, bo góc sạch sẽ)
+          // 1. Cụm nhập số điện thoại khách hàng (Nhập hàng loạt & Nhập nhanh từng số)
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.white,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text(
-                  'Thêm khách hàng vào ca',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF0F172A),
+                // NÚT LỚN "NHẬP HÀNG LOẠT SĐT" (>= 56px) (TASK: PHOTO-SYNC-SHIFT-PICKER-BULK-016 Mục C)
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    key: const Key('btn_bulk_paste_phones'),
+                    onPressed: _openBulkPasteSheet,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.paste_rounded, size: 22),
+                    label: const Text(
+                      'NHẬP HÀNG LOẠT SĐT',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                    ),
                   ),
                 ),
+
+                const SizedBox(height: 12),
+
+                // Phân cách hoặc nhãn nhập lẻ từng số
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text(
+                        'HOẶC THÊM TỪNG SỐ',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade500),
+                      ),
+                    ),
+                    const Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
+                  ],
+                ),
+
                 const SizedBox(height: 10),
+
+                // Ô nhập một số để thêm nhanh từng số
                 Row(
                   children: [
                     Expanded(
@@ -675,7 +583,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
                           decoration: InputDecoration(
                             hintText: 'Nhập số điện thoại (VD: 0901234567)',
-                            hintStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal, color: Color(0xFF94A3B8)),
+                            hintStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.normal, color: Color(0xFF94A3B8)),
                             prefixIcon: const Icon(Icons.phone_android_rounded, size: 20, color: Color(0xFF64748B)),
                             suffixIcon: _phoneController.text.isNotEmpty
                                 ? IconButton(
@@ -707,6 +615,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
                     SizedBox(
                       height: 48,
                       child: ElevatedButton.icon(
+                        key: const Key('btn_add_single_phone'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF0F172A),
                           foregroundColor: Colors.white,
@@ -733,6 +642,10 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
               ],
             ),
           ),
+
+          // Banner kết quả nhập hàng loạt vừa xong (nếu có)
+          if (_lastBulkResult != null)
+            _buildBulkResultBanner(),
 
           const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
 

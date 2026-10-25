@@ -103,7 +103,7 @@ ON CONFLICT (phone_number) DO NOTHING;
 
 -- 6. VỊ TRÍ ĐÃ LƯU (SAVED_LOCATIONS - PostGIS SRID 4326)
 -- Lưu vị trí cho KH_001 (Khu vực 1) và KH_004 (Khu vực 2), các khách hàng khác chưa lưu vị trí để kiểm thử flow đánh dấu vị trí mới
-INSERT INTO saved_locations (id, customer_id, geom, latitude, longitude, gps_accuracy, identification_notes, created_by, updated_by)
+INSERT INTO saved_locations (id, customer_id, geom, latitude, longitude, gps_accuracy, identification_notes, created_by, updated_by, image_url)
 SELECT
     'e0000000-0000-0000-0000-000000000001'::uuid,
     c.id,
@@ -113,7 +113,8 @@ SELECT
     4.5,
     'Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân.',
     u.id,
-    u.id
+    u.id,
+    '/api/v1/photos/00000000-0000-0000-0000-000000000001.jpg'
 FROM customers c, users u
 WHERE c.customer_code = 'KH_001' AND u.phone_number = '0901111111'
 ON CONFLICT (customer_id) DO NOTHING;

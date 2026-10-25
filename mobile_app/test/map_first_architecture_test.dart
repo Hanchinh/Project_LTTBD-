@@ -165,7 +165,7 @@ void main() {
       // Verify that the 3 destinations exist in the NavigationBar
       expect(find.text('Bản đồ'), findsOneWidget);
       expect(find.text('Danh bạ'), findsOneWidget);
-      expect(find.text('Ca làm việc'), findsOneWidget);
+      expect(find.descendant(of: find.byType(NavigationBar), matching: find.text('Ca làm việc')), findsOneWidget);
 
       // Verify Icons
       expect(find.byIcon(Icons.map_rounded), findsOneWidget);

@@ -6,12 +6,15 @@ import { getMyShiftOrders, createShiftOrder } from './controllers/orders.control
 import {
   getCustomerLocation,
   saveOrUpdateCustomerLocation,
+  deleteCustomerLocation,
   getLocationHistory,
   lookupCustomerByPhone,
   servePhoto,
+  getMySavedLocations,
 } from './controllers/locations.controller';
 import {
   getAreas,
+  getMyAreas,
   createArea,
   getUsers,
   createUser,
@@ -28,8 +31,11 @@ import {
   listShifts,
   createShift,
   getShiftDetail,
+  deleteShift,
   updateShiftStatus,
+  updateShiftName,
   addPointToShift,
+  addBulkPointsToShift,
   removePointFromShift,
   updateTemporaryLocation,
   verifyPointLocation,
@@ -41,6 +47,11 @@ import {
   getCustomerDetail,
   updateCustomer,
 } from './controllers/customers.controller';
+import {
+  getCustomerPhotos,
+  addCustomerPhoto,
+  deleteCustomerPhoto,
+} from './controllers/customer-photos.controller';
 
 export const createApp = (): Express => {
   const app = express();
@@ -60,8 +71,11 @@ export const createApp = (): Express => {
   router.get('/shifts', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), listShifts);
   router.post('/shifts', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), createShift);
   router.get('/shifts/:id', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), getShiftDetail);
+  router.delete('/shifts/:id', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), deleteShift);
   router.patch('/shifts/:id/status', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), updateShiftStatus);
+  router.patch('/shifts/:id/name', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), updateShiftName);
   router.post('/shifts/:id/points', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), addPointToShift);
+  router.post('/shifts/:id/points/bulk', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), addBulkPointsToShift);
   router.delete('/shifts/:id/points/:pointId', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), removePointFromShift);
   router.put('/shifts/:id/points/:pointId/temporary-location', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), updateTemporaryLocation);
   router.post('/shifts/:id/points/:pointId/verify-location', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), verifyPointLocation);
@@ -95,6 +109,12 @@ export const createApp = (): Express => {
     checkCustomerAreaScope,
     saveOrUpdateCustomerLocation
   );
+  router.delete(
+    '/customers/:customerId/location',
+    authenticateJwt,
+    requireRoles('SHIPPER', 'ADMIN'),
+    deleteCustomerLocation
+  );
   router.get(
     '/customers/:customerId/location/history',
     authenticateJwt,
@@ -107,7 +127,31 @@ export const createApp = (): Express => {
     servePhoto
   );
 
-  // ADMIN ROUTES
+  // CUSTOMER PHOTOS (TASK: MULTI-PHOTO-AND-THUMB-UI-015A)
+  router.get(
+    '/customers/:customerId/photos',
+    authenticateJwt,
+    checkCustomerAreaScope,
+    getCustomerPhotos
+  );
+  router.post(
+    '/customers/:customerId/photos',
+    authenticateJwt,
+    checkCustomerAreaScope,
+    addCustomerPhoto
+  );
+  router.delete(
+    '/customers/:customerId/photos/:photoId',
+    authenticateJwt,
+    checkCustomerAreaScope,
+    deleteCustomerPhoto
+  );
+
+  // MASTER MAP & SAVED LOCATIONS (TASK: MASTER-MAP-014)
+  router.get('/locations/my-saved-locations', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), getMySavedLocations);
+
+  // ADMIN & SHARED ROUTES
+  router.get('/areas/my-areas', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), getMyAreas);
   router.get('/admin/areas', authenticateJwt, requireRoles('ADMIN'), getAreas);
   router.post('/admin/areas', authenticateJwt, requireRoles('ADMIN'), createArea);
 

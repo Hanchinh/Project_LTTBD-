@@ -396,4 +396,518 @@
       - Flutter: `flutter analyze` **0 issues**, `flutter test` **61/61 tests passed (100%)** bao gồm 5 kịch bản chuyên biệt trong [bug_map_sync_009_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/bug_map_sync_009_test.dart).
       - Live Integration Verification: Xóa ảnh, đổi tọa độ, đổi ghi chú, upload ảnh mới từ bản đồ, đồng bộ 2 chiều giữa Bản đồ và Danh bạ thành công trên backend container và database PostGIS.
 
+30. **[ĐÃ HOÀN TẤT - TASK: SHIFT-DELETE-AND-FIELD-FIX-011] Bổ sung API Xóa Ca Làm Việc & Thống Nhất Tên Trường Dữ Liệu:**
+    - **1. Chức năng Xóa Ca Làm Việc (`DELETE /api/v1/shifts/:id`):**
+      - *Phân quyền an toàn:* Shipper chỉ được xóa ca do chính mình phụ trách (`shift.shipper_id === shipperId`), mọi hành vi xóa ca của shipper khác đều bị từ chối `403 Forbidden`. Tài khoản `ADMIN` có toàn quyền xóa bất kỳ ca làm việc nào.
+      - *Phạm vi dữ liệu cách ly tuyệt đối:* Xóa ca (`shifts`) và toàn bộ điểm giao trong ca (`shift_delivery_points`). **TUYỆT ĐỐI KHÔNG** đụng chạm hay làm mất bất kỳ bản ghi nào trong `customers`, `saved_locations` và `location_history`. Vị trí khách hàng đã xác minh luôn được bảo tồn vĩnh viễn.
+      - *Toàn vẹn kiểm toán:* Tự động ghi nhật ký `audit_logs` với `action: 'DELETE_SHIFT'`, `entity: 'shifts'`, kèm metadata `{ shiftCode, status, deletedPointsCount }`.
+      - *Giao diện Mobile ([shift_list_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_list_view.dart)):* Thêm nút icon thùng rác màu đỏ (`Icons.delete_outline_rounded`) trên mỗi thẻ ca. Khi bấm, mở hộp thoại cảnh báo: 'Xóa ca [mã ca]? Các điểm giao trong ca sẽ bị hủy, vị trí khách đã lưu không bị mất.' Sau khi người dùng xác nhận, gọi [ApiService.deleteShift](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/api_service.dart), hiển thị SnackBar thông báo và tự động tải lại danh sách ca.
+    - **2. Thống nhất tên trường dữ liệu giữa Flutter và Backend (Field Name Unification):**
+      - *createShift:* Backend [shifts.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/shifts.controller.ts) và Flutter [api_service.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/api_service.dart) chấp nhận cả `shiftDate` và `workDate` hoán đổi mềm dẻo. Response trả về cả `shiftDate` và `workDate`.
+      - *addPointToShift:* Backend bổ sung tính toán và trả về đối tượng `summary: { totalPoints, verifiedCount, temporaryCount, noLocationCount }` ở cả trường hợp thêm mới điểm (201) và trường hợp khách đã có trong ca (200), khớp hoàn hảo với `ShiftSummaryModel.fromJson(body['summary'])` của Flutter.
+      - *updateTemporaryLocation & verifyPointLocation:* Backend và Flutter đồng bộ nhận cả `locationNotes` lẫn `identificationNotes`, và nhận cả `photoUrl`, `imageUrl`, lẫn `imageBase64`. Response trả về đầy đủ các trường alias giúp hai phía luôn đồng bộ.
+    - **3. Kết quả kiểm thử thực tế (Evidence-Based):**
+      - Backend Unit Tests: **96/96 tests passed (100%)** qua 5 test suites (bổ sung 10 unit test mới trong [shifts.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/shifts.spec.ts)).
+      - Backend Build: `npm run build` (`tsc`) biên dịch thành công 100% (**Exit Code: 0**).
+      - Flutter Analyze: `flutter analyze` báo cáo: **No issues found!** (0 warning, 0 error).
+      - Flutter Unit & Widget Tests: **65/65 tests passed (100%)** (bổ sung 4 unit test trong [shift_delete_and_field_fix_011_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/shift_delete_and_field_fix_011_test.dart)).
+      - Live API Integration: Xác minh trực tiếp trên container `delivery_backend_api` và database PostGIS `delivery_postgis_db`: Xóa ca thành công, điểm giao bị hủy, bản ghi audit log `DELETE_SHIFT` được lưu. (Lưu ý: Sự cố thay đổi vị trí KH_001 trong ca test đã được xử lý khôi phục trong Task FIX-TEST-DATA-011B).
+
+31. **[ĐÃ HOÀN TẤT - TASK: FIX-TEST-DATA-011B] Khôi phục dữ liệu gốc KH_001 trên delivery_db & Quy tắc cách ly kiểm thử:**
+    - **1. Sự cố phát hiện:**
+      - Trong đợt nghiệm thu sống API của Task 011, thao tác gọi `verify-location` đã chạy trực tiếp trên database chính `delivery_db`. Thao tác này đã thay đổi bản ghi `saved_locations` của khách hàng `0988000001` (`KH_001`, `c0000000-0000-0000-0000-000000000001`) sang tọa độ test `(10.8422500, 106.8181500)`, ghi chú `'Cổng sắt hoa văn đã xác minh'` và đường dẫn ảnh không tồn tại `/api/v1/photos/test_verified.jpg`.
+    - **2. Khôi phục hoàn toàn dữ liệu gốc KH_001 (Restoration):**
+      - Thực hiện lệnh SQL `UPDATE` tiêu chuẩn trên bảng `saved_locations` đưa các trường về đúng giá trị gốc trong [init-db/01-init-db.sql](file:///d:/flutter create delivery_marker_app/init-db/01-init-db.sql):
+        * `latitude`: `10.8422150`
+        * `longitude`: `106.8181230`
+        * `geom`: `ST_SetSRID(ST_MakePoint(106.8181230, 10.8422150), 4326)`
+        * `gps_accuracy`: `4.5`
+        * `identification_notes`: `'Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân.'`
+        * `image_url`: `NULL`
+      - Trigger `trg_saved_locations_history` tự động ghi nhận một dòng lịch sử mới trong `location_history` (id: `48f3cbc1-9c5d-49a8-87fc-c3ec64fa319e`) lưu giữ trạng thái trước khi khôi phục.
+      - **Bảo toàn 100%:** Tuyệt đối không xóa bất kỳ dòng nào trong bảng `location_history`.
+    - **3. Quy chuẩn cách ly môi trường kiểm thử (Strict Policy):**
+      - Mọi test tích hợp có ghi/sửa/xóa dữ liệu bắt buộc phải chạy trên database kiểm thử riêng biệt (như `test_isolated_seed_db` hoặc database test tạm thời), tuyệt đối **NGHIÊM CẤM** chạy các test làm thay đổi dữ liệu trên `delivery_db`.
+
+32. **[ĐÃ HOÀN TẤT - TASK: FIX-TEST-DATA-011C] Khôi phục điểm giao ca SHF-20261025-001, Chốt chặn bảo vệ CSDL chính & Báo cáo cơ chế đồng bộ đa ca:**
+    - **1. Đồng bộ điểm giao `d4e38099-e8de-4b1d-9006-b3481cd35b21` (Ca `SHF-20261025-001`, KH_001):**
+      - Cập nhật điểm giao và `saved_locations` về đúng dữ liệu gốc: tọa độ `(10.8422150, 106.8181230)`, ghi chú gốc `'Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân.'` và khôi phục ảnh thực tế trên ổ cứng `6ffc3833-1f78-48c8-8624-3041f25449f9.jpg` (thay vì ảnh giả không tồn tại `test_verified.jpg`).
+      - Bảo toàn 100% `location_history` và `audit_logs` (không xóa dòng nào).
+    - **2. Báo cáo cơ chế đồng bộ đa ca làm điểm ca khác bị đổi:**
+      - Phát hiện tại [shifts.controller.ts:L928-L946](file:///d:/flutter create delivery_marker_app/backend/src/controllers/shifts.controller.ts#L928-L946), câu lệnh UPDATE đồng bộ tự động `shift_delivery_points` sang các ca khác đang ở trạng thái `PREPARING` hoặc `IN_PROGRESS` của shipper khi một ca gọi `verifyPointLocation`. (Chỉ báo cáo, giữ nguyên chưa sửa mã nguồn theo đúng chỉ đạo).
+    - **3. Chốt chặn bảo vệ CSDL chính & CSDL test riêng (`test_isolated_seed_db`):**
+      - Tạo script [setup-test-db.ts](file:///d:/flutter create delivery_marker_app/backend/scripts/setup-test-db.ts) nạp schema PostGIS và seed dữ liệu sạch vào `test_isolated_seed_db`.
+      - Bổ sung hàm chốt chặn `assertSafeDatabaseForTests` trong [db.ts](file:///d:/flutter create delivery_marker_app/backend/src/db.ts): nếu phát hiện môi trường test (`NODE_ENV=test` hoặc `IS_INTEGRATION_TEST=true`) kết nối tới `delivery_db`, hệ thống lập tức từ chối và ném lỗi `[CRITICAL GUARDRAIL BLOCKED]`.
+      - Bổ sung bộ kiểm thử [database-guard.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/database-guard.spec.ts) và scripts `test:setup-db`, `test:integration` trong `package.json`.
+
+33. **[ĐÃ HOÀN TẤT - TASK: LOCATION-RULES-012] Quy Chuẩn Vị Trí Mới, Tách Biệt Ca - Danh Bạ & Quyền Xóa Vị Trí Cho Shipper:**
+    - **1. Quy tắc 1 & 2 — Phân định rạch ròi trạng thái vị trí:**
+      - Bảng `saved_locations` đại diện cho vị trí đã xác nhận (`ĐÃ XÁC NHẬN`), **không** thêm cột trạng thái mới vào `saved_locations`.
+      - Vị trí `TEMPORARY` chỉ tồn tại cục bộ trong ca làm việc (`shift_delivery_points.location_status = 'TEMPORARY'`), tuyệt đối không ghi vào `saved_locations`.
+    - **2. Quy tắc 3 & Bổ sung bắt buộc 1 — Tinh gọn màn hình ca và gỡ đồng bộ chéo giữa các ca:**
+      - Trong [crosshair_location_picker_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/crosshair_location_picker_view.dart): Khi mở từ luồng ca (`shiftId.isNotEmpty`), bỏ nút "XÁC MINH CỔNG NHÀ", chỉ hiển thị nút duy nhất "LƯU VỊ TRÍ TẠM". Luồng ca không còn gọi `verifyPointLocation`.
+      - Trong [shifts.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/shifts.controller.ts): Gỡ bỏ đoạn code "Synchronize other active shift delivery points" khỏi `verifyPointLocation` để không tự động ghi đè điểm giao của cùng khách hàng ở các ca khác.
+    - **3. Quy tắc 4 — Luồng xác nhận chuẩn từ Danh bạ sang CSDL:**
+      - Luồng chuẩn: `Danh bạ -> Hồ sơ khách -> Bấm chọn trên bản đồ -> Tâm ngắm -> Xác nhận vị trí` => gọi [saveOrUpdateCustomerLocation](file:///d:/flutter create delivery_marker_app/backend/src/controllers/locations.controller.ts) ghi `saved_locations`.
+      - Điểm giao trong các ca đang chạy (`PREPARING`, `IN_PROGRESS`) của khách đó tự động chuyển sang `VERIFIED` theo tọa độ, ghi chú và ảnh mới.
+      - Ghi lại số lượng điểm giao được đồng bộ (`updatedShiftPointsCount`) vào trường `details` của `audit_logs` (`VERIFY_LOCATION_FROM_DIRECTORY`).
+    - **4. Quy tắc 5 — Quyền Shipper xóa vị trí đã lưu của chính mình:**
+      - Bổ sung API `DELETE /api/v1/customers/:customerId/location` trong [locations.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/locations.controller.ts) và [app.ts](file:///d:/flutter create delivery_marker_app/backend/src/app.ts).
+      - Kiểm soát quyền chặt chẽ (RBAC + Area Scope): Shipper chỉ được xóa vị trí do chính mình tạo/cập nhật (`created_by === shipperId || updated_by === shipperId`) và khách hàng phải thuộc khu vực shipper phụ trách (`user_areas`). Tài khoản `ADMIN` có quyền xóa mọi vị trí.
+      - Bảo toàn lịch sử kiểm toán: Tách `saved_location_id = NULL` trong `location_history` trước khi xóa `saved_locations` để tránh phá vỡ ràng buộc khóa ngoại và bảo tồn 100% lịch sử. Ghi nhật ký `audit_logs` hành động `DELETE_LOCATION` kèm `{ revertedShiftPointsCount }`.
+      - Điểm giao trong các ca đang chuẩn bị / đang chạy của khách đó tự động quay về `NO_LOCATION` và xóa tọa độ/ghi chú/ảnh trong ca.
+      - Mobile [customer_directory_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart) & [api_service.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/api_service.dart): Hiển thị nút "Xóa vị trí" nổi bật khi khách có tọa độ. Bấm vào hiển thị hộp thoại xác nhận cảnh báo trước khi gọi API xóa và cập nhật giao diện thời gian thực.
+    - **5. Quy tắc 6, Bổ sung 2 & 3 — Cách ly kiểm thử nghiêm ngặt & Automated Tests:**
+      - Mọi test tích hợp ghi dữ liệu chạy 100% trên `test_isolated_seed_db` qua [setup-test-db.ts](file:///d:/flutter create delivery_marker_app/backend/scripts/setup-test-db.ts). Chốt chặn `assertSafeDatabaseForTests` bảo vệ tuyệt đối CSDL `delivery_db`.
+      - Viết test tích hợp toàn diện [location-rules-012.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/location-rules-012.integration.spec.ts) và test giao diện [location_rules_012_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/location_rules_012_test.dart).
+      - Backend: **105/105 tests passed (100%)** qua 7 test suites.
+      - Flutter: `flutter analyze` **0 issues**, `flutter test` **69/69 tests passed (100%)**.
+      - Live Database `delivery_db` được giữ nguyên vẹn 100%.
+
+34. **[ĐÃ HOÀN TẤT - TASK: LOCATION-RULES-012B] Khóa Chặt Đường verify-location Trong Ca, Cô Lập Tuyệt Đối Điểm Giao Ca & Bảo Vệ Vị Trí TEMPORARY:**
+    - **1. Tắt hẳn luồng `verify-location` từ ca:**
+      - Trong [shifts.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/shifts.controller.ts): Hàm `verifyPointLocation` được cấu hình trả về **HTTP 410 Gone** kèm thông báo hướng dẫn rõ ràng: *"Endpoint xác minh vị trí trong ca đã ngừng hoạt động (410 Gone). Theo quy chuẩn LOCATION-RULES-012, vị trí chuẩn chỉ được xác nhận qua luồng Danh bạ -> Hồ sơ khách -> Xác nhận vị trí."* Tuyệt đối không còn bất kỳ khả năng nào ghi đè hay cập nhật `saved_locations` từ ca.
+      - Trong Mobile App [api_service.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/api_service.dart): Xóa bỏ hoàn toàn hàm `ApiService.verifyShiftLocation`.
+    - **2. Sửa và chuẩn hóa `deleteCustomerLocation` ([locations.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/locations.controller.ts)):**
+      - *Bảo vệ ghim TEMPORARY:* Thêm điều kiện `AND sdp.location_status = 'VERIFIED'`. Khi xóa vị trí đã lưu, các điểm giao có trạng thái `TEMPORARY` (ghim tạm thời của shipper) được **GIỮ NGUYÊN 100%** tọa độ và ghi chú.
+      - *Giới hạn ca shipper xóa:* Thêm điều kiện `AND s.shipper_id = $2 AND (s.status = 'PREPARING' OR s.status = 'IN_PROGRESS')` (đối với SHIPPER). Chỉ cập nhật điểm giao thuộc ca của chính shipper đó, không ảnh hưởng tới ca của shipper khác.
+    - **3. Chuẩn hóa câu UPDATE đồng bộ trong `saveOrUpdateCustomerLocation` ([locations.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/locations.controller.ts)):**
+      - Sửa điều kiện WHERE: Thay thế `(s.status = 'PREPARING' OR (s.status = 'IN_PROGRESS' AND s.shipper_id = $9))` bằng `s.shipper_id = $9 AND (s.status = 'PREPARING' OR s.status = 'IN_PROGRESS')`. Khi Shipper A xác nhận vị trí cho khách hàng, các ca của Shipper B (kể cả đang ở `PREPARING` hay `IN_PROGRESS`) **hoàn toàn KHÔNG bị đụng chạm**.
+    - **4. Kiểm thử tích hợp thật & Coverage ([location-rules-012.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/location-rules-012.integration.spec.ts)):**
+      - Toàn bộ các bài test đều gọi trực tiếp hàm controller thật (`saveOrUpdateCustomerLocation`, `deleteCustomerLocation`, `verifyPointLocation`), không tự viết SQL thay thế logic nghiệp vụ.
+      - Bổ sung kiểm thử: Xóa vị trí giữ nguyên điểm giao `TEMPORARY`.
+      - Bổ sung kiểm thử: Shipper A bị từ chối `403 Forbidden` khi xóa vị trí ngoài khu vực phụ trách.
+      - Bổ sung kiểm thử: Shipper A xác nhận vị trí không làm thay đổi điểm giao trong ca của Shipper B.
+      - Bổ sung kiểm thử: Gọi `verifyPointLocation` trả về đúng 410 Gone.
+      - Backend: **108/108 tests passed (100%)** qua 7 test suites trên `test_isolated_seed_db`.
+      - Flutter: `flutter analyze` **0 issues**, `flutter test` **69/69 tests passed (100%)**.
+    - **5. Dựng lại container Backend & Build APK Debug:**
+      - Rebuild container: `docker compose up -d --build backend` thành công (`delivery_backend_api` Started, `delivery_postgis_db` giữ nguyên).
+      - Kiểm tra API sống bằng GET: `Invoke-WebRequest -Uri 'http://localhost:3000/api/docs/' -Method Get` trả về **200 OK**.
+      - Build APK Debug: `flutter build apk --debug` thành công: `build\app\outputs\flutter-apk\app-debug.apk` (136.5s).
+      - CSDL `delivery_db` được bảo toàn nguyên vẹn 100%, 0 request ghi dữ liệu nào vào API sống hay DB sống.
+
+35. **[ĐÃ HOÀN TẤT - TASK: QUICK-ADD-CUSTOMER-013] Tinh Gọn Luồng Thêm Nhanh Khách Hàng (Quick Add Customer), Chuẩn Hóa SĐT & Chống Trùng Lặp:**
+    - **1. Thiết kế Giao diện Thêm Nhanh Chuẩn ([quick_add_customer_sheet.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/quick_add_customer_sheet.dart)):**
+      - **Chỉ bắt buộc 1 ô duy nhất:** Trường SĐT khách hàng (`phoneNumber`).
+      - **Tương tác mượt mà:** Tự động focus (`autofocus: true`), bàn phím số điện thoại (`keyboardType: TextInputType.phone`), phím Enter/Done trên bàn phím hoặc nút bấm `"TẠO"` lập tức kích hoạt luồng tạo.
+      - **Chuẩn hóa SĐT & Hiển thị trực tiếp:** Tự động chuẩn hóa số điện thoại theo định dạng chuẩn Việt Nam 10 chữ số (xóa khoảng trắng, dấu ngoặc, chuyển đầu 84 thành 0, thêm số 0 đầu nếu nhập 9 số). Hiển thị số đã chuẩn hóa live bên dưới ô nhập (`Số đã chuẩn hóa: XXXXXXXXXX (10 số)`).
+      - **Cảnh báo chống tạo khách rác do gõ nhầm:** Trước khi tạo, nếu số đã chuẩn hóa có số lượng chữ số khác 10 (`length != 10`), hiển thị AlertDialog xác nhận: `"Số này có X chữ số ($cleanPhone), bạn có chắc?"` với 2 nút `"HỦY"` và `"TIẾP TỤC"`.
+      - **Thông tin tùy chọn mặc định ẩn:** Các trường Tên khách hàng, Địa chỉ giao hàng và Ghi chú vị trí được thu gọn vào mục `"Thêm thông tin (Tên, địa chỉ, ghi chú)"`. Bấm vào sẽ mở rộng để người dùng nhập nếu muốn.
+      - **Giá trị mặc định chuẩn:** Nếu để trống Tên, tự động nhận `"Khách [SĐT]"`. Nếu để trống Địa chỉ, tự động nhận `"Chưa cập nhật địa chỉ"`.
+      - **Chống tạo trùng & Tự mở hồ sơ:** Nếu số điện thoại đã tồn tại trong hệ thống, backend trả về `200 OK` kèm `isExisting: true`, Flutter không báo lỗi Conflict mà lập tức hiển thị thông báo và mở ngay hồ sơ khách hàng đó (`CustomerDetailEditView`).
+      - **Quản lý khu vực theo shipper phụ trách:** Tự động lấy khu vực phân công của shipper qua API `GET /api/v1/areas/my-areas`. Nếu shipper phụ trách nhiều khu vực (>1) và chưa có khu vực ưa thích, hệ thống mở hộp thoại hỏi chọn 1 lần duy nhất và lưu vào `SharedPreferences` (`preferred_customer_area_id`).
+    - **2. Đồng bộ toàn bộ các điểm thêm khách trong ứng dụng:**
+      - Áp dụng trên Danh bạ khách hàng [customer_directory_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart) qua hàm `_openCreateCustomerSheet()`.
+      - Áp dụng trên Màn hình chuẩn bị ca [shift_preparation_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_preparation_view.dart) qua hàm `_showQuickCreateCustomerBottomSheet()`.
+    - **3. Cập nhật Backend & API ([customers.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/customers.controller.ts), [admin.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/admin.controller.ts), [shifts.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/shifts.controller.ts), [app.ts](file:///d:/flutter create delivery_marker_app/backend/src/app.ts)):**
+      - Bổ sung endpoint `GET /api/v1/areas/my-areas` cho phép `SHIPPER` và `ADMIN` truy vấn các khu vực được phân công.
+      - `createCustomer`: Xử lý khi SĐT đã tồn tại -> trả về `200 OK` kèm `{ success: true, isExisting: true, data: existingCustomer }`; đồng thời áp dụng mặc định `"Khách [SĐT]"` và `"Chưa cập nhật địa chỉ"`.
+      - `addPointToShift`: Đồng bộ giá trị mặc định cho khách mới tạo qua ca làm.
+    - **4. Kiểm thử tự động & Tuân thủ quy tắc an toàn:**
+      - **Backend Integration Tests:** Viết bộ test [quick-add-customer-013.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/quick-add-customer-013.integration.spec.ts) chạy trên CSDL cô lập `test_isolated_seed_db`, gọi trực tiếp controller thật: **4/4 passed (100%)**.
+      - **Backend Total Tests:** `npm test` đạt **112/112 tests passed (100%)** qua 8 test suites. TypeScript biên dịch 0 lỗi (`tsc`).
+      - **Flutter Widget/Unit Tests:** Viết bộ test [quick_add_customer_013_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/quick_add_customer_013_test.dart) kiểm thử toàn diện: chuẩn hóa SĐT, autofocus, bàn phím, ẩn/hiện thông tin tùy chọn, live preview SĐT, cảnh báo số khác 10 chữ số: **6/6 passed (100%)**.
+      - **Flutter Total Tests:** `flutter test` đạt **75/75 tests passed (100%)**. `flutter analyze` đạt **0 issues found**.
+      - **Rebuild Backend Container:** `docker compose up -d --build backend` thành công (`delivery_backend_api` Started, `delivery_postgis_db` giữ nguyên).
+      - **Kiểm tra API sống:** `GET http://localhost:3000/api/docs/` trả về **200 OK**. Tuyệt đối không gửi request ghi (POST/PUT/PATCH/DELETE) vào API sống hay `delivery_db`.
+      - **Build APK Debug:** `flutter build apk --debug` thành công.
+
+36. **[ĐÃ HOÀN TẤT - TASK: QUICK-ADD-013B] Siết Quyền Khu Vực (403 Forbidden), Tự Động Làm Sạch Preferred Area & Chuẩn Hóa Khu Vực Ca:**
+    - **1. Backend `createCustomer` & `addPointToShift` — Cấm âm thầm đổi khu vực (403 Forbidden):**
+      - Trong [customers.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/customers.controller.ts) và [shifts.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/shifts.controller.ts): Khi `areaId` được gửi lên trong payload yêu cầu, hệ thống kiểm tra ngay lập tức quyền phân công khu vực của shipper (`assignedAreaIds.includes(areaId)`).
+      - Nếu `areaId` không thuộc khu vực shipper được phân công (và không phải `ADMIN`), backend lập tức trả về **HTTP 403 Forbidden** kèm thông báo rõ ràng: *"Khu vực được chỉ định không thuộc khu vực bạn được phân công phụ trách"*.
+      - Tuyệt đối **không âm thầm đổi** sang khu vực khác (`assignedAreaIds[0]`) như phiên bản trước.
+    - **2. Flutter — Tự động làm sạch và hỏi chọn lại khi `preferred_customer_area_id` hết hiệu lực:**
+      - Trong [api_service.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/api_service.dart): Bổ sung hàm `clearPreferredAreaId()` xóa khóa `preferred_customer_area_id` khỏi `SharedPreferences`.
+      - Trong [quick_add_customer_sheet.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/quick_add_customer_sheet.dart): Trong `_loadAreas()`, khi đọc `preferred_customer_area_id`, đối chiếu với danh sách khu vực thực tế trả về từ `getMyAreas()`. Nếu khu vực đã lưu không còn tồn tại trong danh sách được phân công của shipper, hệ thống tự động:
+        1. Gọi `ApiService.clearPreferredAreaId()` để xóa giá trị cũ không còn hợp lệ.
+        2. Nếu shipper có duy nhất 1 khu vực, tự động nhận khu vực đó và cập nhật lại.
+        3. Nếu shipper có >1 khu vực được phân công, tự động mở ngay hộp thoại `_promptSelectArea()` hỏi shipper chọn lại khu vực phụ trách.
+    - **3. Báo cáo & Sửa trường `areaId` của `ShiftModel` & Màn hình chuẩn bị ca:**
+      - **Báo cáo cấu trúc:** `ShiftModel` (và bảng CSDL `shifts`) **HOÀN TOÀN KHÔNG CÓ trường `areaId`**. Bảng `shifts` chỉ gồm: `id`, `shift_code`, `work_date`, `shipper_id`, `status`. Do đó, `_currentShift.areaId` luôn là `null`.
+      - **Báo cáo khu vực thực tế trước đây:** Khi tạo khách từ màn chuẩn bị ca, trước đây code truyền `prefilledAreaId: _currentShift.deliveryPoints.isNotEmpty ? _currentShift.deliveryPoints.first.areaId : null`. Nghĩa là nếu ca đã có điểm giao, nó lấy khu vực của *điểm giao đầu tiên* (có thể lệch với khu vực shipper chọn hôm nay); nếu ca chưa có điểm giao, nó rơi về `preferred_customer_area_id`.
+      - **Sửa triệt để:** Trong [shift_preparation_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_preparation_view.dart), loại bỏ hoàn toàn `prefilledAreaId` (để `null`). `QuickAddCustomerSheet` sẽ tự động giải quyết theo đúng khu vực shipper đã chọn / mặc định thông qua `preferred_customer_area_id` đã được xác thực với `getMyAreas()`.
+    - **4. Báo cáo & Kiểm thử số điện thoại đã tồn tại nhập ở màn chuẩn bị ca:**
+      - **Báo cáo luồng hoạt động:** Số điện thoại đã tồn tại khi nhập ở màn chuẩn bị ca **ĐƯỢC THÊM VÀO CA ĐẦY ĐỦ**:
+        - *Qua ô tìm kiếm:* `_lookupAndAddCustomer()` tra cứu SĐT qua `lookupCustomerLocationByPhone()`, tìm thấy hồ sơ khách và gọi `ApiService.addPointToShift()` thêm vào ca làm, cập nhật thống kê ca.
+        - *Qua BottomSheet:* `QuickAddCustomerSheet` gọi `createCustomer()` nhận về `200 OK` (`isExisting: true`), sau đó `_showQuickCreateCustomerBottomSheet()` tự động gọi `ApiService.addPointToShift()` đưa khách vào ca.
+        - *Kiểm soát khu vực:* Nếu SĐT đã tồn tại nhưng thuộc khu vực shipper không được phân công phụ trách, backend trả về `403 Forbidden` (`Khách hàng này thuộc khu vực bạn không được phân công phụ trách`), ngăn ngừa nhầm lẫn ca làm ngoài khu vực.
+    - **5. Kiểm thử tự động, Dựng lại Backend & Build APK Debug:**
+      - **Backend Integration Tests:** [quick-add-customer-013.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/quick-add-customer-013.integration.spec.ts) mở rộng thêm 4 test cases cho Task 013B chạy trên `test_isolated_seed_db`: **8/8 passed (100%)**.
+      - **Backend Full Suite:** `npm test` đạt **116/116 tests passed (100%)** qua 8 test suites. `tsc` 0 lỗi.
+      - **Flutter Tests:** [quick_add_customer_013_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/quick_add_customer_013_test.dart) bổ sung 2 test cases kiểm thử làm sạch `preferred_customer_area_id`: **8/8 passed (100%)**.
+      - **Flutter Full Suite:** `flutter test` đạt **77/77 tests passed (100%)**. `flutter analyze` đạt **0 issues found** (No issues found, ran in 60.5s).
+      - **Rebuild Backend Container:** `docker compose up -d --build backend` thành công.
+      - **Kiểm tra API sống:** `GET http://localhost:3000/api/docs/` trả về **200 OK**. Không có bất kỳ truy vấn ghi nào tác động vào API sống hay `delivery_db`.
+      - **Build APK Debug:** `flutter build apk --debug` thành công.
+      - **Phân định thực tế kiểm thử:**
+        - **[ĐÃ TEST]:** Automated unit tests và integration tests chạy thành công 100% trên môi trường cô lập `test_isolated_seed_db` và Flutter test engine.
+        - **[CHƯA THỬ TRÊN ĐIỆN THOẠI]:** Chưa chạy thử nghiệm trên thiết bị vật lý thật.
+
+37. **[ĐÃ HOÀN TẤT - TASK: MASTER-MAP-014] Bản Đồ Chính Độc Lập Ca (Master Map), Gom Cụm Marker (Clustering), Ghim Tâm Ngắm & Tự Động Tạo Khách / Cập Nhật Bảo Toàn Lịch Sử:**
+    - **1. Khảo sát hiện trạng kết nối luồng thật (Pre-edit Verification):**
+      - [main.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/main.dart): **ĐÃ GẮN VÀO LUỒNG THẬT**. `AuthSplashScreen` khởi chạy kiểm tra token xác thực qua `ApiService.getToken()`; nếu hợp lệ điều hướng thẳng vào [home_shell_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/home_shell_view.dart), nếu chưa đăng nhập điều hướng vào `LoginView`.
+      - [home_shell_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/home_shell_view.dart): **ĐÃ GẮN VÀO LUỒNG THẬT**. Đóng vai trò vỏ bọc chính điều hướng 3 tab qua `IndexedStack`: Tab 0 là Bản đồ ([main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart)), Tab 1 là Danh bạ ([customer_directory_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart)), Tab 2 là Ca làm việc ([shift_list_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_list_view.dart)).
+      - [customer_directory_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart): **ĐÃ GẮN VÀO LUỒNG THẬT**. Tab 1 của ứng dụng, kết nối trực tiếp các API CRUD khách hàng thật, tìm kiếm tức thì và bộ chọn ghim vị trí.
+      - [main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart): **ĐÃ GẮN VÀO LUỒNG THẬT** (Tab 0 mặc định khi mở app). Trước task này, view bị gắn chặt với `ShiftModel` (chỉ hiển thị điểm giao của ca được chọn). Đã được tái cấu trúc thành Bản đồ chính (Master Map) hoàn toàn độc lập với ca làm việc.
+    - **2. Bản đồ chính độc lập với ca & API lấy vị trí cá nhân:**
+      - **Backend ([locations.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/locations.controller.ts), [app.ts](file:///d:/flutter create delivery_marker_app/backend/src/app.ts)):** Bổ sung endpoint `GET /api/v1/locations/my-saved-locations` phục vụ hàm `getMySavedLocations`.
+      - **Phạm vi truy vấn:** Trả về toàn bộ bản ghi trong `saved_locations` do chính shipper đang đăng nhập tạo hoặc cập nhật (`sl.created_by = $shipperId OR sl.updated_by = $shipperId`) (đối với tài khoản `ADMIN` trả về toàn bộ).
+      - **Dữ liệu trả về đầy đủ:** Tên khách hàng (`customer_name`), SĐT (`customer_phone`), địa chỉ (`address_text`), tọa độ (`latitude`, `longitude`), độ chính xác GPS (`gps_accuracy`), ghi chú nhận diện (`identification_notes`), URL ảnh thực tế (`image_url`), thời điểm tạo/cập nhật.
+      - **Mobile ([api_service.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/api_service.dart), [location_model.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/models/location_model.dart)):** Bổ sung model `MasterSavedLocationModel` và hàm `ApiService.getMySavedLocations()`. Mở app là tự động tải và hiển thị ngay tất cả các điểm đã lưu của shipper.
+    - **3. Thuật toán gom cụm Marker thông minh (Marker Clustering):**
+      - Tích hợp thuật toán nhóm cụm marker địa lý theo cấp độ thu phóng bản đồ (`_clusterLocations`):
+        * Ngưỡng gom cụm tính toán theo zoom level (`threshold = 0.08 / 2^(zoom - 10)`).
+        * Ở mức zoom xa / trung bình (< 16.5): Các điểm gần nhau tự động gộp thành marker cụm tròn màu xanh dương Navy với badge số lượng điểm (`count`). Chạm vào cụm marker sẽ kích hoạt hiệu ứng di chuyển mượt mà phóng to bản đồ đến tâm cụm (`_mapController.move(cluster.center, zoom + 2.5)`).
+        * Ở mức zoom gần (>= 16.5): Tách thành các marker đơn lẻ màu xanh lá đặc trưng cho trạng thái `ĐÃ XÁC NHẬN` (`Icons.check_circle_rounded`). Chạm vào marker đơn lẻ mở thẻ chi tiết vị trí chân trang với đầy đủ tên khách, SĐT (gọi trực tiếp `tel:`), ghi chú, xem ảnh phóng to pinch-to-zoom và nút chỉ đường Google Maps ngoài.
+    - **4. Nút nổi "Ghim vị trí mới" & Chế độ tâm ngắm trên Bản đồ chính:**
+      - Thêm nút nổi `FloatingActionButton.extended` màu xanh `#2563EB` ở góc dưới bên phải màn hình: icon `Icons.add_location_alt_rounded` nhãn `"Ghim vị trí mới"`.
+      - Bấm nút kích hoạt Chế độ tâm ngắm trực tiếp trên bản đồ:
+        * Tâm ngắm chuẩn xác giữ cố định ở chính giữa màn hình. Shipper tùy ý kéo/di chuyển/phóng to bản đồ đến bất kỳ đâu.
+        * Tích hợp thanh tìm kiếm địa chỉ Geocoding OpenStreetMap Photon trên cùng: gõ địa chỉ, chọn gợi ý sẽ lập tức bay bản đồ đến khu vực đó.
+        * Hai nút chân trang: `"HỦY"` (thoát chế độ tâm ngắm, bảo toàn bản đồ) và `"XÁC NHẬN VỊ TRÍ NÀY"`.
+    - **5. Hộp thoại "Gán cho số điện thoại nào?" & Tự động tạo khách mới:**
+      - Bấm `"XÁC NHẬN VỊ TRÍ NÀY"` mở Modal Bottom Sheet bo góc 24px:
+        * Ô nhập SĐT tự động focus (`autofocus: true`), bàn phím số (`TextInputType.phone`).
+        * Chuẩn hóa SĐT live bên dưới ô nhập, cảnh báo nếu khác 10 số.
+        * Gợi ý trực quan danh sách khách hàng đã có trong danh bạ khớp với số đang gõ; chạm vào gợi ý điền ngay SĐT và Tên.
+        * Hỗ trợ gõ số điện thoại hoàn toàn mới bất kỳ (VD: `0908911111`).
+        * Mục mở rộng tùy chọn cho phép nhập thêm Tên khách và Ghi chú nhận diện.
+      - Bấm `"LƯU VỊ TRÍ NÀY"`:
+        * Nếu số điện thoại mới: Tự động gọi `ApiService.createCustomer` tạo hồ sơ khách hàng mới (chỉ cần SĐT, tên mặc định `"Khách [SĐT]"`, khu vực phụ trách của shipper).
+        * Ghi tọa độ tâm ngắm vào `saved_locations` qua `ApiService.updateCustomerLocationAndPhoto`. Mọi điểm lưu vào `saved_locations` đều có trạng thái canonical là **ĐÃ XÁC NHẬN** (`VERIFIED`).
+        * Tự động làm mới danh sách và hiển thị marker ngay lập tức trên bản đồ chính, di chuyển khung nhìn tới vị trí vừa ghim.
+    - **6. Hỏi xác nhận thay thế vị trí cũ & Bảo toàn 100% lịch sử kiểm toán:**
+      - Nếu số điện thoại đã tồn tại và đã có vị trí lưu từ trước: Hệ thống mở hộp thoại AlertDialog xác nhận:
+        *"Khách hàng [Tên khách] đã có vị trí đã lưu từ trước. Bạn có chắc chắn muốn thay thế bằng vị trí mới này? (Lịch sử vị trí cũ vẫn được lưu trữ đầy đủ trong hệ thống)"* với 2 nút `"HỦY"` và `"THAY VỊ TRÍ CŨ"`.
+      - Khi shipper bấm `"THAY VỊ TRÍ CŨ"`: Cập nhật `saved_locations`. Trigger PostgreSQL `trg_log_location_history` trong CSDL tự động lưu trữ bản ghi vị trí cũ vào bảng `location_history`, bảo tồn 100% lịch sử và dấu vết kiểm toán (AGENTS.md rule 2.5).
+    - **7. Kết quả kiểm thử tự động & Nghiệm thu:**
+      - **Backend Integration Tests ([master-map-014.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/master-map-014.integration.spec.ts)):** Viết 4 kịch bản kiểm thử tích hợp trên `test_isolated_seed_db` gọi trực tiếp code controller thật:
+        * Shipper A đăng nhập chỉ thấy các điểm do chính Shipper A lưu (`KH_001`), không thấy điểm của Shipper B (`KH_004`).
+        * Shipper B đăng nhập chỉ thấy điểm do Shipper B lưu (`KH_004`).
+        * Luồng ghim vị trí mới số `0908911111`: Tự tạo khách và lưu vị trí `VERIFIED`, `getMySavedLocations` trả về điểm mới.
+        * Thay vị trí cũ: Cập nhật `saved_locations` và trigger tự động lưu bản ghi vào `location_history`.
+        * Kết quả: **4/4 passed (100%)**.
+      - **Backend Full Test Suite:** `npm test` đạt **120/120 tests passed (100%)** qua 9 test suites. TypeScript biên dịch 0 lỗi (`tsc`).
+      - **Flutter Tests ([master_map_014_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/master_map_014_test.dart)):** Viết 3 tests kiểm thử parser `MasterSavedLocationModel`, giao diện bản đồ không phụ thuộc ca, nút Ghim vị trí mới và chế độ tâm ngắm.
+      - **Flutter Full Test Suite:** `flutter test` đạt **80/80 tests passed (100%)**. `flutter analyze` đạt **0 issues found** (No issues found!).
+      - **Dựng lại Container Backend:** `docker compose up -d --build backend` thành công.
+      - **Kiểm tra API sống:** `GET http://localhost:3000/api/docs/` trả về **200 OK**. Không gửi bất kỳ request ghi nào lên API sống hay `delivery_db`.
+      - **Phân định thực tế kiểm thử:**
+        * **[ĐÃ TEST]:** Toàn bộ automated unit & integration tests trên `test_isolated_seed_db` và Flutter test engine (120 backend tests, 80 Flutter tests).
+        * **[CHƯA THỬ TRÊN ĐIỆN THOẠI]:** Chưa cài đặt và kiểm thử trực tiếp trên điện thoại vật lý thật.
+
+38. **[ĐÃ HOÀN TẤT - TASK: MASTER-MAP-014B] Khôi Phục Test Gốc Map-First, Cảnh Báo Lỗi Kèm Nút Thử Lại & Báo Cáo Cơ Chế Hiển Thị Đa Shipper:**
+    - **1. Báo cáo & Khôi phục kiểm thử [map_first_architecture_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/map_first_architecture_test.dart):**
+      - *Hiện tượng:* Trong Task 014 trước đó, khi viết thanh tiêu đề nổi của `MainMapView`, icon `Icons.map_rounded` được thêm vào thanh tiêu đề. Khi widget test chạy `HomeShellView(initialTab: 0)`, cây widget tồn tại đồng thời 2 widget `Icons.map_rounded` (1 trong `NavigationBar`, 1 trong header `MainMapView`), khiến lệnh `expect(find.byIcon(Icons.map_rounded), findsOneWidget)` bị fail do tìm thấy 2 widget.
+      - *Sửa đổi cũ:* Trước đó test assertion đã được thu hẹp phạm vi tìm kiếm thành `expect(find.descendant(of: find.byType(NavigationBar), matching: find.byIcon(Icons.map_rounded)), findsOneWidget)`.
+      - *Khôi phục chuẩn xác:* Đã khôi phục 100% assertion gốc: `expect(find.byIcon(Icons.map_rounded), findsOneWidget);` trong [map_first_architecture_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/map_first_architecture_test.dart) (không có bất kỳ sửa đổi hay nới lỏng nào trong test).
+      - *Khắc phục xung đột tận gốc tại mã nguồn:* Đổi icon thanh tiêu đề của [main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart) từ `Icons.map_rounded` sang `Icons.pin_drop_rounded` (biểu tượng ghim vị trí chuẩn xác hơn cho bản đồ điểm đã lưu), loại bỏ hoàn toàn việc trùng lặp icon trên giao diện.
+    - **2. Xử lý lỗi ghim vị trí cho số mới & Nút "THỬ LẠI":**
+      - Trong [main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart), cập nhật hàm `_processSaveLocation`:
+        * Thêm biến cờ `isNewlyCreated` và tham số `String? knownCustomerId`.
+        * Khi tạo hồ sơ khách hàng mới thành công nhưng bước lưu tọa độ vào `saved_locations` gặp sự cố (mạng yếu, timeout, lỗi kết nối...):
+          1. Hiển thị thông báo rõ ràng: `"Đã tạo khách $phone nhưng chưa lưu được vị trí, thử lại"` qua SnackBar thời lượng dài (12s) có nút action `"THỬ LẠI"`.
+          2. Đồng thời mở hộp thoại `AlertDialog` cảnh báo chi tiết kèm 2 nút: `"ĐÓNG"` và `"THỬ LẠI"`, tuyệt đối không để im lặng.
+          3. Khi bấm `"THỬ LẠI"`, hệ thống tự động truyền `knownCustomerId = customerId` đã tạo trước đó để thực hiện lưu vị trí trực tiếp, không tạo khách hàng trùng lặp lần 2.
+    - **3. Báo cáo cơ chế hiển thị điểm trên Bản đồ chính khi Shipper A lưu và Shipper B cập nhật:**
+      - *Phân tích truy vấn Backend:* Endpoint `GET /api/v1/locations/my-saved-locations` lọc theo điều kiện:
+        `WHERE sl.created_by = $userId OR sl.updated_by = $userId`.
+      - *Phân tích thao tác CSDL:*
+        * Khi Shipper A tạo mới: `created_by = Shipper A`, `updated_by = Shipper A`.
+        * Khi Shipper B cập nhật vị trí: CSDL thực thi câu `UPDATE saved_locations SET updated_by = Shipper B, updated_at = NOW() WHERE customer_id = ...`. Lúc này `created_by` vẫn giữ nguyên là **Shipper A**, còn `updated_by` được gán thành **Shipper B**.
+      - *Kết luận:* Điểm đó sẽ hiện trên bản đồ chính của **CẢ HAI (Shipper A VÀ Shipper B)**:
+        * Shipper A thấy vì thỏa mãn điều kiện `sl.created_by = Shipper A`.
+        * Shipper B thấy vì thỏa mãn điều kiện `sl.updated_by = Shipper B`.
+        *(Nếu sau đó Shipper C cập nhật đè lên, thì C trở thành `updated_by`: lúc đó chỉ có A và C thấy, còn B không còn là người tạo lẫn người cập nhật mới nhất nên sẽ không còn thấy)*.
+    - **4. Kết quả kiểm thử tự động & Nghiệm thu:**
+      - **Backend Integration Tests:** `npm run test:integration` đạt **25/25 tests passed (100%)** trên CSDL `test_isolated_seed_db` qua 4 test suites.
+      - **Backend Unit Tests:** `npm test` đạt **120/120 tests passed (100%)** qua 9 test suites.
+      - **Flutter Tests:** `flutter test` đạt **82/82 tests passed (100%)** (gồm toàn bộ các test phục hồi và test retry mới).
+      - **Flutter Analyze:** `flutter analyze` đạt **No issues found!** (0 warning, 0 error).
+      - **Dựng lại Container Backend:** `docker compose up -d --build backend` thành công (`delivery_backend_api` Recreated & Started, `delivery_postgis_db` Healthy).
+      - **Kiểm tra API sống:** `GET http://localhost:3000/api/docs/` trả về **200 OK**. CSDL `delivery_db` được giữ nguyên vẹn 100%.
+      - **Phân định thực tế kiểm thử:**
+        * **[ĐÃ TEST]:** Automated unit & integration tests trên `test_isolated_seed_db` và Flutter test engine (120 backend tests, 82 mobile tests), xác minh liveness GET 200 OK.
+        * **[CHƯA THỬ TRÊN ĐIỆN THOẠI]:** Chưa cài đặt và kiểm thử trực tiếp trên điện thoại Android vật lý thật.
+
+39. **[ĐÃ HOÀN TẤT - TASK: MULTI-PHOTO-AND-THUMB-UI-015A] Hệ Thống Đa Ảnh Điểm Giao, Thẻ Chi Tiết Dành Cho Shipper Đi Xe Một Tay & Bảo Toàn Dữ Liệu:**
+    - **1. Mục tiêu & Cơ sở dữ liệu Idempotent ([06-create-customer-photos.sql](file:///d:/flutter create delivery_marker_app/init-db/06-create-customer-photos.sql)):**
+      - Mọi điểm vị trí trên bản đồ chính và bản đồ ca khi bấm vào LUÔN có khu vực ảnh do shipper chụp thêm, mỗi khách hàng có thể lưu trữ NHIỀU ảnh thực tế.
+      - Tạo bảng `customer_photos` (`id UUID PRIMARY KEY`, `customer_id UUID FK customers`, `image_url VARCHAR(500)`, `created_by UUID FK users`, `created_at TIMESTAMPTZ`, `deleted_at TIMESTAMPTZ` hỗ trợ xóa mềm). Ảnh gắn theo `customer_id`, do đó điểm ở trạng thái `TEMPORARY`, `VERIFIED`, hay chưa có vị trí `NO_LOCATION` đều lưu ảnh được.
+      - Migration chuyển toàn bộ ảnh cũ từ `saved_locations.image_url` và `shift_delivery_points.image_url` sang `customer_photos` bằng mệnh đề `WHERE NOT EXISTS` chống trùng lặp tuyệt đối khi chạy lại nhiều lần (idempotent). Giữ nguyên các cột cũ để tương thích ngược.
+      - Ràng buộc: Tối đa 10 ảnh hoạt động / khách, <= 5MB/ảnh, kiểm tra MIME magic bytes đầu tệp (`image/jpeg`, `image/png`, `image/webp`).
+    - **2. Backend Endpoints & Phục vụ ảnh có kiểm soát:**
+      - `GET /api/v1/customers/:customerId/photos`: Lấy danh sách ảnh mới nhất trước (`deleted_at IS NULL`), kiểm tra khu vực `checkCustomerAreaScope`.
+      - `POST /api/v1/customers/:customerId/photos`: Tải 1 ảnh lên (Base64), kiểm tra MIME magic bytes, kiểm tra giới hạn 10 ảnh, tạo tên file ngẫu nhiên UUID (`cust-photo-uuid.jpg`), lưu đĩa `/uploads`, ghi `audit_logs` action `ADD_PHOTO`.
+      - `DELETE /api/v1/customers/:customerId/photos/:photoId`: Xóa mềm (`deleted_at = NOW()`), chỉ shipper tải ảnh hoặc ADMIN mới có quyền, KHÔNG xóa file vật lý trên đĩa để bảo toàn chứng từ, ghi `audit_logs` action `DELETE_PHOTO`.
+      - Cập nhật `servePhoto`: Cho phép phục vụ ảnh từ `customer_photos` có `deleted_at IS NULL` với xác thực Bearer JWT + kiểm tra quyền khu vực. Chống path traversal, giữ header `Cache-Control: private, no-store`.
+      - Cập nhật các API trả điểm: `getMySavedLocations`, `getShiftDetail`, `lookupCustomerByPhone` trả thêm `photoCount` và mảng `photos` (tối đa 3 ảnh đầu để client render thumbnail nhanh).
+    - **3. Flutter: Thẻ Chi Tiết Điểm Cho Shipper Đi Xe Một Tay ([point_detail_bottom_sheet.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/point_detail_bottom_sheet.dart)):**
+      - Thẻ là bottom sheet bám đáy màn hình (vùng ngón cái), vuốt lên để xem thêm, vuốt xuống để đóng. Không đặt nút quan trọng ở góc trên.
+      - Trên cùng của thẻ: Dải ảnh cuộn ngang. Điểm chưa có ảnh vẫn luôn hiển thị ô "Chưa có ảnh - Thêm ảnh" lớn nổi bật, không bao giờ ẩn khu vực ảnh.
+      - Nút "+ Thêm ảnh" lớn (cao >= 56px) ngay trong dải ảnh: một chạm mở thẳng camera, chụp xong tự tải lên, có nút phụ chọn từ thư viện. Hỗ trợ chụp liên tiếp nhiều ảnh. Tự động nén ảnh trên client (cạnh dài <= 1600px, chất lượng 80) trước khi gửi. Hiển thị tiến trình tải và báo lỗi SnackBar rõ ràng nếu mất mạng.
+      - Nhấn giữ vào ảnh: Mở hộp thoại xác nhận xóa mềm.
+      - Dưới dải ảnh: Tên khách (20sp bold) + SĐT (18sp bold).
+      - Hàng 3 nút bấm lớn chia đều chiều ngang: `GỌI` (xanh lá) | `CHỈ ĐƯỜNG` (xanh dương) | `GHIM LẠI` (vàng hổ phách). Cỡ chạm tối thiểu 56px, khoảng cách giữa các nút >= 12px, cỡ chữ >= 16sp, độ tương phản cao dùng tốt ngoài trời nắng gắt.
+      - Ảnh tải bằng [authenticated_image.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/authenticated_image.dart) có Bearer token. Trình xem ảnh toàn màn hình [fullscreen_image_viewer.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/fullscreen_image_viewer.dart) hỗ trợ vuốt lướt giữa các ảnh (Gallery PageView).
+      - Tích hợp đồng bộ vào cả [main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart) và [shift_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_map_view.dart).
+    - **4. Kết quả kiểm thử tự động & Nghiệm thu:**
+      - **Backend Integration Tests ([multi-photo-015.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/multi-photo-015.integration.spec.ts)):** Đạt **17/17 tests passed (100%)** trên CSDL `test_isolated_seed_db` gọi controller thật:
+        * Thêm ảnh hợp lệ (JPG, PNG, WEBP), kiểm tra magic bytes.
+        * Chặn file sai định dạng (PDF/TXT), chặn file vượt quá 5MB.
+        * Kiểm tra giới hạn tối đa 10 ảnh / khách hàng.
+        * Xóa mềm: `deleted_at` được gán thời gian, file đĩa được giữ nguyên.
+        * Phân quyền xóa: Shipper khác không xóa được ảnh của Shipper A (403), Admin xóa được.
+        * Phân quyền khu vực: Shipper ngoài khu vực bị 403.
+        * `servePhoto`: Trả 200 cho ảnh hợp lệ; 404 cho ảnh đã xóa mềm hoặc không tồn tại; 403 cho người ngoài khu vực; chặn path traversal.
+        * Idempotent migration: Chạy lại migration không nhân đôi bản ghi.
+        * `audit_logs`: Ghi nhận đầy đủ `ADD_PHOTO` và `DELETE_PHOTO`.
+        * Các endpoint danh sách điểm trả đúng `photoCount` và mảng `photos` (tối đa 3 ảnh).
+      - **Backend Full Test Suite:** `npm run test:integration` đạt **42/42 tests passed (100%)** qua 5 test suites. `npm test` đạt **120/120 unit tests passed**. TypeScript `npm run build` biên dịch 0 lỗi.
+      - **Flutter Tests ([multi_photo_015_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/multi_photo_015_test.dart)):** Viết 2 widget tests kiểm tra kích thước nút >= 56px, khoảng cách >= 12px, font >= 16sp, khu vực ảnh luôn hiển thị kể cả khi 0 ảnh, nút Thêm ảnh hiện đủ, tương tác callback đầy đủ.
+      - **Flutter Full Test Suite:** `flutter test` đạt **84/84 tests passed (100%)**. `flutter analyze` đạt **0 issues found** (No issues found!).
+      - **Dựng lại Container Backend:** `docker compose up -d --build backend` thành công (`delivery_backend_api` Recreated & Started, `delivery_postgis_db` Healthy).
+      - **Kiểm tra API sống:** `GET http://localhost:3000/api/docs/` trả về **200 OK**. Tuyệt đối không gửi request ghi nào lên API sống hay `delivery_db`.
+      - **Build Debug APK:** Thành công sinh tệp `app-debug.apk`.
+      - **Phân định thực tế kiểm thử:**
+        * **[ĐÃ TEST]:** Toàn bộ automated unit & integration tests trên `test_isolated_seed_db` và Flutter test engine (120 backend unit tests, 42 backend integration tests, 84 Flutter mobile tests), xác minh liveness GET 200 OK.
+        * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa cài đặt và kiểm thử trực tiếp trên thiết bị di động vật lý ngoài thực địa.
+
+40. **[ĐÃ HOÀN TẤT - TASK: SHIFT-FROM-MAP-AND-BULK-PASTE-015B] Tạo Ca Từ Bản Đồ Chính, Dán Hàng Loạt Số Điện Thoại & Giao Diện Thao Tác Một Tay:**
+    - **1. Mục tiêu & Cơ sở dữ liệu Idempotent ([07-add-shift-name.sql](file:///d:/flutter create delivery_marker_app/init-db/07-add-shift-name.sql)):**
+      - Cho phép shipper tạo ca trực tiếp từ bản đồ chính, đặt tên ca linh hoạt, dán hàng loạt số điện thoại từ bộ nhớ tạm vào ca; bản đồ ca tự động hiển thị các điểm đã có vị trí và đưa các số chưa có vị trí vào danh sách "Cần xác nhận vị trí".
+      - Bổ sung an toàn cột `shift_name VARCHAR(100) NULL` vào bảng `shifts` bằng cú pháp `ALTER TABLE shifts ADD COLUMN IF NOT EXISTS shift_name VARCHAR(100) NULL;`.
+      - Giữ nguyên cột mã ca `shift_code` (`SHF-YYYYMMDD-XXX`). Ca cũ không có tên hiển thị `shift_code`.
+      - Tạo chỉ mục `idx_shifts_shift_name` tra cứu nhanh.
+    - **2. Backend Endpoints & Xử lý Transaction Hàng Loạt:**
+      - `POST /api/v1/shifts`: Nhận thêm `shiftName` (tùy chọn, tối đa 100 ký tự, trimmed). Trả `shiftName` trong tất cả các API ca (`listShifts`, `createShift`, `getShiftDetail`, `updateShiftStatus`).
+      - `PATCH /api/v1/shifts/:id/name`: Đổi tên ca làm việc, kiểm tra quyền sở hữu (chỉ chủ ca hoặc ADMIN), ghi vết `audit_logs` `UPDATE_SHIFT_NAME`.
+      - `POST /api/v1/shifts/:id/points/bulk`:
+        * Nhận `phones: string[]` hoặc `rawText: string`, `areaId?: string`.
+        * Tách số theo xuống dòng, dấu phẩy, dấu chấm phẩy. Giữ khoảng trắng và dấu chấm bên trong số (`0908 911 111`, `+84 908 911 111`, `0908.911.111`) rồi chuẩn hóa về 10 chữ số. Lọc trùng lặp (deduplicate).
+        * Giới hạn tối đa 200 số / lần (vượt quá trả 400 Bad Request).
+        * Xử lý nguyên tử trong một transaction: Số đã có khách và có vị trí lưu thêm vào ca dạng `VERIFIED`; số có khách nhưng chưa có vị trí thêm dạng `NO_LOCATION`; số chưa có khách tự tạo nhanh (`Khách [SĐT]`, `Chưa cập nhật địa chỉ`) gắn khu vực mặc định của shipper.
+        * Nếu shipper có nhiều khu vực mà chưa chọn `areaId`, transaction rollback và trả lỗi 400 yêu cầu chọn khu vực trước, tuyệt đối không tự lấy khu vực đầu.
+        * Số ngoài khu vực phụ trách: Từ chối riêng số đó vào nhóm `rejected` (`OUT_OF_AREA`), các số khác trong lô vẫn được tiếp tục xử lý thành công.
+        * Response trả 4 nhóm: `added`, `alreadyInShift`, `rejected`, `summary`.
+        * Ghi 1 dòng `audit_logs` `BULK_ADD_POINTS` cho cả lô lưu tổng kết số lượng.
+        * Giới hạn UPDATE/INSERT theo ca của chính shipper (shipper khác bị 403 Forbidden).
+    - **3. Flutter: Giao diện Thao Tác Một Tay Ở Vùng Ngón Cái:**
+      - Bản đồ chính ([main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart)): Bổ sung nút "Tạo ca" lớn (chiều cao 56px) đặt song song cạnh nút "Ghim vị trí mới" (chiều cao 56px) ở vùng ngón cái sát đáy màn hình.
+      - Hộp tạo ca ([create_shift_dialog.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/create_shift_dialog.dart)): Ô nhập duy nhất "Tên ca", tự focus, gợi ý sẵn "Ca sáng/chiều dd/MM", nút "TẠO CA VÀ MỞ BẢN ĐỒ" >= 56px. Tạo xong tự động chuyển hướng mở bản đồ ca trống.
+      - Bản đồ ca ([shift_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_map_view.dart)): Nút lớn "DÁN DANH SÁCH SĐT" (cao 56px) ở đáy màn hình.
+      - Bottom sheet dán số ([bulk_paste_phone_sheet.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/bulk_paste_phone_sheet.dart)):
+        * Nút "DÁN TỪ BỘ NHỚ TẠM" một chạm lấy clipboard.
+        * Ô văn bản lớn đa dòng, tự động xem trước số đã chuẩn hóa, đếm số hợp lệ và cảnh báo số sai định dạng bằng Wrap badges.
+        * Nút "THÊM VÀO CA" >= 56px.
+        * Sau khi thêm: hiển thị 2 nhóm rõ ràng "Đã có vị trí" (marker hiện ngay trên bản đồ ca, auto-fit bounds) và "Chưa có vị trí - cần xác nhận" (mỗi dòng có nút lớn "GHIM TÂM NGẮM" >= 56px để ghim tạm `TEMPORARY`), kèm nhóm "Bị từ chối" ghi rõ lý do.
+      - Tích hợp liền mạch thẻ chi tiết nhiều ảnh của Task 015A cho mọi điểm trên bản đồ ca.
+    - **4. Kết quả kiểm thử tự động & Nghiệm thu:**
+      - **Backend Integration Tests ([shift-bulk-015b.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/shift-bulk-015b.integration.spec.ts)):** Đạt **12/12 tests passed (100%)** trên CSDL `test_isolated_seed_db` gọi controller thật:
+        * Tách số và chuẩn hóa theo xuống dòng, phẩy, chấm phẩy, `+84`, khoảng trắng, dấu chấm.
+        * Lọc trùng lặp chính xác.
+        * Từ chối nếu trên 200 số (400 Bad Request).
+        * Shipper khác không thể thêm điểm vào ca (403 Forbidden).
+        * Xử lý lô hỗn hợp: VERIFIED, NO_LOCATION, tạo khách mới, sai định dạng, ngoài khu vực.
+        * Dán lại số đã có trong ca được phân vào nhóm `alreadyInShift`.
+        * Shipper có nhiều khu vực chưa chọn `areaId` bị trả lỗi 400 yêu cầu chọn.
+        * Tạo ca có và không có tên (`shiftName`).
+        * Đổi tên ca bởi chủ ca, Admin và chặn shipper khác (403).
+      - **Backend Full Test Suite:** `npm run test:integration` đạt **54/54 tests passed (100%)** qua 6 test suites. `npm test` đạt **149/149 unit & integration tests passed**. TypeScript `npm run build` biên dịch 0 lỗi.
+      - **Flutter Tests ([shift_bulk_015b_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/shift_bulk_015b_test.dart)):** Đạt **3/3 widget tests passed** kiểm tra hộp tên ca, bottom sheet dán số, hai nhóm kết quả, nút GHIM TÂM NGẮM >= 56px.
+      - **Flutter Full Test Suite:** `flutter test` đạt **87/87 tests passed (100%)** qua 13 test files. `flutter analyze` đạt **0 issues found** (No issues found!).
+      - **Dựng lại Container Backend:** `docker compose up -d --build backend` thành công (`delivery_backend_api` Recreated & Started, `delivery_postgis_db` Healthy).
+      - **Kiểm tra API sống:** `GET http://localhost:3000/api/docs/` trả về **200 OK**. Tuyệt đối không gửi request ghi nào lên API sống hay `delivery_db`.
+      - **Build Debug APK:** Thành công sinh tệp `app-debug.apk`.
+      - **Phân định thực tế kiểm thử:**
+        * **[ĐÃ TEST]:** Toàn bộ automated unit & integration tests trên `test_isolated_seed_db` và Flutter test engine (149 backend tests, 87 mobile tests), xác minh liveness GET 200 OK.
+        * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa cài đặt và kiểm thử trực tiếp trên thiết bị di động vật lý ngoài thực địa.
+
+41. **[ĐÃ HOÀN TẤT - TASK: LIVE-DB-MIGRATE-AND-MERGE-CHECK-015C] Áp Dụng Migration 06 & 07 Lên CSDL Thật (`delivery_db`), Kiểm Tra Hợp Nhất & Kiểm Thử Toàn Diện:**
+    - **1. Trạng Thái Áp Dụng Migration Lên CSDL Thật:**
+      * **ĐÃ ÁP DỤNG LÊN DB THẬT:** Có. Thực hiện lúc **15:15:00 ngày 25/10/2026** theo ngoại lệ được phê duyệt.
+      * **Sao lưu trước (pg_dump):** Đặt tại `D:\db_backups\delivery_db_backup_20261025_151305.sql` (dung lượng: **172,388 bytes**, ~172 KB), nằm ngoài thư mục git repository.
+    - **2. Kết quả thực thi Migration trên `delivery_db`:**
+      * **Migration 06 ([06-create-customer-photos.sql](file:///d:/flutter create delivery_marker_app/init-db/06-create-customer-photos.sql)):**
+        - Tạo bảng `customer_photos` và 3 chỉ mục (`idx_customer_photos_customer_id`, `idx_customer_photos_deleted_at`, `idx_customer_photos_created_at`).
+        - Nạp dữ liệu ảnh cũ: Chuyển 3 ảnh từ `saved_locations` và 1 ảnh duy nhất còn lại từ `shift_delivery_points` (6 dòng ảnh khác trong `shift_delivery_points` là liên kết trùng URL của cùng khách hàng nên được bỏ qua bởi `NOT EXISTS`).
+        - Tổng số dòng `customer_photos` được tạo: **4 dòng**.
+        - Toàn bộ ảnh cũ đều có `created_by` hợp lệ (`d0000000-0000-0000-0000-000000000001` - Trần Văn Giao Shipper A), không có bản ghi nào bị bỏ sót hay vi phạm khóa ngoại.
+        - Chạy lại lần 2: Trả về `INSERT 0 0`, chứng minh 100% idempotent không nhân đôi dữ liệu.
+      * **Migration 07 ([07-add-shift-name.sql](file:///d:/flutter create delivery_marker_app/init-db/07-add-shift-name.sql)):**
+        - Thêm cột `shift_name VARCHAR(100) NULL` vào bảng `shifts` và tạo chỉ mục `idx_shifts_shift_name`.
+        - 7 ca làm việc hiện hữu giữ nguyên `shift_code`, trường `shift_name` là `NULL`.
+        - Chạy lại lần 2: Thông báo cột và chỉ mục đã tồn tại, bỏ qua an toàn.
+      * **Đối soát dữ liệu khách Anh Hoàng (`c0000000-0000-0000-0000-000000000001`):**
+        - Hồ sơ khách hàng, mã `KH_001`, SĐT `0988000001`, địa chỉ `Hẻm 124 Nguyễn Xiển` giữ nguyên 100%.
+        - Vị trí `e0000000-0000-0000-0000-000000000001` (10.8422150, 106.8181230), ghi chú mặt tiền nhà giữ nguyên 100%.
+        - Bảng `customer_photos` gắn đúng 2 ảnh cho Anh Hoàng: `/api/v1/photos/6ffc3833-1f78-48c8-8624-3041f25449f9.jpg` và `/api/v1/photos/test_verified.jpg`.
+    - **3. Kiểm tra Mã Nguồn Hợp Nhất & Phục Vụ Ảnh (`servePhoto`):**
+      * [main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart) và [shift_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_map_view.dart) đều tích hợp đầy đủ thẻ chi tiết nhiều ảnh `PointDetailBottomSheet` (015A) VÀ cụm nút hành động ngón cái "Tạo ca" / "DÁN DANH SÁCH SĐT" (015B).
+      * Ảnh của `customer_photos` được lưu tại `/app/uploads/photos` trong container, nằm trọn vẹn trong volume `backend_uploads` được mount vào `/app/uploads`.
+      * Cập nhật regex trong `servePhoto` ([locations.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/locations.controller.ts)) thành `/^(cust-photo-)?[0-9a-fA-F-]{36}\.(jpg|jpeg|png|webp)$/` để chấp nhận cả UUID thuần và tiền tố `cust-photo-`. Bổ sung unit test trong [location.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/location.spec.ts) và integration test trong [multi-photo-015.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/multi-photo-015.integration.spec.ts).
+    - **4. Kết quả kiểm thử toàn bộ hệ thống:**
+      * `npm --prefix backend run build`: Biên dịch TypeScript ra `dist/` **0 lỗi**.
+      * `npm --prefix backend test`: **11 test suites passed, 152/152 tests passed (100%)**.
+      * `npm --prefix backend run test:integration`: **6 test suites passed, 55/55 tests passed (100%)**.
+      * `flutter analyze`: **0 issues found** (No issues found!).
+      * `flutter test`: **13 test suites passed, 87/87 tests passed (100%)**.
+      * Test suites thất bại: **0**.
+    - **5. Dựng lại Backend & Build APK:**
+      * Backend container: `docker compose up -d --build backend` hoàn thành, API phản hồi `GET http://localhost:3000/api/docs/` mã **200 OK**.
+      * Build APK: `flutter build apk --debug` hoàn thành lúc **15:21:50 ngày 25/10/2026** tại `mobile_app/build/app/outputs/flutter-apk/app-debug.apk` (dung lượng: **184,718,791 bytes**, ~184.7 MB).
+    - **6. Phân định thực tế kiểm thử:**
+      * **[ĐÃ TEST]:** Toàn bộ automated tests (152 backend tests, 87 mobile tests), xác minh liveness GET 200 OK, kiểm tra truy vấn đọc trên `delivery_db`.
+      * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa nạp APK lên thiết bị di động vật lý ngoài thực địa.
+42. **[ĐÃ HOÀN TẤT - TASK: PHOTO-SYNC-SHIFT-PICKER-BULK-016] Đồng Bộ Ảnh Khách Hàng Toàn Diện, Bộ Chọn Ca Từ Bản Đồ Chính & Nhập Hàng Loạt SĐT Trong Chuẩn Bị Ca:**
+    - **1. Trạng Thái Áp Dụng Migration Lên CSDL Thật (`delivery_db`):**
+      * **Đã áp migration lên DB thật chưa:** Không có file migration mới trong Task 016. Cả 7 file migration (`01` đến `07`) đã được áp đầy đủ lên `delivery_db` và `test_isolated_seed_db` từ Task 015C.
+      * Bảng `customer_photos` và cột `shifts.shift_name` đã hiện hữu và hoạt động ổn định trên `delivery_db`.
+    - **2. Báo Cáo Điều Tra Nguyên Nhân Gốc (Phần A.1 - Chỉ GET/SELECT kiểm tra sống):**
+      * *(a) Bảng `customer_photos` trên `delivery_db`:* Đã tồn tại với đầy đủ các cột (`id`, `customer_id`, `image_url`, `created_by`, `created_at`, `deleted_at`).
+      * *(b) Vị trí lưu ảnh tải từ thẻ điểm của bản đồ ca:* Khi chụp ảnh từ `PointDetailBottomSheet`, client gọi `POST /api/v1/customers/:customerId/photos`. Controller `customer-photos.controller.ts` ghi tệp vật lý vào thư mục `/app/uploads/photos/<uuid>.<ext>` (nằm trọn vẹn trong Docker volume `backend_uploads`) và tạo một dòng bản ghi mới trong bảng `customer_photos`.
+      * *(c) Nguồn đọc ảnh của `customer_directory_view.dart` và hồ sơ khách:* Trước Task 016, API `GET /api/v1/customers` trong `customers.controller.ts` chỉ thực hiện `LEFT JOIN` với bảng `saved_locations` (`sl.image_url`) và `shift_delivery_points` (`sdp.image_url`), hoàn toàn chưa kết nối bảng `customer_photos`. Do đó, bất kỳ ảnh chụp nào gắn với điểm ca chưa có vị trí cố định (`NO_LOCATION`) hoặc chỉ lưu trong `customer_photos` đều không thể xuất hiện trong Danh bạ hoặc Hồ sơ khách.
+    - **3. Chi Tiết Thay Đổi & Giải Pháp Kỹ Thuật:**
+      * **A. Đồng bộ ảnh khách hàng toàn diện (MỌI màn hình dùng chung `customer_photos`):**
+        - **Backend ([customers.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/customers.controller.ts)):**
+          * Bổ sung `LEFT JOIN LATERAL` tổng hợp dữ liệu từ `customer_photos cp` (`WHERE cp.customer_id = c.id AND cp.deleted_at IS NULL`): đếm `photo_count`, lấy `latest_photo_url`, gom danh sách mảng JSON `photos_json`.
+          * Cập nhật bộ lọc `hasPhoto` để tìm kiếm trên cả `customer_photos` lẫn trường ảnh cũ.
+          * Trả về `photoCount`, mảng `photos` và ưu tiên `latest_photo_url` làm `imageUrl` đại diện.
+          * Cập nhật `getCustomerDetail` truy vấn trực tiếp bảng `customer_photos` kèm `photoCount` và `photos`.
+        - **Mobile Shared Widget ([customer_photos_strip_widget.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/customer_photos_strip_widget.dart)):**
+          * Tạo widget dải nhiều ảnh dùng chung cho Danh bạ, Hồ sơ khách, Bản đồ chính, Bản đồ ca và Thẻ điểm.
+          * Hỗ trợ nút lớn "+ THÊM ẢNH" (chiều cao >= 56px), chụp trực tiếp hoặc chọn thư viện, nén ảnh tự động trước khi gửi.
+          * Xử lý lỗi tải ảnh: Khi API trả lỗi (kể cả lỗi HTTP 500), hiển thị SnackBar cảnh báo người dùng rõ ràng kèm thông điệp chi tiết, tuyệt đối không im lặng nuốt lỗi.
+          * Nhấn giữ hoặc bấm nút xóa ảnh: Hiển thị hộp thoại xác nhận xóa mềm, gọi `ApiService.deleteCustomerPhoto`.
+          * Vô hiệu hóa cache cũ ngay sau khi thêm/xóa: Gọi `PaintingBinding.instance.imageCache.clear()` và `clearLiveImages()`, kích hoạt callback `onPhotosUpdated()` để làm mới dữ liệu tức thì cho tất cả các màn hình liên quan khi quay lại.
+        - **Cập nhật Màn hình & Thẻ điểm:**
+          * [customer_directory_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart): Thẻ khách hàng hiển thị badge số lượng ảnh nếu có nhiều hơn 1 ảnh; màn hình Hồ sơ khách (`CustomerDetailEditView`) nhúng `CustomerPhotosStripWidget` cho phép xem, thêm và xóa ảnh độc lập không cần ghim lại GPS.
+          * [point_detail_bottom_sheet.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/point_detail_bottom_sheet.dart): Tích hợp `CustomerPhotosStripWidget` thay thế toàn bộ khối xử lý ảnh đơn lẻ cũ.
+      * **B. Chọn ca từ bản đồ chính ([main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart), [shift_picker_bottom_sheet.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/shift_picker_bottom_sheet.dart)):**
+        - Thêm nút "Ca làm việc" lớn (cao >= 56px, `btn_open_shift_picker`) vào vùng ngón cái sát đáy bản đồ chính. Thiết kế bố cục 2 tầng: tầng trên gồm "Ca làm việc" (flex 1) song song với "Tạo ca" (flex 1), tầng dưới là nút "Ghim vị trí mới" (chiều rộng tối đa), tuyệt đối không chồng lấn hay che khuất nhau.
+        - Chạm "Ca làm việc" mở `ShiftPickerBottomSheet` liệt kê các ca của shipper: hiển thị `shiftName` (nếu rỗng lấy `shift_code`), ngày tạo, badge trạng thái, số điểm đã có vị trí vs chưa có vị trí, sắp xếp mới nhất trước.
+        - Mục đầu danh sách: Thẻ bấm nhanh "+ Tạo ca làm việc mới".
+        - Mỗi dòng ca có menu tác vụ (PopupMenuButton) hỗ trợ "Đổi tên ca" (`PATCH /api/v1/shifts/:id/name`) và "Xóa ca" (`DELETE /api/v1/shifts/:id`) với hộp thoại xác nhận.
+        - Khi chưa có ca nào: Hiển thị hướng dẫn ngắn gọn và nút lớn "+ TẠO CA MỚI".
+        - Chạm vào một ca: Chuyển hướng trực tiếp vào bản đồ ca `ShiftMapView(shiftId: shift.id)`.
+      * **C. Nhập hàng loạt SĐT trong màn Chuẩn bị ca ([shift_preparation_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_preparation_view.dart)):**
+        - Bổ sung nút lớn "NHẬP HÀNG LOẠT SĐT" (chiều cao 56px, `btn_bulk_paste_phones`) cạnh ô nhập một số.
+        - Tái sử dụng trực tiếp bottom sheet `BulkPastePhoneSheet.show` (không code lại logic trùng lặp).
+        - Sau khi dán danh sách SĐT thành công: Tự động tải lại danh sách điểm của ca ngay lập tức, hiển thị bảng banner tổng kết phân tách rõ 2 nhóm: "Đã có vị trí" và "Chưa có vị trí - cần xác nhận", cùng danh sách các số bị từ chối kèm lý do cụ thể.
+        - Giữ nguyên ô nhập một số điện thoại để hỗ trợ thao tác thêm nhanh từng số đơn lẻ.
+    - **4. Kết quả kiểm thử tự động & Nghiệm thu:**
+      * **Backend Integration Tests ([photo-sync-016.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/photo-sync-016.integration.spec.ts)):** Đạt **4/4 tests passed (100%)** trên CSDL `test_isolated_seed_db` gọi controller thật:
+        - Kiểm tra khách hàng ban đầu 0 ảnh: API danh bạ và chi tiết trả đúng `photoCount = 0`, `photos = []`.
+        - Thêm ảnh qua `addCustomerPhoto`: Xuất hiện ngay lập tức trong `listCustomers` và `getCustomerDetail`, đếm đúng `photoCount = 1`, `imageUrl` cập nhật trỏ về ảnh vừa tải.
+        - Thêm ảnh thứ hai: `photoCount = 2`, `imageUrl` ưu tiên ảnh mới nhất theo thứ tự thời gian.
+        - Xóa mềm ảnh (`deleteCustomerPhoto`): Biến mất hoàn toàn khỏi danh bạ và chi tiết khách hàng, các ảnh chưa xóa còn lại vẫn hiển thị nguyên vẹn, đảm bảo tính toàn vẹn kiểm toán `audit_logs`.
+      * **Backend Full Test Suite:** `npm test` đạt **12 test suites passed, 156/156 tests passed (100%)**. TypeScript `npm run build` biên dịch 0 lỗi.
+      * **Flutter Tests ([photo_sync_and_shift_picker_016_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/photo_sync_and_shift_picker_016_test.dart)):** Viết 4 widget tests kiểm tra toàn diện:
+        - `CustomerPhotosStripWidget`: Hiển thị danh sách ảnh, nút `empty_photo_slot` >= 56px, gọi callback cập nhật ảnh.
+        - `MainMapView`: Kiểm tra vùng ngón cái có đủ 3 nút hành động (`btn_open_shift_picker`, `btn_create_shift_map`, `btn_pin_new_location`), tất cả đều đạt kích thước >= 56px và không bị chồng đè.
+        - `ShiftPreparationView`: Kiểm tra có đủ nút "NHẬP HÀNG LOẠT SĐT" (>= 56px) và ô nhập một số `btn_add_single_phone`.
+        - `CustomerModel`: Kiểm tra parsing JSON `photoCount`, `photos`, và logic getter `hasPhoto`.
+      * **Flutter Full Test Suite:** `flutter test` đạt **14 test files passed, 91/91 tests passed (100%)**. `flutter analyze lib/` đạt **0 issues found** (No issues found!).
+      * **Dựng lại Container Backend:** `docker compose up -d --build backend` hoàn thành MỘT LẦN duy nhất (`delivery_backend_api` Recreated & Started, `delivery_postgis_db` Healthy giữ nguyên không đụng chạm).
+      * **Kiểm tra API sống:** `GET http://localhost:3000/api/docs/` phản hồi **200 OK**. Tuyệt đối không gửi request ghi (POST/PUT/PATCH/DELETE) nào lên API sống hay `delivery_db`.
+      * **Build Debug APK:** Tiến hành chạy `flutter build apk --debug` MỘT LẦN duy nhất.
+    - **5. Phân định thực tế kiểm thử (Evidence-Based):**
+      * **[ĐÃ TEST]:** Toàn bộ automated unit & integration tests trên `test_isolated_seed_db` và Flutter test runner (156 backend tests, 91 Flutter tests), xác minh liveness GET 200 OK trên backend container sống.
+      * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa nạp file APK lên thiết bị di động vật lý ngoài thực địa.
+
+43. **[ĐÃ HOÀN TẤT - TASK: MAP-COMPACT-CONTROLS-AND-SHEET-CLOSE-017] Thu Gọn Cụm Nút Bản Đồ Thành Cột Icon & Bổ Sung Cơ Chế Đóng Thẻ Chi Tiết Điểm:**
+    - **1. Mục Tiêu & Phạm Vi (Frontend UI Only):**
+      * Thay đổi hoàn toàn ở tầng giao diện Flutter, không thay đổi backend và không thay đổi cấu trúc dữ liệu.
+      * Không dựng lại container backend do backend giữ nguyên 100%.
+    - **2. Chi Tiết Thực Hiện & Giải Pháp Kỹ Thuật:**
+      * **A. Bản đồ chính ([main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart)):**
+        - Bỏ 3 nút chữ to chiếm nhiều không gian dưới đáy.
+        - Thay bằng 1 cột icon dọc gọn ở mép PHẢI phía dưới (vùng ngón cái, ngay trên thanh điều hướng):
+          * **Ghim vị trí mới:** Nút tròn chính dưới cùng, to nhất (đường kính 60px), màu xanh `#2563EB`, icon `Icons.add_location_alt_rounded`.
+          * **Tạo ca:** Nút tròn ở giữa (đường kính 52px), nền Navy `#0F172A`, icon `Icons.add_task_rounded`.
+          * **Ca làm việc:** Nút tròn trên cùng (đường kính 52px), nền trắng viền xám `#CBD5E1`, icon `Icons.work_history_rounded`.
+          * Khoảng cách giữa các nút >= 12px. Icon-only nhưng có Tooltip và Semantics label đầy đủ tên chức năng. Chạm nút hoạt động chính xác theo luồng nghiệp vụ hiện tại.
+        - Giữ nguyên các nút GPS và "vừa khít điểm" ở góc trên bên phải, không bị chồng lấn.
+        - Thu thanh tiêu đề trên cùng "Bản đồ vị trí đã lưu" thành thanh mảnh (cao 48px <= 52px), giữ nguyên nút đổi lớp bản đồ và làm mới.
+        - Tự động ẩn cột icon khi bật chế độ tâm ngắm ghim vị trí mới (hiện lại khi thoát).
+        - Tự động ẩn cột icon khi thẻ chi tiết điểm mở ra, hoàn toàn không bị thẻ che khuất.
+      * **B. Thẻ chi tiết điểm ([point_detail_bottom_sheet.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/widgets/point_detail_bottom_sheet.dart)):**
+        - Thêm nút tắt X (vùng chạm >= 48px, `btn_close_point_detail`) ở góc phải trên cùng của thẻ, màu sắc tương phản cao ngoài nắng.
+        - Đa dạng cơ chế tắt thẻ đồng bộ cho cả Bản đồ chính và Bản đồ ca:
+          * Bấm nút tắt X.
+          * Vuốt thẻ xuống (drag handle / swipe gesture).
+          * Chạm vào vùng bản đồ trống bên ngoài thẻ (`MapOptions.onTap`).
+          * Bấm nút Back của hệ thống/trình duyệt (`PopScope`).
+        - Khi thẻ đóng, gán `_selectedLocation = null` / `_selectedPoint = null`, lập tức bỏ trạng thái "đang chọn" (không còn highlight) của chấm trên bản đồ.
+        - Chiều cao ban đầu của thẻ ~45-46% màn hình (365px - 480px) để shipper vừa xem thẻ vừa quan sát được bản đồ; hỗ trợ vuốt lên để mở rộng lên 85% xem hết ảnh, địa chỉ và ghi chú.
+        - Đóng thẻ không làm mất ảnh vừa tải lên hay dữ liệu đang xem.
+      * **C. Bản đồ ca ([shift_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_map_view.dart)):**
+        - Áp dụng đầy đủ cơ chế đóng thẻ như Mục B (nút X, vuốt xuống, chạm nền bản đồ, nút Back qua `PopScope`).
+        - Thay cụm nút chữ to dưới đáy thành cột icon tròn 56px ở mép phải dưới gồm "Dán danh sách SĐT" (xanh `#2563EB`, `btn_bulk_paste_phones`) và "Chọn vị trí" (Navy `#0F172A`, `btn_choose_location`) kèm Tooltip và Semantics label.
+    - **3. Kết Quả Kiểm Thử Tự Động & Nghiệm Thu:**
+      * **Flutter Widget Tests Mới ([compact_controls_and_sheet_close_017_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/compact_controls_and_sheet_close_017_test.dart)):** Đạt **3/3 widget tests passed (100%)**:
+        - Kiểm tra cột icon 3 nút ở góc phải dưới của `MainMapView`, mỗi nút vùng chạm >= 52px (Ghim 60px, Tạo ca 52px, Ca làm việc 52px), có Tooltip, khoảng cách >= 12px; chế độ tâm ngắm tự động ẩn cột icon.
+        - Kiểm tra `PointDetailBottomSheet` có nút tắt X vùng chạm >= 48px, bấm X kích hoạt callback `onClose()`.
+        - Kiểm tra `ShiftMapView` có cột icon tròn 56px có Tooltip.
+      * **Flutter Full Test Suite:** `flutter test` đạt **15 test files passed, 94/94 tests passed (100%)**.
+      * **Flutter Static Analysis:** `flutter analyze` đạt **No issues found!** (0 cảnh báo, 0 lỗi).
+      * **Backend Test Suite & Build:** TypeScript `npm run build` 0 lỗi, `npm test` đạt **12 test suites passed, 156/156 tests passed (100%)**.
+      * **Build Debug APK:** Tiến hành chạy `flutter build apk --debug` MỘT LẦN duy nhất.
+    - **4. Phân Định Thực Tế Kiểm Thử (Evidence-Based):**
+      * **[ĐÃ TEST]:** Toàn bộ automated tests (156 backend tests, 94 Flutter tests), kiểm tra tĩnh `flutter analyze` 0 issues.
+      * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa nạp và thử nghiệm APK trực tiếp trên thiết bị di động vật lý ngoài thực địa.
+
+44. **[ĐÃ HOÀN TẤT - TASK: MAP-SMOOTH-AND-REPIN-FIX-019] Sửa Lỗi "Ghim Lại" Bắt Nhập Lại SĐT & Tối Ưu Kéo/Zoom Bản Đồ Mượt Hơn:**
+    - **1. Mục Tiêu & Phạm Vi (Frontend Mobile Only):**
+      * Sửa triệt để lỗi khi bấm "Ghim lại" từ thẻ chi tiết điểm bắt shipper phải gõ lại số điện thoại khách hàng.
+      * Tăng tốc độ và độ mượt khi kéo (pan) và phóng to/thu nhỏ (zoom) bản đồ trên cả Bản đồ chính (`MainMapView`), Bản đồ ca (`ShiftMapView`) và Bộ chọn tâm ngắm (`CrosshairLocationPickerView`).
+      * Giữ nguyên 100% giao diện, nghiệp vụ và dữ liệu: Tuyệt đối KHÔNG thêm Lite Mode, KHÔNG lưu dữ liệu khách hàng cục bộ, KHÔNG thay đổi backend hay CSDL.
+    - **2. Chi Tiết Kỹ Thuật Đã Triển Khai:**
+      * **A. Sửa lỗi luồng "Ghim lại" không bắt nhập lại số điện thoại:**
+        - **Bản đồ chính ([main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart)):**
+          * Khi bấm "Ghim lại" trên thẻ chi tiết điểm (`PointDetailBottomSheet`), lưu thông tin khách hàng đang chọn vào `_repinTarget = loc` trước khi mở chế độ tâm ngắm.
+          * Khi bấm "XÁC NHẬN VỊ TRÍ NÀY" ở tâm ngắm, hộp thoại gán SĐT tự động điền sẵn SĐT (`phoneCtrl.text = _repinTarget!.customerPhone`), tên (`nameCtrl.text = _repinTarget!.customerName ?? ''`) và ghi chú (`notesCtrl.text = _repinTarget!.identificationNotes ?? ''`).
+          * Hiển thị banner nổi bật `repin_customer_banner`: `"Đang ghim lại cho: [tên] - [SĐT]"` kèm nút nhỏ `"Đổi số"` (`btn_change_repin_phone`). Bấm "Đổi số" sẽ xóa form và chuyển sang gán cho số khác.
+          * Nút "LƯU VỊ TRÍ NÀY" (`btn_confirm_save_location`) bấm được ngay lập tức mà không cần gõ lại gì.
+          * Giữ nguyên quy trình: Nếu khách đã có vị trí, hệ thống vẫn hiển thị hộp thoại xác nhận thay thế vị trí cũ, bảo toàn toàn bộ lịch sử trong `location_history`.
+        - **Bản đồ ca ([shift_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_map_view.dart)):**
+          * Bấm "Ghim lại" gọi `_openCrosshairPickerForPoint(point)`, truyền nguyên vẹn `ShiftDeliveryPointModel` (`customerId`, SĐT, tên, địa chỉ, trạng thái) sang `CrosshairLocationPickerView`.
+          * Trong ca, bấm "Lưu vị trí tạm" chỉ gọi `ApiService.updateTemporaryLocation`, cập nhật tọa độ tạm cho điểm giao trong ca (`shift_delivery_points`), tuyệt đối không làm biến đổi hay đụng chạm `saved_locations` của hệ thống.
+        - **Bộ chọn tâm ngắm ([crosshair_location_picker_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/crosshair_location_picker_view.dart)):**
+          * Hiển thị banner trực quan `repin_customer_banner`: `"Đang ghim lại cho: ${widget.point.customerName} - ${widget.point.customerPhone}"`.
+          * Nút "Lưu vị trí tạm" được kích hoạt sẵn sàng bấm ngay lập tức.
+        - **Luồng "Ghim vị trí mới":** Giữ nguyên form trống, autofocus vào ô SĐT, không hiển thị banner ghim lại, ngăn chặn lưu khi SĐT chưa được nhập.
+      * **B. Tối ưu kéo/zoom bản đồ mượt hơn (Map Smoothness):**
+        - **Cache tile trên đĩa ([map_tile_cache_service.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/map_tile_cache_service.dart)):**
+          * Xây dựng `MapTileCacheService` quản lý bộ nhớ đệm mảnh bản đồ trên đĩa với dung lượng tối đa **200MB** (`maxCacheSizeBytes = 200 * 1024 * 1024`), tự động dọn dẹp (LRU/Prune) về 150MB khi đạt ngưỡng.
+          * Cơ chế lọc nghiêm ngặt `isMapTileUrl` và `containsCustomerPhoto`: **Chỉ cho phép cache tile bản đồ (OpenStreetMap, Google Maps, CartoDB); tuyệt đối CẤM cache bất kỳ ảnh hiện trường hay ảnh khách hàng nào** (`/photos/`, `/uploads/`, `/avatar/`).
+        - **Đệm tile trước khung nhìn (Pre-buffering):** Cấu hình `TileLayer` với `panBuffer: 1`, `keepBuffer: 2`, giữ lại tile cũ ở zoom thấp trong thời gian nạp mảnh mới, loại bỏ hoàn toàn hiện tượng ô trắng khi lướt bản đồ.
+        - **Cancellable Tile Provider & Giới hạn Concurrency:**
+          * Triển khai `CancellableDiskCachedTileProvider` (kế thừa `TileProvider`) và `CancellableTileImageProvider`.
+          * Giới hạn tối đa **10 yêu cầu HTTP đồng thời** (`maxConcurrentRequests = 10`) qua hàng đợi semaphore, tự động hủy bỏ (abort/cancel) các yêu cầu tile trôi ra ngoài khung nhìn khi shipper lướt nhanh.
+        - **Tối ưu gom cụm Marker (Viewport Clustering & Debounce):**
+          * Trong `MainMapView`, hàm `_recomputeClusters` chỉ tính toán các điểm nằm trong khung nhìn hiển thị (visible bounds mở rộng 15% biên).
+          * Thêm cơ chế Debounce **150ms** khi shipper đang kéo bản đồ (`hasGesture == true`), tránh tính toán lại cụm liên tục trên từng frame cử chỉ.
+          * Lưu cache kết quả gom cụm theo zoom và viewport (`_clusterCache`).
+        - **Cô lập Render Pipeline với `RepaintBoundary`:**
+          * Bao bọc `RepaintBoundary` quanh `FlutterMap`, Header nổi, Cột icon hành động và Thẻ chi tiết điểm `PointDetailBottomSheet` trên cả 3 màn hình (`MainMapView`, `ShiftMapView`, `CrosshairLocationPickerView`).
+          * Cắt đứt hoàn toàn việc Rasterization của lớp bản đồ lan sang các thành phần giao diện tĩnh phía trên, giảm tải render pipeline cho GPU thiết bị.
+    - **3. Kết Quả Kiểm Thử Tự Động & Nghiệm Thu:**
+      * **Automated Tests Mới ([map_smooth_and_repin_019_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/map_smooth_and_repin_019_test.dart)):** Đạt **6/6 tests passed (100%)**:
+        - `B.1 & B.7`: Cache tile trên đĩa tối đa 200MB, kiểm tra các URL tile hợp lệ và xác nhận tuyệt đối từ chối cache ảnh khách hàng (`isMapTileUrl` / `containsCustomerPhoto`).
+        - `B.3`: Giới hạn tối đa 10 yêu cầu HTTP đồng thời của `CancellableDiskCachedTileProvider`.
+        - `B.5`: Cô lập render bản đồ bằng `RepaintBoundary`.
+        - `A.3`: Luồng "Ghim vị trí mới" giữ hộp thoại trống và nút lưu từ chối khi chưa có SĐT.
+        - `A.1, A.2`: Thẻ chi tiết kích hoạt callback `onRepin` và nút "Đổi số".
+        - `A.1, A.2, A.4`: Bộ chọn tâm ngắm hiển thị banner "Đang ghim lại cho..." và cho phép lưu vị trí tạm trong ca ngay lập tức.
+      * **Flutter Full Test Suite:** `flutter test` đạt **15 test files passed, 100/100 tests passed (100%)**.
+      * **Flutter Static Analysis:** `flutter analyze` đạt **No issues found!** (0 cảnh báo, 0 lỗi trên toàn bộ dự án).
+      * **Backend Không Đổi:** Container backend giữ nguyên, không cần build lại.
+      * **Build Release APK MỘT LẦN DUY NHẤT:** Thực thi lệnh `flutter build apk --release`.
+    - **4. Phân Định Thực Tế Kiểm Thử (Evidence-Based):**
+      * **[ĐÃ TEST]:** 100/100 automated Flutter tests passed, `flutter analyze` 0 issues, toàn bộ logic cache và repin được kiểm thử tự động.
+      * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa nạp file release APK lên thiết bị di động vật lý ngoài thực địa.
+
 

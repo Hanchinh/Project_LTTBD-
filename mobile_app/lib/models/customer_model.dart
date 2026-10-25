@@ -1,5 +1,6 @@
 import 'package:latlong2/latlong.dart';
 import 'shift_model.dart';
+import 'customer_photo_model.dart';
 
 class CustomerDirectoryModel {
   final String id;
@@ -15,9 +16,12 @@ class CustomerDirectoryModel {
   final double? longitude;
   final String? identificationNotes;
   final String? imageUrl;
+  final int photoCount;
+  final List<CustomerPhotoModel> photos;
   final String? savedLocationId;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final bool isExisting;
 
   CustomerDirectoryModel({
     required this.id,
@@ -33,16 +37,19 @@ class CustomerDirectoryModel {
     this.longitude,
     this.identificationNotes,
     this.imageUrl,
+    this.photoCount = 0,
+    this.photos = const [],
     this.savedLocationId,
     this.createdAt,
     this.updatedAt,
+    this.isExisting = false,
   });
 
   bool get hasValidCoordinates => latitude != null && longitude != null;
 
   LatLng? get latLng => hasValidCoordinates ? LatLng(latitude!, longitude!) : null;
 
-  bool get hasPhoto => imageUrl != null && imageUrl!.trim().isNotEmpty;
+  bool get hasPhoto => photoCount > 0 || (imageUrl != null && imageUrl!.trim().isNotEmpty);
 
   factory CustomerDirectoryModel.fromJson(Map<String, dynamic> json) {
     double? parseCoord(dynamic value) {
@@ -50,6 +57,19 @@ class CustomerDirectoryModel {
       if (value is num) return value.toDouble();
       return double.tryParse(value.toString());
     }
+
+    List<CustomerPhotoModel> parsedPhotos = [];
+    if (json['photos'] != null && json['photos'] is List) {
+      parsedPhotos = (json['photos'] as List)
+          .map((item) => CustomerPhotoModel.fromJson(item as Map<String, dynamic>, defaultCustomerId: json['id']?.toString()))
+          .toList();
+    }
+
+    final pCount = json['photoCount'] is int
+        ? json['photoCount'] as int
+        : (int.tryParse(json['photoCount']?.toString() ?? '') ?? parsedPhotos.length);
+
+    final rawImageUrl = json['imageUrl']?.toString() ?? (parsedPhotos.isNotEmpty ? parsedPhotos.first.imageUrl : null);
 
     return CustomerDirectoryModel(
       id: json['id']?.toString() ?? '',
@@ -64,10 +84,13 @@ class CustomerDirectoryModel {
       latitude: parseCoord(json['latitude']),
       longitude: parseCoord(json['longitude']),
       identificationNotes: json['identificationNotes']?.toString(),
-      imageUrl: json['imageUrl']?.toString(),
+      imageUrl: rawImageUrl,
+      photoCount: pCount,
+      photos: parsedPhotos,
       savedLocationId: json['savedLocationId']?.toString(),
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
       updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt'].toString()) : null,
+      isExisting: json['isExisting'] == true,
     );
   }
 
@@ -86,9 +109,12 @@ class CustomerDirectoryModel {
       'longitude': longitude,
       'identificationNotes': identificationNotes,
       'imageUrl': imageUrl,
+      'photoCount': photoCount,
+      'photos': photos.map((p) => p.toJson()).toList(),
       'savedLocationId': savedLocationId,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'isExisting': isExisting,
     };
   }
 
@@ -106,9 +132,12 @@ class CustomerDirectoryModel {
     double? longitude,
     String? identificationNotes,
     String? imageUrl,
+    int? photoCount,
+    List<CustomerPhotoModel>? photos,
     String? savedLocationId,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isExisting,
   }) {
     return CustomerDirectoryModel(
       id: id ?? this.id,
@@ -124,9 +153,12 @@ class CustomerDirectoryModel {
       longitude: longitude ?? this.longitude,
       identificationNotes: identificationNotes ?? this.identificationNotes,
       imageUrl: imageUrl ?? this.imageUrl,
+      photoCount: photoCount ?? this.photoCount,
+      photos: photos ?? this.photos,
       savedLocationId: savedLocationId ?? this.savedLocationId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isExisting: isExisting ?? this.isExisting,
     );
   }
 }

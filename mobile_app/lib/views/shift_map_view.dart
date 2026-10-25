@@ -6,7 +6,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/shift_model.dart';
 import '../services/api_service.dart';
 import 'crosshair_location_picker_view.dart';
-import '../widgets/fullscreen_image_viewer.dart';
+import '../widgets/point_detail_bottom_sheet.dart';
+import '../widgets/bulk_paste_phone_sheet.dart';
+import '../services/map_tile_cache_service.dart';
 
 class ShiftMapView extends StatefulWidget {
   final String shiftId;
@@ -22,6 +24,7 @@ class ShiftMapView extends StatefulWidget {
 
 class _ShiftMapViewState extends State<ShiftMapView> {
   final MapController _mapController = MapController();
+  final CancellableDiskCachedTileProvider _tileProvider = CancellableDiskCachedTileProvider();
   ShiftModel? _shift;
   bool _isLoading = true;
   String? _errorMessage;
@@ -122,6 +125,24 @@ class _ShiftMapViewState extends State<ShiftMapView> {
         _isLoading = false;
       });
     }
+  }
+
+  /// Mở bottom sheet dán danh sách số điện thoại hàng loạt (TASK: SHIFT-FROM-MAP-AND-BULK-PASTE-015B)
+  void _showBulkPasteBottomSheet() {
+    BulkPastePhoneSheet.show(
+      context: context,
+      shiftId: widget.shiftId,
+      onPointsAdded: (result) {
+        _loadShiftData(preserveSelected: false).then((_) {
+          if (mounted) {
+            _fitMapBounds();
+          }
+        });
+      },
+      onPinPointRequested: (point) {
+        _openCrosshairPickerForPoint(point);
+      },
+    );
   }
 
   Future<void> _getShipperLocation() async {
@@ -418,12 +439,21 @@ class _ShiftMapViewState extends State<ShiftMapView> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 1. BẢN ĐỒ TOÀN MÀN HÌNH (Google Maps & CartoDB tiles)
+      body: PopScope(
+        canPop: _selectedPoint == null,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (_selectedPoint != null) {
+            setState(() => _selectedPoint = null);
+          }
+        },
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+          // 1. BẢN ĐỒ TOÀN MÀN HÌNH (Google Maps & CartoDB tiles, CÔ LẬP REPAINT BOUNDARY)
           Positioned.fill(
-            child: FlutterMap(
+            child: RepaintBoundary(
+              child: FlutterMap(
               mapController: _mapController,
               options: MapOptions(
                 initialCenter: validPoints.isNotEmpty
@@ -452,6 +482,9 @@ class _ShiftMapViewState extends State<ShiftMapView> {
                   fallbackUrl: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
                   subdomains: _getSubdomains(),
                   userAgentPackageName: 'com.example.delivery_marker_mobile',
+                  panBuffer: 1,
+                  keepBuffer: 2,
+                  tileProvider: _tileProvider,
                   errorTileCallback: (tile, error, stackTrace) {
                     if (!_hasTileError && mounted) {
                       setState(() => _hasTileError = true);
@@ -532,14 +565,16 @@ class _ShiftMapViewState extends State<ShiftMapView> {
               ],
             ),
           ),
+        ),
 
-          // 2. HEADER NỔI HIỆN ĐẠI (FLOATING TOP BAR)
+          // 2. HEADER NỔI HIỆN ĐẠI (FLOATING TOP BAR, CÔ LẬP REPAINT BOUNDARY)
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            child: SafeArea(
-              bottom: false,
+            child: RepaintBoundary(
+              child: SafeArea(
+                bottom: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
                 child: Container(
@@ -570,7 +605,7 @@ class _ShiftMapViewState extends State<ShiftMapView> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Ca: ${shift.shiftCode}',
+                              shift.displayTitle,
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
@@ -608,6 +643,7 @@ class _ShiftMapViewState extends State<ShiftMapView> {
               ),
             ),
           ),
+        ),
 
           // BANNER CẢNH BÁO KHI TILE MẠNG GẶP SỰ CỐ
           if (_hasTileError)
@@ -674,12 +710,12 @@ class _ShiftMapViewState extends State<ShiftMapView> {
             ),
           ),
 
-          // 4. THẺ THÔNG TIN ĐIỂM GIAO KHI CHẠM MARKER
+          // 4. THẺ THÔNG TIN ĐIỂM GIAO KHI CHẠM MARKER - BOTTOM SHEET BÁM ĐÁY MÀN HÌNH (TASK: MULTI-PHOTO-AND-THUMB-UI-015A)
           if (_selectedPoint != null)
             Positioned(
-              left: 14,
-              right: 14,
-              bottom: 84,
+              left: 0,
+              right: 0,
+              bottom: 0,
               child: _buildSelectedPointCard(_selectedPoint!),
             ),
 
@@ -718,38 +754,98 @@ class _ShiftMapViewState extends State<ShiftMapView> {
               ),
             ),
 
-          // 6. NÚT HÀNH ĐỘNG "CHỌN VỊ TRÍ" NỔI BẬT Ở GÓC DƯỚI BÊN PHẢI
-          Positioned(
-            right: 14,
-            bottom: 20,
-            child: SizedBox(
-              height: 52,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F172A),
-                  foregroundColor: Colors.white,
-                  elevation: 4,
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(26),
+          // 6. CỘT ICON DỌC Ở MÉP PHẢI PHÍA DƯỚI (VÙNG NGÓN CÁI) (TASK 017 - MỤC C)
+          // Nút tròn 56px: Dán danh sách SĐT (xanh #2563EB) & Chọn vị trí (Navy #0F172A), kèm Tooltip & Semantics
+          if (_selectedPoint == null)
+            Positioned(
+              right: 16,
+              bottom: 20,
+              child: RepaintBoundary(
+                child: SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Nút "DÁN DANH SÁCH SĐT" (nút tròn 56px, màu xanh #2563EB)
+                      Semantics(
+                        label: 'Dán danh sách SĐT',
+                        button: true,
+                        child: Tooltip(
+                          message: 'Dán danh sách SĐT',
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              key: const Key('btn_bulk_paste_phones'),
+                              borderRadius: BorderRadius.circular(28),
+                              onTap: _showBulkPasteBottomSheet,
+                              child: Container(
+                                width: 56,
+                                height: 56,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF2563EB),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(color: Color(0x662563EB), blurRadius: 10, offset: Offset(0, 4)),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.playlist_add_rounded,
+                                    size: 28,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Nút "CHỌN VỊ TRÍ" (nút tròn 56px, nền Navy #0F172A)
+                      Semantics(
+                        label: 'Chọn vị trí',
+                        button: true,
+                        child: Tooltip(
+                          message: 'Chọn vị trí',
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              key: const Key('btn_choose_location'),
+                              borderRadius: BorderRadius.circular(28),
+                              onTap: _handleFloatingCrosshairPicker,
+                              child: Container(
+                                width: 56,
+                                height: 56,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF0F172A),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3)),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.add_location_alt_rounded,
+                                    size: 24,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                icon: const Icon(Icons.add_location_alt_rounded, size: 22),
-                label: const Text(
-                  'CHỌN VỊ TRÍ',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-                onPressed: _handleFloatingCrosshairPicker,
               ),
             ),
-          ),
         ],
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildMapToolButton({
@@ -816,242 +912,51 @@ class _ShiftMapViewState extends State<ShiftMapView> {
         break;
     }
 
-    final hasPhoto = point.photoUrl != null && point.photoUrl!.isNotEmpty;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+    return RepaintBoundary(
+      child: PointDetailBottomSheet(
+        customerId: point.customerId,
+        customerName: point.customerName,
+        customerPhone: point.customerPhone,
+        customerAddress: point.customerAddress,
+        locationStatusText: point.locationStatus.displayName,
+        statusBadgeBg: badgeBg,
+        statusBadgeTextColor: badgeText,
+        statusBadgeIcon: badgeIcon,
+        identificationNotes: point.locationNotes,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        initialPhotos: point.photos,
+        legacyImageUrl: point.photoUrl,
+        onCall: () => _makePhoneCall(point.customerPhone),
+        onDirections: () {
+          if (point.hasValidCoordinates) {
+            ApiService.openExternalNavigation(point.latitude!, point.longitude!);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Khách hàng chưa có tọa độ để chỉ đường')),
+            );
+          }
+        },
+        onRepin: () => _openCrosshairPickerForPoint(point),
+        onPhotosUpdated: (updatedPhotos) {
+          setState(() {
+            _selectedPoint = _selectedPoint!.copyWith(
+              photos: updatedPhotos,
+              photoCount: updatedPhotos.length,
+            );
+            if (_shift != null) {
+              final idx = _shift!.deliveryPoints.indexWhere((p) => p.id == point.id);
+              if (idx != -1) {
+                _shift!.deliveryPoints[idx] = _shift!.deliveryPoints[idx].copyWith(
+                  photos: updatedPhotos,
+                  photoCount: updatedPhotos.length,
+                );
+              }
+            }
+          });
+        },
+        onClose: () => setState(() => _selectedPoint = null),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (hasPhoto)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-              child: SizedBox(
-                height: 140,
-                width: double.infinity,
-                child: FutureBuilder<Map<String, String>>(
-                  key: ValueKey('shift_photo_${point.id}_${point.photoUrl}'),
-                  future: ApiService.getPhotoAuthInfo(point.photoUrl!),
-                  builder: (ctx, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Container(
-                        color: const Color(0xFFF1F5F9),
-                        child: const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
-                        ),
-                      );
-                    }
-
-                    if (snapshot.hasError || !snapshot.hasData) {
-                      return const SizedBox.shrink();
-                    }
-
-                    final authInfo = snapshot.data!;
-                    final photoUrlWithAuth = authInfo['url'] ?? '';
-                    final token = authInfo['token'];
-
-                    return GestureDetector(
-                      onTap: () {
-                        FullscreenImageViewer.show(
-                          context,
-                          photoUrl: point.photoUrl!,
-                          title: point.customerName,
-                        );
-                      },
-                      child: Image.network(
-                        photoUrlWithAuth,
-                        key: ValueKey('shift_img_${point.id}_$photoUrlWithAuth'),
-                        headers: {
-                          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-                        },
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Tiêu đề, số điện thoại & nút đóng
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        point.customerName,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          const Icon(Icons.phone_rounded, size: 13, color: Color(0xFF2563EB)),
-                          const SizedBox(width: 4),
-                          Text(
-                            point.customerPhone,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF2563EB)),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: badgeBg,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(badgeIcon, size: 12, color: badgeText),
-                      const SizedBox(width: 4),
-                      Text(
-                        point.locationStatus.displayName,
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: badgeText),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 6),
-                InkWell(
-                  onTap: () => setState(() => _selectedPoint = null),
-                  borderRadius: BorderRadius.circular(20),
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-            Text(
-              point.customerAddress,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-
-            if (point.hasValidCoordinates) ...[
-              const SizedBox(height: 4),
-              Text(
-                'Tọa độ: ${point.latitude!.toStringAsFixed(6)}, ${point.longitude!.toStringAsFixed(6)}',
-                style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF64748B)),
-              ),
-            ],
-
-            if (point.locationNotes != null && point.locationNotes!.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.note_alt_outlined, size: 13, color: Color(0xFF64748B)),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        point.locationNotes!,
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF334155)),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 12),
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
-            const SizedBox(height: 10),
-
-            // Các nút hành động: GỌI ĐIỆN, CHỈ ĐƯỜNG, TÂM NGẮM
-            Row(
-              children: [
-                // Nút Gọi điện
-                OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2563EB),
-                    side: const BorderSide(color: Color(0xFFBFDBFE)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  ),
-                  icon: const Icon(Icons.phone_rounded, size: 15),
-                  label: const Text('Gọi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  onPressed: () => _makePhoneCall(point.customerPhone),
-                ),
-                const SizedBox(width: 8),
-
-                // Nút Chỉ đường
-                if (point.hasValidCoordinates) ...[
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF15803D),
-                      side: const BorderSide(color: Color(0xFFBBF7D0)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                    icon: const Icon(Icons.directions_rounded, size: 15),
-                    label: const Text('Đường đi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    onPressed: () => ApiService.openExternalNavigation(point.latitude!, point.longitude!),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-
-                // Nút Cập nhật vị trí bằng tâm ngắm
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F172A),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                    icon: const Icon(Icons.crop_free_rounded, size: 16),
-                    label: const Text(
-                      'Tâm ngắm',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                    onPressed: () => _openCrosshairPickerForPoint(point),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    ],
-  ),
-);
+    );
   }
 }

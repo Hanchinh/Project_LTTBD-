@@ -1,16 +1,34 @@
 import 'dart:async';
-import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:image_picker/image_picker.dart';
+import '../models/customer_model.dart';
+import '../models/location_model.dart';
 import '../models/shift_model.dart';
 import '../services/api_service.dart';
-import '../widgets/fullscreen_image_viewer.dart';
+import '../widgets/quick_add_customer_sheet.dart';
+import '../widgets/point_detail_bottom_sheet.dart';
+import '../widgets/create_shift_dialog.dart';
+import '../widgets/shift_picker_bottom_sheet.dart';
+import '../services/map_tile_cache_service.dart';
+import 'shift_map_view.dart';
 
-/// Màn hình Bản đồ Chính làm Trung tâm (Map-First Architecture)
+/// Lớp đại diện cho cụm điểm (Cluster) trên Bản đồ chính
+class _LocationCluster {
+  final LatLng center;
+  final List<MasterSavedLocationModel> items;
+
+  _LocationCluster({required this.center, required this.items});
+}
+
+/// Màn hình Bản đồ Chính độc lập với ca (TASK: MASTER-MAP-014)
+/// - Hiển thị tất cả các điểm shipper đang đăng nhập đã lưu (saved_locations do chính họ lưu)
+/// - Hỗ trợ gom cụm marker (Clustering) khi ở mức zoom xa
+/// - Nút nổi "Ghim vị trí mới": mở tâm ngắm, kéo chọn tọa độ tùy ý
+/// - Hộp thoại "Gán cho số điện thoại nào?": tự tạo khách nếu mới, hỏi thay thế nếu đã có vị trí
 class MainMapView extends StatefulWidget {
   final ShiftModel? initialShift;
   final Function(ShiftModel)? onActiveShiftChanged;
@@ -31,50 +49,303 @@ class MainMapView extends StatefulWidget {
 
 class MainMapViewState extends State<MainMapView> {
   final MapController _mapController = MapController();
-  final ImagePicker _imagePicker = ImagePicker();
 
-  ShiftModel? _activeShift;
-  List<ShiftModel> _availableShifts = [];
-  bool _isLoadingShifts = true;
-  bool _isLoadingPoints = false;
+  // Danh sách toàn bộ vị trí đã lưu của shipper đăng nhập
+  List<MasterSavedLocationModel> _savedLocations = [];
+  bool _isLoading = true;
   String? _errorMessage;
 
-  // Race-condition protection counter khi đổi ca liên tục
-  int _loadSequence = 0;
-
-  // Timestamp làm mới ảnh chống dính cache
-  int _photoCacheVersion = DateTime.now().millisecondsSinceEpoch;
+  // Điểm được chọn để hiển thị chi tiết dưới đáy màn hình
+  MasterSavedLocationModel? _selectedLocation;
+  bool _isMapReady = false;
+  double _currentZoom = 15.0;
 
   // Vị trí GPS của shipper
   LatLng? _shipperLocation;
   bool _isLocatingShipper = false;
 
-  // Điểm giao đang được chọn trên bản đồ
-  ShiftDeliveryPointModel? _selectedPoint;
-  bool _isMapReady = false;
-
-  // Chế độ ghim vị trí trực tiếp trên bản đồ chính (TASK: MAP-PIN-FLOW-SIMPLIFICATION-006)
-  bool _isPinningMode = false;
-  ShiftDeliveryPointModel? _pinningPoint;
-  LatLng _currentCrosshairCoord = _hcmDefault;
-  bool _isSavingPin = false;
-
   // Loại bản đồ nền (0: Google Đường phố, 1: Google Hybrid Vệ tinh, 2: CartoDB Voyager)
   int _currentMapType = 0;
-  bool _hasTileError = false;
 
-  // Mở rộng khay tóm tắt danh sách điểm giao dưới đáy
-  bool _isSummaryTrayExpanded = false;
+  // Chế độ ghim vị trí mới bằng tâm ngắm (TASK: MASTER-MAP-014)
+  bool _isPinningMode = false;
+  LatLng _crosshairCoord = _hcmDefault;
+
+  // Tìm kiếm địa chỉ Geocoding trong chế độ ghim
+  final TextEditingController _addressSearchCtrl = TextEditingController();
+  List<AddressSearchResult> _addressSearchResults = [];
+  bool _isSearchingAddress = false;
+  Timer? _searchDebounceTimer;
+
+  // Danh bạ khách hàng lưu tạm trong bộ nhớ để gợi ý khi gán SĐT
+  List<CustomerDirectoryModel> _directoryCustomers = [];
+
+  // Khách hàng mục tiêu khi kích hoạt luồng Ghim lại (TASK 019)
+  MasterSavedLocationModel? _repinTarget;
+
+  // Tile Provider hỗ trợ Disk Cache tối đa 200MB & Cancellable (TASK 019)
+  final CancellableDiskCachedTileProvider _tileProvider = CancellableDiskCachedTileProvider();
+
+  // Tối ưu gom cụm: debounce 150ms, cache kết quả theo zoom, chỉ tính điểm trong viewport (TASK 019)
+  Timer? _clusterDebounceTimer;
+  final Map<String, List<_LocationCluster>> _clusterCache = {};
+  List<_LocationCluster> _cachedClusters = [];
 
   // Tọa độ mặc định (TP.HCM)
-  static const LatLng _hcmDefault = LatLng(10.776889, 106.700806);
+  static const LatLng _hcmDefault = LatLng(10.842215, 106.818123);
 
   @override
   void initState() {
     super.initState();
-    _activeShift = widget.initialShift;
-    _initShiftsAndSelectDefault();
+    _loadMasterData();
     _getShipperLocation();
+  }
+
+  @override
+  void dispose() {
+    _addressSearchCtrl.dispose();
+    _searchDebounceTimer?.cancel();
+    _clusterDebounceTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Mở hộp thoại tạo ca làm việc mới từ bản đồ chính (TASK: SHIFT-FROM-MAP-AND-BULK-PASTE-015B)
+  Future<void> _handleCreateShift() async {
+    final newShift = await CreateShiftBottomSheet.show(context);
+    if (newShift != null && mounted) {
+      widget.onActiveShiftChanged?.call(newShift);
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ShiftMapView(shiftId: newShift.id),
+        ),
+      );
+    }
+  }
+
+  /// Mở bottom sheet chọn ca làm việc từ bản đồ chính (TASK: PHOTO-SYNC-SHIFT-PICKER-BULK-016 - Mục B)
+  Future<void> _handleOpenShiftPicker() async {
+    await ShiftPickerBottomSheet.show(
+      context: context,
+      onShiftSelected: (selectedShift) {
+        widget.onActiveShiftChanged?.call(selectedShift);
+      },
+    );
+  }
+
+  /// Tải dữ liệu các vị trí đã lưu của shipper và danh bạ để gợi ý SĐT
+  Future<void> _loadMasterData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final futures = await Future.wait([
+        ApiService.getMySavedLocations(),
+        ApiService.getCustomers().catchError((_) => <CustomerDirectoryModel>[]),
+      ]);
+
+      if (!mounted) return;
+
+      final locations = futures[0] as List<MasterSavedLocationModel>;
+      final customers = futures[1] as List<CustomerDirectoryModel>;
+
+      setState(() {
+        _savedLocations = locations;
+        _directoryCustomers = customers;
+        _isLoading = false;
+        _clusterCache.clear();
+        _cachedClusters = _clusterLocations(locations, _currentZoom);
+      });
+
+      // Nếu có vị trí và bản đồ đã sẵn sàng, tự động căn khung hình
+      if (_isMapReady && locations.isNotEmpty) {
+        _fitLocationsBounds();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Cho phép các màn hình khác (như HomeShellView) gọi reload qua GlobalKey
+  void reloadLocations() {
+    _loadMasterData();
+  }
+
+  /// Tương thích ngược với lời gọi cũ từ HomeShellView
+  void reloadActiveShift({bool preserveSelected = true}) {
+    reloadLocations();
+  }
+
+  /// Căn chỉnh khung hình bản đồ bao quát các điểm đã lưu
+  void _fitLocationsBounds() {
+    final validCoords = _savedLocations
+        .where((loc) => loc.hasValidCoordinates)
+        .map((loc) => LatLng(loc.latitude, loc.longitude))
+        .toList();
+
+    if (validCoords.isEmpty) {
+      if (_shipperLocation != null) {
+        _mapController.move(_shipperLocation!, 15.5);
+      }
+      return;
+    }
+
+    if (validCoords.length == 1) {
+      _mapController.move(validCoords.first, 16.5);
+      return;
+    }
+
+    final bounds = LatLngBounds.fromPoints(validCoords);
+    _mapController.fitCamera(
+      CameraFit.bounds(
+        bounds: bounds,
+        padding: const EdgeInsets.fromLTRB(40, 110, 40, 140),
+        maxZoom: 17.5,
+      ),
+    );
+  }
+
+  /// Thuật toán gom cụm marker (Clustering) theo khoảng cách tại mức zoom hiện tại
+  List<_LocationCluster> _clusterLocations(List<MasterSavedLocationModel> locations, double zoom) {
+    if (locations.isEmpty) return [];
+
+    // Khi zoom rất gần (zoom >= 16.5), không gom cụm để hiện từng điểm riêng biệt
+    if (zoom >= 16.5) {
+      return locations
+          .where((loc) => loc.hasValidCoordinates)
+          .map((loc) => _LocationCluster(
+                center: LatLng(loc.latitude, loc.longitude),
+                items: [loc],
+              ))
+          .toList();
+    }
+
+    // Ngưỡng khoảng cách tính theo độ kinh/vĩ dựa theo mức zoom
+    final double threshold = 0.065 / math.pow(2, (zoom - 10).clamp(0.0, 10.0));
+    final List<_LocationCluster> clusters = [];
+
+    for (final loc in locations) {
+      if (!loc.hasValidCoordinates) continue;
+      final latLng = LatLng(loc.latitude, loc.longitude);
+
+      _LocationCluster? closestCluster;
+      double minDistance = double.infinity;
+
+      for (final cluster in clusters) {
+        final dLat = cluster.center.latitude - latLng.latitude;
+        final dLng = cluster.center.longitude - latLng.longitude;
+        final dist = math.sqrt(dLat * dLat + dLng * dLng);
+
+        if (dist < threshold && dist < minDistance) {
+          minDistance = dist;
+          closestCluster = cluster;
+        }
+      }
+
+      if (closestCluster != null) {
+        closestCluster.items.add(loc);
+      } else {
+        clusters.add(_LocationCluster(center: latLng, items: [loc]));
+      }
+    }
+
+    return clusters;
+  }
+
+  /// Tối ưu hiệu năng gom cụm marker (TASK 019 - Mục B.4):
+  /// 1. Chỉ tính toán cho các điểm nằm trong khung nhìn (visibleBounds + 15% margin)
+  /// 2. Cache kết quả gom cụm theo mức zoom và khung nhìn để tránh tính toán lại liên tục
+  void _recomputeClusters(double zoom, LatLngBounds? bounds) {
+    if (!mounted) return;
+    if (bounds == null) {
+      final res = _clusterLocations(_savedLocations, zoom);
+      setState(() => _cachedClusters = res);
+      return;
+    }
+
+    final zoomKey = zoom.toStringAsFixed(1);
+    final cacheKey = '${zoomKey}_${bounds.southWest.latitude.toStringAsFixed(2)}_${bounds.northEast.latitude.toStringAsFixed(2)}';
+    if (_clusterCache.containsKey(cacheKey)) {
+      setState(() => _cachedClusters = _clusterCache[cacheKey]!);
+      return;
+    }
+
+    final latPad = (bounds.northEast.latitude - bounds.southWest.latitude).abs() * 0.15;
+    final lngPad = (bounds.northEast.longitude - bounds.southWest.longitude).abs() * 0.15;
+    final extendedBounds = LatLngBounds(
+      LatLng(bounds.southWest.latitude - latPad, bounds.southWest.longitude - lngPad),
+      LatLng(bounds.northEast.latitude + latPad, bounds.northEast.longitude + lngPad),
+    );
+
+    final visible = _savedLocations.where((loc) {
+      if (!loc.hasValidCoordinates) return false;
+      return extendedBounds.contains(LatLng(loc.latitude, loc.longitude));
+    }).toList();
+
+    final computed = _clusterLocations(visible, zoom);
+    _clusterCache[cacheKey] = computed;
+    if (_clusterCache.length > 50) {
+      _clusterCache.remove(_clusterCache.keys.first);
+    }
+
+    setState(() => _cachedClusters = computed);
+  }
+
+  /// Lấy tọa độ GPS hiện tại của Shipper
+  Future<void> _getShipperLocation() async {
+    setState(() => _isLocatingShipper = true);
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        if (mounted) setState(() => _isLocatingShipper = false);
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+
+      if (mounted) {
+        setState(() {
+          _shipperLocation = LatLng(position.latitude, position.longitude);
+          _isLocatingShipper = false;
+        });
+
+        // Nếu shipper chưa có điểm nào được lưu, di chuyển đến vị trí shipper
+        if (_savedLocations.isEmpty && _isMapReady) {
+          _mapController.move(_shipperLocation!, 16.0);
+        }
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLocatingShipper = false);
+    }
+  }
+
+  /// Chuyển đổi giữa 3 loại bản đồ nền
+  void _switchMapType() {
+    setState(() {
+      _currentMapType = (_currentMapType + 1) % 3;
+    });
+    final names = [
+      'Bản đồ đường phố',
+      'Ảnh vệ tinh + Tên đường',
+      'Bản đồ CartoDB Voyager',
+    ];
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Đã chuyển sang: ${names[_currentMapType]}'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   String _getUrlTemplate() {
@@ -96,793 +367,412 @@ class MainMapViewState extends State<MainMapView> {
     return const [];
   }
 
-  void _switchMapType() {
+  /// Bắt đầu chế độ ghim vị trí mới bằng tâm ngắm (luồng Ghim vị trí mới)
+  void _startPinningMode() {
     setState(() {
-      _currentMapType = (_currentMapType + 1) % 3;
-      _hasTileError = false;
+      _repinTarget = null;
+      _isPinningMode = true;
+      _selectedLocation = null;
+      try {
+        _crosshairCoord = _mapController.camera.center;
+      } catch (_) {
+        _crosshairCoord = _hcmDefault;
+      }
+      _addressSearchCtrl.clear();
+      _addressSearchResults = [];
     });
-    final names = [
-      'Bản đồ đường phố',
-      'Ảnh vệ tinh + Tên đường',
-      'Bản đồ CartoDB Voyager',
-    ];
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Đã chuyển sang: ${names[_currentMapType]}'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
-  /// Khởi tạo danh sách ca làm việc và chọn ca mặc định theo thứ tự ưu tiên
-  Future<void> _initShiftsAndSelectDefault() async {
+  /// Hủy chế độ ghim vị trí mới
+  void _cancelPinningMode() {
     setState(() {
-      _isLoadingShifts = true;
-      _errorMessage = null;
+      _repinTarget = null;
+      _isPinningMode = false;
+      _addressSearchCtrl.clear();
+      _addressSearchResults = [];
     });
-
-    try {
-      final shifts = await ApiService.getShifts();
-      if (!mounted) return;
-
-      setState(() {
-        _availableShifts = shifts;
-        _isLoadingShifts = false;
-      });
-
-      if (shifts.isEmpty) {
-        setState(() {
-          _activeShift = null;
-        });
-        return;
-      }
-
-      // 1. Kiểm tra ca đã chọn gần nhất trong SharedPreferences
-      final savedShiftId = await ApiService.getLastActiveShiftId();
-      ShiftModel? chosenShift;
-
-      if (savedShiftId != null) {
-        final found = shifts.where((s) => s.id == savedShiftId).toList();
-        if (found.isNotEmpty) {
-          chosenShift = found.first;
-        }
-      }
-
-      // 2. Nếu không có, tự động chọn ca IN_PROGRESS phù hợp
-      if (chosenShift == null) {
-        final inProgressList = shifts.where((s) => s.status == ShiftStatus.inProgress).toList();
-        if (inProgressList.isNotEmpty) {
-          chosenShift = inProgressList.first;
-        }
-      }
-
-      // 3. Nếu không có ca đang thực hiện, chọn ca PREPARING mới nhất
-      if (chosenShift == null) {
-        final preparingList = shifts.where((s) => s.status == ShiftStatus.preparing).toList();
-        if (preparingList.isNotEmpty) {
-          chosenShift = preparingList.first;
-        }
-      }
-
-      // 4. Nếu vẫn không có, chọn ca đầu tiên trong danh sách
-      chosenShift ??= shifts.first;
-
-      // Kích hoạt ca được chọn
-      await _switchShift(chosenShift.id, preserveCamera: false);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isLoadingShifts = false;
-      });
-    }
   }
 
-  /// Chuyển đổi sang ca làm việc khác (chống race condition với _loadSequence)
-  Future<void> _switchShift(String shiftId, {bool preserveCamera = false, bool preserveSelected = false}) async {
-    final currentSeq = ++_loadSequence;
-
-    setState(() {
-      _isLoadingPoints = true;
-      if (!preserveSelected) {
-        _selectedPoint = null;
-      }
-    });
-
-    try {
-      // Lưu lại ca đã chọn gần nhất vào bộ nhớ
-      await ApiService.saveLastActiveShiftId(shiftId);
-
-      // Tải chi tiết ca kèm các điểm giao
-      final fullShift = await ApiService.getShiftDetail(shiftId);
-
-      // Chống race-condition: nếu đã có request đổi ca mới hơn thì bỏ qua
-      if (currentSeq != _loadSequence || !mounted) return;
-
-      setState(() {
-        _activeShift = fullShift;
-        _isLoadingPoints = false;
-        _photoCacheVersion = DateTime.now().millisecondsSinceEpoch;
-
-        // Cập nhật lại điểm đang chọn nếu có yêu cầu giữ lại
-        if (preserveSelected && _selectedPoint != null) {
-          final matched = fullShift.deliveryPoints.where((p) => p.id == _selectedPoint!.id).toList();
-          if (matched.isNotEmpty) {
-            _selectedPoint = matched.first;
-          }
-        }
-      });
-
-      // Báo cho component cha (nếu có)
-      widget.onActiveShiftChanged?.call(fullShift);
-
-      // Fit bounds camera bản đồ
-      if (!preserveCamera && _isMapReady) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _fitMapBounds();
-        });
-      }
-    } catch (e) {
-      if (currentSeq != _loadSequence || !mounted) return;
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-        _isLoadingPoints = false;
-      });
-    }
-  }
-
-  /// Gọi từ bên ngoài khi có điểm mới thêm vào ca
-  void reloadActiveShift({bool preserveSelected = true}) {
-    if (_activeShift != null) {
-      _switchShift(_activeShift!.id, preserveCamera: true, preserveSelected: preserveSelected);
-    }
-  }
-
-  /// Lấy vị trí GPS của shipper
-  Future<void> _getShipperLocation() async {
-    setState(() => _isLocatingShipper = true);
-    try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return;
-      }
-      if (permission == LocationPermission.deniedForever) return;
-
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 8),
-        ),
-      );
-
-      if (mounted) {
-        setState(() {
-          _shipperLocation = LatLng(pos.latitude, pos.longitude);
-        });
-      }
-    } catch (_) {
-      // Bỏ qua lỗi định vị
-    } finally {
-      if (mounted) setState(() => _isLocatingShipper = false);
-    }
-  }
-
-  /// Căn chỉnh camera bao quát toàn bộ điểm giao có tọa độ
-  void _fitMapBounds() {
-    if (!_isMapReady) return;
-
-    if (_activeShift == null) {
-      if (_shipperLocation != null) {
-        _mapController.move(_shipperLocation!, 15.0);
-      }
+  /// Tìm kiếm địa chỉ bằng Geocoding
+  void _onAddressSearchChanged(String query) {
+    _searchDebounceTimer?.cancel();
+    if (query.trim().length < 3) {
+      setState(() => _addressSearchResults = []);
       return;
     }
 
-    final validPoints = _activeShift!.deliveryPoints.where((p) => p.hasValidCoordinates).toList();
-    if (validPoints.isEmpty) {
-      if (_shipperLocation != null) {
-        _mapController.move(_shipperLocation!, 15.0);
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 350), () async {
+      setState(() => _isSearchingAddress = true);
+      try {
+        final results = await ApiService.searchAddress(query.trim());
+        if (mounted) {
+          setState(() {
+            _addressSearchResults = results;
+            _isSearchingAddress = false;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() => _isSearchingAddress = false);
       }
-      return;
-    }
-
-    if (validPoints.length == 1) {
-      _mapController.move(validPoints.first.latLng!, 16.5);
-      return;
-    }
-
-    double minLat = validPoints.first.latitude!;
-    double maxLat = validPoints.first.latitude!;
-    double minLng = validPoints.first.longitude!;
-    double maxLng = validPoints.first.longitude!;
-
-    for (final p in validPoints) {
-      if (p.latitude! < minLat) minLat = p.latitude!;
-      if (p.latitude! > maxLat) maxLat = p.latitude!;
-      if (p.longitude! < minLng) minLng = p.longitude!;
-      if (p.longitude! > maxLng) maxLng = p.longitude!;
-    }
-
-    final bounds = LatLngBounds(LatLng(minLat, minLng), LatLng(maxLat, maxLng));
-    _mapController.fitCamera(
-      CameraFit.bounds(
-        bounds: bounds,
-        padding: const EdgeInsets.fromLTRB(40, 110, 40, 240),
-      ),
-    );
+    });
   }
 
-  /// Mở Bottom Sheet danh sách ca làm việc để chọn/chuyển ca
-  void _openShiftPickerSheet() {
-    final searchCtrl = TextEditingController();
-    String filterStatus = 'ALL';
+  /// Chọn kết quả tìm kiếm và bay bản đồ tới đó
+  void _selectSearchResult(AddressSearchResult result) {
+    final target = LatLng(result.latitude, result.longitude);
+    _mapController.move(target, 17.5);
+    setState(() {
+      _crosshairCoord = target;
+      _addressSearchResults = [];
+      _addressSearchCtrl.text = result.displayName;
+    });
+    FocusScope.of(context).unfocus();
+  }
 
-    showModalBottomSheet(
+  /// Mở hộp thoại "Gán cho số điện thoại nào?" (TASK: MASTER-MAP-014 Điểm 3, 4, 5 & TASK 019 Mục A)
+  Future<void> _showAssignPhoneDialog(LatLng targetCoord) async {
+    final phoneCtrl = TextEditingController(text: _repinTarget?.customerPhone ?? '');
+    final nameCtrl = TextEditingController(text: _repinTarget?.customerName ?? '');
+    final notesCtrl = TextEditingController(text: _repinTarget?.identificationNotes ?? '');
+
+    String normalizedPhone = _repinTarget != null ? normalizeCustomerPhone(_repinTarget!.customerPhone) : '';
+    List<CustomerDirectoryModel> suggestions = List.from(_directoryCustomers);
+
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (sheetCtx) {
-        return StatefulBuilder(
-          builder: (ctx, setSheetState) {
-            final query = searchCtrl.text.trim().toLowerCase();
-
-            final filteredShifts = _availableShifts.where((s) {
-              if (filterStatus != 'ALL' && s.status.toApiString() != filterStatus) {
-                return false;
-              }
-              if (query.isNotEmpty) {
-                final matchCode = s.shiftCode.toLowerCase().contains(query);
-                final matchDate = s.shiftDate.toLowerCase().contains(query);
-                return matchCode || matchDate;
-              }
-              return true;
-            }).toList();
-
-            return DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.65,
-              minChildSize: 0.4,
-              maxChildSize: 0.9,
-              builder: (_, scrollCtrl) {
-                return Column(
-                  children: [
-                    // Thanh gạch ngang (Drag handle)
-                    Container(
-                      width: 36,
-                      height: 4,
-                      margin: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFCBD5E1),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-
-                    // Tiêu đề
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.swap_horiz_rounded, color: Color(0xFF2563EB), size: 24),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Chọn ca làm việc',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                          const Spacer(),
-                          TextButton.icon(
-                            style: TextButton.styleFrom(
-                              foregroundColor: const Color(0xFF2563EB),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            ),
-                            icon: const Icon(Icons.add_rounded, size: 18),
-                            label: const Text('Tạo ca', style: TextStyle(fontWeight: FontWeight.w700)),
-                            onPressed: () {
-                              Navigator.pop(sheetCtx);
-                              _handleCreateNewShift();
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Ô tìm kiếm nhanh
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-                      child: SizedBox(
-                        height: 42,
-                        child: TextField(
-                          controller: searchCtrl,
-                          onChanged: (_) => setSheetState(() {}),
-                          decoration: InputDecoration(
-                            hintText: 'Tìm theo mã ca (VD: SHF-...), ngày...',
-                            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                            prefixIcon: const Icon(Icons.search_rounded, size: 18, color: Color(0xFF64748B)),
-                            filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Filter Chips trạng thái
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _buildShiftStatusFilterChip(
-                              label: 'Tất cả',
-                              isSelected: filterStatus == 'ALL',
-                              onTap: () => setSheetState(() => filterStatus = 'ALL'),
-                            ),
-                            const SizedBox(width: 8),
-                            _buildShiftStatusFilterChip(
-                              label: 'Đang làm',
-                              isSelected: filterStatus == 'IN_PROGRESS',
-                              onTap: () => setSheetState(() => filterStatus = 'IN_PROGRESS'),
-                              dotColor: const Color(0xFF2563EB),
-                            ),
-                            const SizedBox(width: 8),
-                            _buildShiftStatusFilterChip(
-                              label: 'Chuẩn bị',
-                              isSelected: filterStatus == 'PREPARING',
-                              onTap: () => setSheetState(() => filterStatus = 'PREPARING'),
-                              dotColor: const Color(0xFFF59E0B),
-                            ),
-                            const SizedBox(width: 8),
-                            _buildShiftStatusFilterChip(
-                              label: 'Hoàn thành',
-                              isSelected: filterStatus == 'COMPLETED',
-                              onTap: () => setSheetState(() => filterStatus = 'COMPLETED'),
-                              dotColor: const Color(0xFF10B981),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 10),
-                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
-
-                    // Danh sách ca
-                    Expanded(
-                      child: filteredShifts.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'Không tìm thấy ca làm việc phù hợp',
-                                style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
-                              ),
-                            )
-                          : ListView.separated(
-                              controller: scrollCtrl,
-                              padding: const EdgeInsets.all(16),
-                              itemCount: filteredShifts.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 10),
-                              itemBuilder: (itemCtx, idx) {
-                                final shift = filteredShifts[idx];
-                                final isCurrent = _activeShift?.id == shift.id;
-                                final summary = shift.summary;
-
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    color: isCurrent ? const Color(0xFFEFF6FF) : Colors.white,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: isCurrent ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
-                                      width: isCurrent ? 1.5 : 1.0,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.02),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      borderRadius: BorderRadius.circular(14),
-                                      onTap: () {
-                                        Navigator.pop(sheetCtx);
-                                        _switchShift(shift.id);
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(14),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    shift.shiftCode,
-                                                    style: TextStyle(
-                                                      fontSize: 15,
-                                                      fontWeight: FontWeight.w700,
-                                                      color: isCurrent ? const Color(0xFF1D4ED8) : const Color(0xFF0F172A),
-                                                    ),
-                                                  ),
-                                                ),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                                  decoration: BoxDecoration(
-                                                    color: _getShiftStatusBg(shift.status),
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: Text(
-                                                    shift.status.displayName,
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: _getShiftStatusText(shift.status),
-                                                    ),
-                                                  ),
-                                                ),
-                                                if (isCurrent) ...[
-                                                  const SizedBox(width: 8),
-                                                  const Icon(Icons.check_circle_rounded, color: Color(0xFF2563EB), size: 18),
-                                                ],
-                                              ],
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Row(
-                                              children: [
-                                                const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF64748B)),
-                                                const SizedBox(width: 4),
-                                                Text(
-                                                  shift.shiftDate,
-                                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                                                ),
-                                                const Text(' · ', style: TextStyle(color: Color(0xFFCBD5E1))),
-                                                Text(
-                                                  '${summary.totalPoints} điểm',
-                                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
-                                                ),
-                                                const Spacer(),
-                                                // Dot Badges tóm tắt
-                                                _buildDotBadge(count: summary.verifiedCount, color: const Color(0xFF10B981)),
-                                                const SizedBox(width: 4),
-                                                _buildDotBadge(count: summary.temporaryCount, color: const Color(0xFFF59E0B)),
-                                                const SizedBox(width: 4),
-                                                _buildDotBadge(count: summary.noLocationCount, color: const Color(0xFF64748B)),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildShiftStatusFilterChip({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-    Color? dotColor,
-  }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (dotColor != null) ...[
-              Container(width: 6, height: 6, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
-              const SizedBox(width: 5),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? Colors.white : const Color(0xFF475569),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDotBadge({required int count, required Color color}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 5, height: 5, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-          const SizedBox(width: 3),
-          Text(
-            '$count',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Color _getShiftStatusBg(ShiftStatus status) {
-    switch (status) {
-      case ShiftStatus.inProgress:
-        return const Color(0xFFDBEAFE);
-      case ShiftStatus.completed:
-        return const Color(0xFFDCFCE7);
-      case ShiftStatus.cancelled:
-        return const Color(0xFFFEE2E2);
-      case ShiftStatus.preparing:
-        return const Color(0xFFFEF3C7);
-    }
-  }
-
-  Color _getShiftStatusText(ShiftStatus status) {
-    switch (status) {
-      case ShiftStatus.inProgress:
-        return const Color(0xFF1D4ED8);
-      case ShiftStatus.completed:
-        return const Color(0xFF15803D);
-      case ShiftStatus.cancelled:
-        return const Color(0xFFB91C1C);
-      case ShiftStatus.preparing:
-        return const Color(0xFFD97706);
-    }
-  }
-
-  /// Xử lý tạo ca làm việc mới ngay từ bản đồ
-  Future<void> _handleCreateNewShift() async {
-    try {
-      final newShift = await ApiService.createShift();
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đã tạo thành công ca làm: ${newShift.shiftCode}'),
-          backgroundColor: const Color(0xFF10B981),
-        ),
-      );
-
-      // Cập nhật danh sách ca và chuyển thẳng sang ca vừa tạo
-      _availableShifts.insert(0, newShift);
-      await _switchShift(newShift.id);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi tạo ca: $e'),
-          backgroundColor: const Color(0xFFEF4444),
-        ),
-      );
-    }
-  }
-
-  /// Mở menu thêm nhanh khi bấm nút [+] trên Floating Bar
-  void _openQuickActionMenu() {
-    showModalBottomSheet(
-      context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 14),
-                decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)),
-              ),
-              ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: const Color(0xFFDBEAFE), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.post_add_rounded, color: Color(0xFF2563EB)),
-                ),
-                title: const Text('Tạo ca làm việc mới', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                subtitle: const Text('Bắt đầu một ca làm việc và thêm điểm giao mới', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _handleCreateNewShift();
-                },
-              ),
-              const Divider(height: 1, color: Color(0xFFE2E8F0)),
-              ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.contacts_rounded, color: Color(0xFF15803D)),
-                ),
-                title: const Text('Mở Danh bạ vị trí', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-                subtitle: const Text('Chọn khách hàng từ danh bạ để thêm vào ca này', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  widget.onOpenDirectory?.call();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  /// Nút ghim nổi góc dưới bên phải - Mở danh sách chọn khách hàng thuộc ca để ghim vị trí
-  void _handleFloatingCrosshairPicker() {
-    if (_activeShift == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn hoặc tạo ca làm việc trước'), backgroundColor: Color(0xFFF59E0B)),
-      );
-      return;
-    }
-
-    if (_activeShift!.deliveryPoints.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ca làm việc này chưa có điểm giao nào. Hãy thêm khách từ Danh bạ.'), backgroundColor: Color(0xFFF59E0B)),
-      );
-      return;
-    }
-
-    _showPointSelectionForCrosshairSheet();
-  }
-
-  /// Bước 1: Mở Bottom Sheet nhỏ gọn chọn khách hàng thuộc ca đang chọn (có tìm kiếm nhanh)
-  void _showPointSelectionForCrosshairSheet() {
-    if (_activeShift == null) return;
-    final allPoints = _activeShift!.deliveryPoints;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        String searchQuery = '';
-
+      builder: (sheetCtx) {
         return StatefulBuilder(
-          builder: (sheetCtx, setSheetState) {
-            final filteredPoints = allPoints.where((p) {
-              if (searchQuery.isEmpty) return true;
-              final q = searchQuery.toLowerCase();
-              return p.customerName.toLowerCase().contains(q) ||
-                     p.customerPhone.contains(q) ||
-                     p.customerAddress.toLowerCase().contains(q);
-            }).toList();
+          builder: (ctx, setSheetState) {
+            void updateFilter(String query) {
+              final clean = normalizeCustomerPhone(query);
+              setSheetState(() {
+                normalizedPhone = clean;
+                if (query.trim().isEmpty) {
+                  suggestions = List.from(_directoryCustomers);
+                } else {
+                  suggestions = _directoryCustomers.where((c) {
+                    final pMatch = c.phoneNumber.contains(clean) || c.phoneNumber.contains(query.trim());
+                    final nMatch = c.fullName.toLowerCase().contains(query.trim().toLowerCase());
+                    return pMatch || nMatch;
+                  }).toList();
+                }
+              });
+            }
 
-            return DraggableScrollableSheet(
-              expand: false,
-              initialChildSize: 0.6,
-              minChildSize: 0.35,
-              maxChildSize: 0.85,
-              builder: (_, scrollCtrl) {
-                return Column(
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: 36,
-                      height: 4,
-                      margin: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.add_location_alt_rounded, color: Color(0xFF2563EB), size: 22),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Chọn khách để ghim vị trí',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                          ),
-                          const Spacer(),
-                          Text('${filteredPoints.length}/${allPoints.length} khách', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                        ],
-                      ),
-                    ),
-
-                    // Ô tìm kiếm nhanh theo SĐT hoặc Tên
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Tìm theo tên hoặc số điện thoại...',
-                          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
-                          prefixIcon: const Icon(Icons.search_rounded, size: 20, color: Color(0xFF64748B)),
-                          filled: true,
-                          fillColor: const Color(0xFFF1F5F9),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                          isDense: true,
+                    // Thanh gạt
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCBD5E1),
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        onChanged: (val) {
-                          setSheetState(() {
-                            searchQuery = val.trim();
-                          });
-                        },
                       ),
                     ),
+                    const SizedBox(height: 12),
 
-                    const SizedBox(height: 8),
-                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    // Tiêu đề
+                    const Row(
+                      children: [
+                        Icon(Icons.add_location_alt_rounded, color: Color(0xFF2563EB), size: 24),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Gán cho số điện thoại nào?',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tọa độ: ${targetCoord.latitude.toStringAsFixed(6)}, ${targetCoord.longitude.toStringAsFixed(6)}',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 16),
 
-                    Expanded(
-                      child: filteredPoints.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.search_off_rounded, size: 36, color: Color(0xFF94A3B8)),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    searchQuery.isEmpty ? 'Không có điểm giao nào' : 'Không tìm thấy khách "$searchQuery"',
-                                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                    // Banner thông báo ghim lại cho khách đã chọn (TASK 019 - Mục A.2)
+                    if (_repinTarget != null) ...[
+                      Container(
+                        key: const ValueKey('repin_customer_banner'),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF2563EB)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Đang ghim lại cho: ${_repinTarget!.customerName} - ${_repinTarget!.customerPhone}',
+                                key: const ValueKey('repin_customer_banner_text'),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1E40AF),
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            TextButton(
+                              key: const ValueKey('btn_change_repin_phone'),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              onPressed: () {
+                                setSheetState(() {
+                                  _repinTarget = null;
+                                  phoneCtrl.clear();
+                                  nameCtrl.clear();
+                                  notesCtrl.clear();
+                                  normalizedPhone = '';
+                                  suggestions = List.from(_directoryCustomers);
+                                });
+                              },
+                              child: const Text(
+                                'Đổi số',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2563EB),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    // Ô nhập SĐT
+                    const Text(
+                      'SỐ ĐIỆN THOẠI KHÁCH HÀNG *',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      key: const Key('input_assign_phone'),
+                      controller: phoneCtrl,
+                      autofocus: _repinTarget == null,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        hintText: 'Nhập SĐT (VD: 0908911111)',
+                        prefixIcon: const Icon(Icons.phone_rounded, color: Color(0xFF2563EB)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+                        ),
+                      ),
+                      onChanged: updateFilter,
+                    ),
+
+                    // Nhãn số đã chuẩn hóa
+                    if (normalizedPhone.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Số đã chuẩn hóa: $normalizedPhone (${normalizedPhone.length} số)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: normalizedPhone.length == 10 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+
+                    // Danh sách gợi ý số điện thoại trong danh bạ
+                    if (suggestions.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Gợi ý từ danh bạ:',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 4),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 120),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: suggestions.length > 3 ? 3 : suggestions.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (itemCtx, index) {
+                            final cust = suggestions[index];
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading: CircleAvatar(
+                                radius: 14,
+                                backgroundColor: const Color(0xFFE0E7FF),
+                                child: Text(
+                                  cust.fullName.isNotEmpty ? cust.fullName[0].toUpperCase() : 'K',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                                ),
+                              ),
+                              title: Text(cust.fullName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              subtitle: Text(cust.phoneNumber, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                              trailing: cust.hasLocation
+                                  ? const Text('Đã có vị trí', style: TextStyle(fontSize: 10, color: Color(0xFF10B981)))
+                                  : null,
+                              onTap: () {
+                                phoneCtrl.text = cust.phoneNumber;
+                                nameCtrl.text = cust.fullName;
+                                updateFilter(cust.phoneNumber);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 14),
+
+                    // Tên khách hàng (tùy chọn)
+                    const Text(
+                      'TÊN KHÁCH HÀNG (TÙY CHỌN)',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'Mặc định: Khách [SĐT]',
+                        prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF64748B)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Ghi chú đặc điểm vị trí / cổng nhà
+                    const Text(
+                      'GHI CHÚ VỊ TRÍ / CỔNG NHÀ (TÙY CHỌN)',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: notesCtrl,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        hintText: 'VD: Cổng sắt xanh, hẻm cạnh tạp hóa',
+                        prefixIcon: const Icon(Icons.edit_note_rounded, color: Color(0xFF64748B)),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Nút bấm xác nhận LƯU
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        key: const Key('btn_confirm_save_location'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () async {
+                          final rawPhone = phoneCtrl.text.trim();
+                          if (rawPhone.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Vui lòng nhập số điện thoại khách hàng')),
+                            );
+                            return;
+                          }
+
+                          final clean = normalizeCustomerPhone(rawPhone);
+                          if (clean.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Số điện thoại không hợp lệ')),
+                            );
+                            return;
+                          }
+
+                          // Cảnh báo nếu số khác 10 số
+                          if (clean.length != 10) {
+                            final proceed = await showDialog<bool>(
+                              context: context,
+                              builder: (dlgCtx) => AlertDialog(
+                                title: const Row(
+                                  children: [
+                                    Icon(Icons.warning_amber_rounded, color: Color(0xFFF59E0B)),
+                                    SizedBox(width: 8),
+                                    Text('Cảnh báo số điện thoại', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                                content: Text('Số này có ${clean.length} chữ số ($clean), bạn có chắc muốn tiếp tục?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(dlgCtx, false),
+                                    child: const Text('HỦY'),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                                    onPressed: () => Navigator.pop(dlgCtx, true),
+                                    child: const Text('TIẾP TỤC', style: TextStyle(color: Colors.white)),
                                   ),
                                 ],
                               ),
-                            )
-                          : ListView.separated(
-                              controller: scrollCtrl,
-                              padding: const EdgeInsets.all(12),
-                              itemCount: filteredPoints.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 8),
-                              itemBuilder: (_, idx) {
-                                final point = filteredPoints[idx];
-                                return _buildPointPickerListItem(point, () {
-                                  Navigator.pop(ctx);
-                                  _startPinningMode(point);
-                                });
-                              },
-                            ),
+                            );
+                            if (proceed != true) return;
+                          }
+
+                          if (!sheetCtx.mounted) return;
+                          Navigator.pop(sheetCtx);
+                          await _processSaveLocation(
+                            phone: clean,
+                            fullName: nameCtrl.text.trim(),
+                            notes: notesCtrl.text.trim(),
+                            targetCoord: targetCoord,
+                            knownCustomerId: _repinTarget?.customerId,
+                          );
+                        },
+                        child: const Text(
+                          'LƯU VỊ TRÍ NÀY',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ),
                   ],
-                );
-              },
+                ),
+              ),
             );
           },
         );
@@ -890,746 +780,202 @@ class MainMapViewState extends State<MainMapView> {
     );
   }
 
-  Widget _buildPointPickerListItem(ShiftDeliveryPointModel point, VoidCallback onTap) {
-    Color statusBg;
-    Color statusText;
+  /// Xử lý logic nghiệp vụ lưu vị trí theo TASK: MASTER-MAP-014 Điểm 4 & 5
+  Future<void> _processSaveLocation({
+    required String phone,
+    required String fullName,
+    required String notes,
+    required LatLng targetCoord,
+    String? knownCustomerId,
+  }) async {
+    setState(() => _isLoading = true);
 
-    switch (point.locationStatus) {
-      case LocationStatus.verified:
-        statusBg = const Color(0xFFDCFCE7);
-        statusText = const Color(0xFF15803D);
-        break;
-      case LocationStatus.temporary:
-        statusBg = const Color(0xFFFEF3C7);
-        statusText = const Color(0xFFD97706);
-        break;
-      case LocationStatus.noLocation:
-        statusBg = const Color(0xFFF1F5F9);
-        statusText = const Color(0xFF64748B);
-        break;
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-        leading: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(color: statusBg, shape: BoxShape.circle),
-          child: Icon(
-            point.locationStatus == LocationStatus.verified
-                ? Icons.verified_rounded
-                : (point.locationStatus == LocationStatus.temporary ? Icons.pin_drop_rounded : Icons.location_off_rounded),
-            color: statusText,
-            size: 18,
-          ),
-        ),
-        title: Text(point.customerName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF0F172A))),
-        subtitle: Text(
-          '${point.customerPhone} · ${point.customerAddress}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(6)),
-          child: Text(
-            point.locationStatus.pickerDisplayName,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: statusText),
-          ),
-        ),
-        onTap: onTap,
-      ),
-    );
-  }
-
-  /// Bước 2: Bắt đầu chế độ ghim vị trí trực tiếp trên bản đồ chính
-  void _startPinningMode(ShiftDeliveryPointModel point) {
-    setState(() {
-      _isPinningMode = true;
-      _pinningPoint = point;
-      _selectedPoint = null;
-      _isSummaryTrayExpanded = false;
-    });
-
-    LatLng targetCoord;
-    if (point.hasValidCoordinates) {
-      targetCoord = point.latLng!;
-    } else if (_shipperLocation != null) {
-      targetCoord = _shipperLocation!;
-    } else {
-      targetCoord = _isMapReady ? _mapController.camera.center : _hcmDefault;
-    }
-
-    _currentCrosshairCoord = targetCoord;
-    if (_isMapReady) {
-      _mapController.move(targetCoord, 17.5);
-    }
-  }
-
-  /// Hủy chế độ ghim vị trí - Không lưu và trở về bản đồ bình thường
-  void _cancelPinningMode() {
-    setState(() {
-      _isPinningMode = false;
-      _pinningPoint = null;
-    });
-  }
-
-  /// Bước 3: Xác nhận vị trí - Gửi API 1 lần duy nhất, cập nhật trực tiếp trên bản đồ chính
-  Future<void> _confirmPinningLocation() async {
-    if (_activeShift == null || _pinningPoint == null) return;
-
-    setState(() => _isSavingPin = true);
-    final pointToPin = _pinningPoint!;
-    final shiftId = _activeShift!.id;
-    final targetCoord = _currentCrosshairCoord;
+    String? customerId = knownCustomerId;
+    String customerDisplayName = fullName.isNotEmpty ? fullName : 'Khách $phone';
+    bool isNewlyCreated = false;
 
     try {
-      final updatedPoint = await ApiService.updateTemporaryLocation(
-        shiftId,
-        pointToPin.id,
-        latitude: targetCoord.latitude,
-        longitude: targetCoord.longitude,
-      );
+      if (customerId == null) {
+        // 1. Tra cứu khách hàng theo SĐT xem đã có trong CSDL chưa
+        final lookup = await ApiService.lookupCustomerLocationByPhone(phone);
 
-      if (!mounted) return;
+        if (lookup != null && lookup['customer'] != null) {
+          // Khách hàng đã tồn tại trong CSDL
+          final cust = lookup['customer'] as Map<String, dynamic>;
+          customerId = cust['id']?.toString() ?? '';
+          customerDisplayName = cust['fullName']?.toString() ?? customerDisplayName;
 
-      // Thoát chế độ ghim
-      setState(() {
-        _isPinningMode = false;
-        _pinningPoint = null;
-        _isSavingPin = false;
-      });
+          final hasOldLocation = lookup['hasSavedLocation'] == true;
 
-      // Tải lại dữ liệu ca và giữ vị trí camera
-      await _switchShift(shiftId, preserveCamera: true, preserveSelected: false);
-
-      if (mounted) {
-        // Chọn điểm vừa ghim để hiển thị chi tiết
-        final refreshedPoint = _activeShift?.deliveryPoints.firstWhere(
-          (p) => p.id == pointToPin.id,
-          orElse: () => updatedPoint,
-        );
-        setState(() {
-          _selectedPoint = refreshedPoint ?? updatedPoint;
-        });
-
-        if (_isMapReady) {
-          _mapController.move(targetCoord, 17.5);
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Đã ghim vị trí cho ${pointToPin.customerName} (${targetCoord.latitude.toStringAsFixed(5)}, ${targetCoord.longitude.toStringAsFixed(5)})',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: const Color(0xFF10B981),
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSavingPin = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi lưu vị trí: ${e.toString().replaceAll('Exception: ', '')}'),
-          backgroundColor: const Color(0xFFEF4444),
-          duration: const Duration(seconds: 4),
-        ),
-      );
-    }
-  }
-
-  Widget _buildCrosshairReticle() {
-    return IgnorePointer(
-      child: Center(
-        child: SizedBox(
-          width: 84,
-          height: 84,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Vòng tròn tâm ngắm đỏ
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFEF4444), width: 2),
-                  color: const Color(0xFFEF4444).withValues(alpha: 0.08),
-                ),
-              ),
-              // Trục chữ thập ngang và dọc
-              Container(width: 72, height: 1.5, color: const Color(0xFFEF4444).withValues(alpha: 0.8)),
-              Container(width: 1.5, height: 72, color: const Color(0xFFEF4444).withValues(alpha: 0.8)),
-              // Chấm tâm ngắm chính xác
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFEF4444),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              // Icon ghim nổi phía trên tâm ngắm
-              Transform.translate(
-                offset: const Offset(0, -26),
-                child: const Icon(
-                  Icons.location_on,
-                  size: 36,
-                  color: Color(0xFFEF4444),
-                  shadows: [
-                    Shadow(color: Colors.black38, blurRadius: 6, offset: Offset(0, 3)),
+          if (hasOldLocation) {
+            // TASK: MASTER-MAP-014 Điểm 5: Khách đã có vị trí cũ -> Hỏi xác nhận thay thế
+            if (!mounted) return;
+            final confirmReplace = await showDialog<bool>(
+              context: context,
+              builder: (dlgCtx) => AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(Icons.help_outline_rounded, color: Color(0xFF2563EB)),
+                    SizedBox(width: 8),
+                    Text('Thay vị trí cũ bằng vị trí này?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ],
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPinningHeaderCard() {
-    if (_pinningPoint == null) return const SizedBox.shrink();
-    final point = _pinningPoint!;
-
-    Color badgeBg;
-    Color badgeText;
-    switch (point.locationStatus) {
-      case LocationStatus.verified:
-        badgeBg = const Color(0xFFDCFCE7);
-        badgeText = const Color(0xFF15803D);
-        break;
-      case LocationStatus.temporary:
-        badgeBg = const Color(0xFFFEF3C7);
-        badgeText = const Color(0xFFD97706);
-        break;
-      case LocationStatus.noLocation:
-        badgeBg = const Color(0xFFF1F5F9);
-        badgeText = const Color(0xFF64748B);
-        break;
-    }
-
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.96),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.gps_fixed_rounded, color: Color(0xFF2563EB), size: 20),
+                content: Text(
+                  'Khách hàng $customerDisplayName ($phone) đã có vị trí đã lưu trước đó.\n\n'
+                  'Bạn có chắc muốn thay thế vị trí cũ bằng vị trí này không?\n'
+                  '(Lịch sử vị trí cũ vẫn được lưu trữ đối soát đầy đủ).',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dlgCtx, false),
+                    child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B))),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                'Ghim vị trí: ${point.customerName}',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF0F172A),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(4)),
-                              child: Text(
-                                point.locationStatus.displayName,
-                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: badgeText),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'SĐT: ${point.customerPhone}',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF2563EB)),
-                        ),
-                      ],
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
                     ),
+                    onPressed: () => Navigator.pop(dlgCtx, true),
+                    child: const Text('THAY VỊ TRÍ CŨ'),
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              // Hiển thị tọa độ tâm ngắm trực tiếp
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.my_location_rounded, size: 14, color: Color(0xFFEF4444)),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Tọa độ: ${_currentCrosshairCoord.latitude.toStringAsFixed(6)}, ${_currentCrosshairCoord.longitude.toStringAsFixed(6)}',
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+            );
 
-  Widget _buildPinningActionBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Nút HỦY
-          SizedBox(
-            height: 48,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF64748B),
-                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-              ),
-              icon: const Icon(Icons.close_rounded, size: 18),
-              label: const Text('Hủy', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              onPressed: _isSavingPin ? null : _cancelPinningMode,
-            ),
-          ),
-          const SizedBox(width: 10),
-          // Nút XÁC NHẬN VỊ TRÍ duy nhất
-          Expanded(
-            child: SizedBox(
-              height: 48,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F172A),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                ),
-                icon: _isSavingPin
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                      )
-                    : const Icon(Icons.check_circle_rounded, size: 20),
-                label: Text(
-                  _isSavingPin ? 'ĐANG LƯU VỊ TRÍ...' : 'XÁC NHẬN VỊ TRÍ',
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.3),
-                ),
-                onPressed: _isSavingPin ? null : _confirmPinningLocation,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Mở hộp thoại chụp hoặc thay đổi ảnh trực tiếp từ thẻ điểm giao
-  void _openPhotoManagementSheet(ShiftDeliveryPointModel point) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 14),
-                decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)),
-              ),
-              Text(
-                'Thao tác vị trí & ảnh: ${point.customerName}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: const Color(0xFFFEF3C7), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.edit_location_alt_rounded, color: Color(0xFFD97706)),
-                ),
-                title: const Text('Ghim lại vị trí bằng tâm ngắm', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('Chỉnh sửa tọa độ trực tiếp trên bản đồ chính', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _startPinningMode(point);
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: const Color(0xFFEDE9FE), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.edit_note_rounded, color: Color(0xFF7C3AED)),
-                ),
-                title: const Text('Sửa ghi chú nhận diện vị trí', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                subtitle: const Text('Cập nhật màu cửa, cổng nhà, số hẻm...', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _editNotesForPoint(point);
-                },
-              ),
-              const Divider(height: 1, color: Color(0xFFE2E8F0)),
-              ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: const Color(0xFFDBEAFE), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.camera_alt_rounded, color: Color(0xFF2563EB)),
-                ),
-                title: const Text('Chụp ảnh mới bằng Camera', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _captureAndUploadPhoto(point, ImageSource.camera);
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.photo_library_rounded, color: Color(0xFF475569)),
-                ),
-                title: const Text('Chọn ảnh từ Thư viện', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _captureAndUploadPhoto(point, ImageSource.gallery);
-                },
-              ),
-              if (point.photoUrl != null && point.photoUrl!.isNotEmpty) ...[
-                const Divider(height: 1, color: Color(0xFFE2E8F0)),
-                ListTile(
-                  leading: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(color: const Color(0xFFFEE2E2), borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFDC2626)),
-                  ),
-                  title: const Text('Xóa ảnh vị trí hiện tại', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFFDC2626))),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _deletePhotoForPoint(point);
-                  },
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _editNotesForPoint(ShiftDeliveryPointModel point) async {
-    final controller = TextEditingController(text: point.locationNotes ?? '');
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Ghi chú nhận diện vị trí', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Khách: ${point.customerName} - ${point.customerPhone}', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Nhập ghi chú (màu cửa, cổng nhà, số hẻm...)',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B)))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('LƯU GHI CHÚ'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    try {
-      final targetLat = point.latitude ?? _shipperLocation?.latitude ?? _hcmDefault.latitude;
-      final targetLng = point.longitude ?? _shipperLocation?.longitude ?? _hcmDefault.longitude;
-      final newNotes = controller.text.trim();
-
-      await ApiService.updateCustomerLocationAndPhoto(
-        customerId: point.customerId,
-        latitude: targetLat,
-        longitude: targetLng,
-        identificationNotes: newNotes.isNotEmpty ? newNotes : 'Vị trí đã lưu',
-      );
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã cập nhật ghi chú thành công!'), backgroundColor: Color(0xFF10B981)),
-      );
-
-      await _switchShift(_activeShift!.id, preserveCamera: true, preserveSelected: true);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi cập nhật ghi chú: $e'), backgroundColor: const Color(0xFFEF4444)),
-      );
-    }
-  }
-
-  Future<void> _captureAndUploadPhoto(ShiftDeliveryPointModel point, ImageSource source) async {
-    try {
-      final picked = await _imagePicker.pickImage(source: source, maxWidth: 1600, maxHeight: 1600, imageQuality: 85);
-      if (picked == null) return;
-
-      // Đọc byte trực tiếp từ XFile - hỗ trợ hoàn hảo cả Flutter Web (Chrome) và Android
-      final bytes = await picked.readAsBytes();
-      if (bytes.lengthInBytes > 5 * 1024 * 1024) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ảnh quá lớn (vượt quá 5MB). Vui lòng chọn ảnh khác.'), backgroundColor: Color(0xFFEF4444)),
-        );
-        return;
+            if (confirmReplace != true) {
+              if (mounted) setState(() => _isLoading = false);
+              return;
+            }
+          }
+        } else {
+          // Khách hàng chưa có trong hệ thống -> Tự tạo hồ sơ khách hàng mới (TASK: MASTER-MAP-014 Điểm 4)
+          final preferredAreaId = await ApiService.getPreferredAreaId();
+          final newCust = await ApiService.createCustomer(
+            phoneNumber: phone,
+            fullName: fullName.isNotEmpty ? fullName : null,
+            areaId: preferredAreaId,
+          );
+          customerId = newCust.id;
+          customerDisplayName = newCust.fullName;
+          isNewlyCreated = true;
+        }
       }
 
-      // Hiển thị bản xem trước ảnh trước khi lưu chính thức (BUG-04)
+      // 2. Ghi tọa độ tâm ngắm vào saved_locations (Vị trí lưu là ĐÃ XÁC NHẬN)
+      await ApiService.updateCustomerLocationAndPhoto(
+        customerId: customerId,
+        latitude: targetCoord.latitude,
+        longitude: targetCoord.longitude,
+        gpsAccuracy: 0.0,
+        identificationNotes: notes.isNotEmpty ? notes : 'Ghim trực tiếp từ Bản đồ chính',
+      );
+
+      // 3. Tải lại danh sách vị trí đã lưu để marker hiện ngay trên bản đồ chính
+      await _loadMasterData();
+
       if (!mounted) return;
-      final confirmSave = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Xem trước ảnh vị trí', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.memory(
-                  bytes,
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(point.customerName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF0F172A))),
-              const SizedBox(height: 2),
-              Text(point.customerAddress, style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)), maxLines: 2, overflow: TextOverflow.ellipsis),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B))),
-            ),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white),
-              icon: const Icon(Icons.cloud_upload_rounded, size: 16),
-              label: const Text('LƯU ẢNH'),
-              onPressed: () => Navigator.pop(ctx, true),
-            ),
-          ],
+
+      setState(() {
+        _isPinningMode = false;
+        _isLoading = false;
+      });
+
+      // Di chuyển bản đồ đến điểm vừa ghim
+      _mapController.move(targetCoord, 17.5);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã ghim vị trí ĐÃ XÁC NHẬN cho $customerDisplayName!'),
+          backgroundColor: const Color(0xFF10B981),
+          duration: const Duration(seconds: 4),
         ),
       );
-
-      if (confirmSave != true) return;
-
-      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đang tải ảnh lên máy chủ...'), duration: Duration(seconds: 2)),
-      );
-
-      final targetLat = point.latitude ?? _shipperLocation?.latitude ?? _hcmDefault.latitude;
-      final targetLng = point.longitude ?? _shipperLocation?.longitude ?? _hcmDefault.longitude;
-      final safeNotes = (point.locationNotes != null && point.locationNotes!.trim().isNotEmpty)
-          ? point.locationNotes!.trim()
-          : 'Vị trí đã lưu';
-
-      // Cập nhật vị trí và ảnh lên backend
-      final updateRes = await ApiService.updateCustomerLocationAndPhoto(
-        customerId: point.customerId,
-        latitude: targetLat,
-        longitude: targetLng,
-        identificationNotes: safeNotes,
-        imageBase64: base64Image,
-      );
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã cập nhật ảnh thành công!'), backgroundColor: Color(0xFF10B981)),
-      );
-
-      // Xóa triệt để cache ảnh của Flutter
-      PaintingBinding.instance.imageCache.clear();
-      PaintingBinding.instance.imageCache.clearLiveImages();
-
-      final newPhotoUrl = updateRes['data']?['imageUrl'] as String?;
-      setState(() {
-        _photoCacheVersion = DateTime.now().millisecondsSinceEpoch;
-        if (_selectedPoint != null && _selectedPoint!.id == point.id) {
-          _selectedPoint = _selectedPoint!.copyWith(
-            photoUrl: newPhotoUrl ?? _selectedPoint!.photoUrl,
-            locationStatus: LocationStatus.verified,
-          );
-        }
-      });
-      await _switchShift(_activeShift!.id, preserveCamera: true, preserveSelected: true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi tải ảnh: $e'), backgroundColor: const Color(0xFFEF4444)),
-      );
-    }
-  }
+      setState(() => _isLoading = false);
 
-  Future<void> _deletePhotoForPoint(ShiftDeliveryPointModel point) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Xác nhận xóa ảnh', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
-        content: const Text('Bác tài có chắc muốn xóa ảnh cổng nhà/vị trí của khách hàng này?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B)))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('XÓA'),
+      // TASK: MASTER-MAP-014B Điểm 2: Nếu tạo khách xong mà lưu vị trí lỗi -> Báo rõ kèm nút thử lại
+      if (isNewlyCreated || knownCustomerId != null) {
+        final errText = 'Đã tạo khách $phone nhưng chưa lưu được vị trí, thử lại';
+
+        // 1. Hiện SnackBar có nút thử lại
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errText),
+            backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 12),
+            action: SnackBarAction(
+              label: 'THỬ LẠI',
+              textColor: Colors.white,
+              onPressed: () {
+                _processSaveLocation(
+                  phone: phone,
+                  fullName: fullName,
+                  notes: notes,
+                  targetCoord: targetCoord,
+                  knownCustomerId: customerId,
+                );
+              },
+            ),
           ),
-        ],
-      ),
-    );
+        );
 
-    if (confirm != true) return;
-
-    try {
-      final targetLat = point.latitude ?? _shipperLocation?.latitude ?? _hcmDefault.latitude;
-      final targetLng = point.longitude ?? _shipperLocation?.longitude ?? _hcmDefault.longitude;
-      final safeNotes = (point.locationNotes != null && point.locationNotes!.trim().isNotEmpty)
-          ? point.locationNotes!.trim()
-          : 'Vị trí đã lưu';
-
-      await ApiService.updateCustomerLocationAndPhoto(
-        customerId: point.customerId,
-        latitude: targetLat,
-        longitude: targetLng,
-        identificationNotes: safeNotes,
-        deletePhoto: true,
-      );
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã xóa ảnh vị trí thành công!'), backgroundColor: Color(0xFF10B981)),
-      );
-
-      // Xóa triệt để cache ảnh của Flutter
-      PaintingBinding.instance.imageCache.clear();
-      PaintingBinding.instance.imageCache.clearLiveImages();
-
-      setState(() {
-        _photoCacheVersion = DateTime.now().millisecondsSinceEpoch;
-        if (_selectedPoint != null && _selectedPoint!.id == point.id) {
-          _selectedPoint = _selectedPoint!.copyWith(
-            photoUrl: '', // Xóa ảnh trên state tức thì
-          );
-        }
-      });
-      await _switchShift(_activeShift!.id, preserveCamera: true, preserveSelected: true);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi xóa ảnh: $e'), backgroundColor: const Color(0xFFEF4444)),
-      );
+        // 2. Hiện AlertDialog thông báo rõ ràng kèm nút thử lại, không để im lặng
+        await showDialog<void>(
+          context: context,
+          builder: (dlgCtx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Lưu vị trí không thành công', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            content: Text('$errText.\n\nChi tiết lỗi: $e'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dlgCtx),
+                child: const Text('ĐÓNG', style: TextStyle(color: Color(0xFF64748B))),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                ),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('THỬ LẠI'),
+                onPressed: () {
+                  Navigator.pop(dlgCtx);
+                  _processSaveLocation(
+                    phone: phone,
+                    fullName: fullName,
+                    notes: notes,
+                    targetCoord: targetCoord,
+                    knownCustomerId: customerId,
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi lưu vị trí: $e'),
+            backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
+  /// Mở ứng dụng gọi điện thoại ngoài
   Future<void> _makePhoneCall(String phone) async {
-    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
-    final uri = Uri.parse('tel:$cleanPhone');
+    final clean = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    final uri = Uri.parse('tel:$clean');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
@@ -1643,103 +989,169 @@ class MainMapViewState extends State<MainMapView> {
 
   @override
   Widget build(BuildContext context) {
-    final validPoints = _activeShift?.deliveryPoints.where((p) => p.hasValidCoordinates).toList() ?? [];
-    final noLocationPoints = _activeShift?.deliveryPoints.where((p) => !p.hasValidCoordinates).toList() ?? [];
+    // Tính toán các cụm marker (Clusters) theo zoom hiện tại hoặc dùng kết quả đã cache (TASK 019)
+    final clusters = _cachedClusters.isNotEmpty
+        ? _cachedClusters
+        : _clusterLocations(_savedLocations, _currentZoom);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // 1. BẢN ĐỒ TOÀN MÀN HÌNH (FULL-BLEED)
-          Positioned.fill(
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: validPoints.isNotEmpty
-                    ? validPoints.first.latLng!
-                    : (_shipperLocation ?? _hcmDefault),
-                initialZoom: 15.0,
-                maxZoom: 19.0,
-                minZoom: 10.0,
-                onMapReady: () {
-                  _isMapReady = true;
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted && !_isPinningMode) _fitMapBounds();
-                  });
-                },
-                onTap: (_, __) {
-                  if (!_isPinningMode) {
-                    setState(() => _selectedPoint = null);
-                  }
-                },
-                onPositionChanged: (camera, hasGesture) {
-                  if (_isPinningMode && camera.center != null) {
-                    setState(() {
-                      _currentCrosshairCoord = camera.center!;
-                    });
-                  }
-                },
-              ),
-              children: [
-                TileLayer(
-                  key: ValueKey('main_tile_layer_$_currentMapType'),
-                  urlTemplate: _getUrlTemplate(),
-                  fallbackUrl: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-                  subdomains: _getSubdomains(),
-                  userAgentPackageName: 'com.example.delivery_marker_mobile',
-                  errorTileCallback: (tile, error, stackTrace) {
-                    if (!_hasTileError && mounted) {
-                      setState(() => _hasTileError = true);
-                    }
-                  },
-                ),
+      body: PopScope(
+        canPop: _selectedLocation == null && !_isPinningMode,
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) return;
+          if (_selectedLocation != null) {
+            setState(() => _selectedLocation = null);
+          } else if (_isPinningMode) {
+            _cancelPinningMode();
+          }
+        },
+        child: Stack(
+          children: [
+            // 1. BẢN ĐỒ FLUTTER MAP (CÔ LẬP RENDER VỚI REPAINT BOUNDARY)
+            Positioned.fill(
+              child: RepaintBoundary(
+                child: FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _savedLocations.isNotEmpty
+                        ? LatLng(_savedLocations.first.latitude, _savedLocations.first.longitude)
+                        : (_shipperLocation ?? _hcmDefault),
+                    initialZoom: _currentZoom,
+                    minZoom: 4.0,
+                    maxZoom: 18.5,
+                    onTap: (tapPosition, point) {
+                      // Chạm vào vùng bản đồ trống bên ngoài thẻ để đóng thẻ (TASK 017 - Mục B.2)
+                      if (_selectedLocation != null) {
+                        setState(() => _selectedLocation = null);
+                      }
+                    },
+                    onMapReady: () {
+                      _isMapReady = true;
+                      if (_savedLocations.isNotEmpty) {
+                        _fitLocationsBounds();
+                      }
+                    },
+                    onPositionChanged: (position, hasGesture) {
+                      if (position.zoom != null && position.zoom != _currentZoom) {
+                        _currentZoom = position.zoom!;
+                      }
+                      if (_isPinningMode && position.center != null) {
+                        _crosshairCoord = position.center!;
+                      }
+                      // Debounce 150ms khi đang kéo bản đồ (TASK 019 Mục B.4)
+                      if (hasGesture) {
+                        _clusterDebounceTimer?.cancel();
+                        _clusterDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+                          _recomputeClusters(
+                            position.zoom ?? _currentZoom,
+                            position.bounds,
+                          );
+                        });
+                      } else {
+                        _clusterDebounceTimer?.cancel();
+                        _recomputeClusters(
+                          position.zoom ?? _currentZoom,
+                          position.bounds,
+                        );
+                      }
+                    },
+                  ),
+                  children: [
+                    // Lớp ngói bản đồ hỗ trợ Disk Cache tối đa 200MB, panBuffer 1, keepBuffer 2 (TASK 019)
+                    TileLayer(
+                      urlTemplate: _getUrlTemplate(),
+                      subdomains: _getSubdomains(),
+                      userAgentPackageName: 'com.deliverymarker.mobile',
+                      maxZoom: 19,
+                      panBuffer: 1,
+                      keepBuffer: 2,
+                      tileProvider: _tileProvider,
+                    ),
 
-                // LỚP MARKER
+              // Marker vị trí GPS thực tế của Shipper (chấm xanh radar)
+              if (_shipperLocation != null)
                 MarkerLayer(
                   markers: [
-                    // Marker GPS Shipper (Chấm xanh dương nổi bật)
-                    if (_shipperLocation != null)
-                      Marker(
-                        point: _shipperLocation!,
+                    Marker(
+                      point: _shipperLocation!,
+                      width: 24,
+                      height: 24,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+              // MarkerLayer: Danh sách các marker / cụm marker (Chỉ hiện khi KHÔNG ở chế độ tâm ngắm)
+              if (!_isPinningMode)
+                MarkerLayer(
+                  markers: clusters.map((cluster) {
+                    final isCluster = cluster.items.length > 1;
+
+                    if (isCluster) {
+                      // MARKER CỤM (CLUSTER BADGE)
+                      final count = cluster.items.length;
+                      return Marker(
+                        point: cluster.center,
                         width: 48,
                         height: 48,
-                        child: Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            _mapController.move(cluster.center, (_currentZoom + 2.5).clamp(1.0, 18.0));
+                          },
                           child: Container(
-                            width: 22,
-                            height: 22,
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2563EB),
                               shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF2563EB), Color(0xFF1D4ED8)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
                               border: Border.all(color: Colors.white, width: 3),
                               boxShadow: const [
-                                BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
+                                BoxShadow(color: Color(0x662563EB), blurRadius: 8, offset: Offset(0, 3)),
                               ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$count',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-
-                    // Markers các điểm giao có tọa độ hợp lệ
-                    ...validPoints.map((point) {
-                      final isSelected = _selectedPoint?.id == point.id;
-                      final isVerified = point.locationStatus == LocationStatus.verified;
-                      final markerColor = isVerified ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+                      );
+                    } else {
+                      // MARKER ĐƠN LẺ (SINGLE LOCATION PIN - ĐÃ XÁC NHẬN)
+                      final item = cluster.items.first;
+                      final isSelected = _selectedLocation?.id == item.id;
 
                       return Marker(
-                        point: point.latLng!,
+                        point: cluster.center,
                         width: isSelected ? 48 : 40,
                         height: isSelected ? 48 : 40,
                         child: GestureDetector(
                           onTap: () {
-                            if (_isPinningMode) return;
-                            setState(() => _selectedPoint = point);
-                            _mapController.move(point.latLng!, 17.0);
+                            setState(() => _selectedLocation = item);
+                            _mapController.move(cluster.center, 17.0);
                           },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             decoration: BoxDecoration(
-                              color: markerColor,
+                              color: const Color(0xFF10B981), // Xanh lá: ĐÃ XÁC NHẬN
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: Colors.white,
@@ -1747,7 +1159,7 @@ class MainMapViewState extends State<MainMapView> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: isSelected ? markerColor.withValues(alpha: 0.5) : Colors.black26,
+                                  color: isSelected ? const Color(0x8010B981) : Colors.black26,
                                   blurRadius: isSelected ? 8 : 4,
                                   offset: const Offset(0, 2),
                                 ),
@@ -1755,7 +1167,7 @@ class MainMapViewState extends State<MainMapView> {
                             ),
                             child: Center(
                               child: Icon(
-                                isVerified ? Icons.check_circle_rounded : Icons.pin_drop_rounded,
+                                Icons.check_circle_rounded,
                                 color: Colors.white,
                                 size: isSelected ? 24 : 20,
                               ),
@@ -1763,929 +1175,481 @@ class MainMapViewState extends State<MainMapView> {
                           ),
                         ),
                       );
-                    }),
+                    }
+                  }).toList(),
+                ),
+            ],
+          ),
+        ),
+      ),
+
+          // 2. CHẾ ĐỘ TÂM NGẮM (CROSSHAIR PINNING MODE)
+          if (_isPinningMode) ...[
+            // Icon tâm ngắm cố định giữa màn hình
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 36),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.85),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        'Kéo bản đồ để đặt tâm ghim',
+                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Icon(Icons.location_pin, size: 48, color: Color(0xFFEF4444)),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
 
-          // 2. CHẾ ĐỘ GHIM: TÂM NGẮM CỐ ĐỊNH CHÍNH GIỮA MÀN HÌNH
-          if (_isPinningMode) _buildCrosshairReticle(),
-
-          // 3. THANH NỔI PHÍA TRÊN: HOẶC THANH CHỌN CA, HOẶC THANH THÔNG TIN ĐANG GHIM
-          if (!_isPinningMode)
+            // Thanh tìm kiếm địa chỉ Geocoding phía trên
             Positioned(
               top: 0,
               left: 0,
               right: 0,
               child: SafeArea(
-                bottom: false,
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-                  child: Row(
+                  child: Column(
                     children: [
-                      // Thanh chọn ca bấm được
-                      Expanded(
-                        child: Container(
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.96),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: _openShiftPickerSheet,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 14),
-                                child: Row(
-                                  children: [
-                                    // Chấm tròn trạng thái ca
-                                    Container(
-                                      width: 10,
-                                      height: 10,
-                                      decoration: BoxDecoration(
-                                        color: _activeShift != null
-                                            ? (_activeShift!.status == ShiftStatus.inProgress
-                                                ? const Color(0xFF2563EB)
-                                                : (_activeShift!.status == ShiftStatus.completed
-                                                    ? const Color(0xFF10B981)
-                                                    : const Color(0xFFF59E0B)))
-                                            : const Color(0xFF94A3B8),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-
-                                    Expanded(
-                                      child: _activeShift != null
-                                          ? Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  _activeShift!.shiftCode,
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Color(0xFF0F172A),
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                                Text(
-                                                  '${validPoints.length} đã ghim · ${noLocationPoints.length} chưa vị trí',
-                                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                                                ),
-                                              ],
-                                            )
-                                          : const Text(
-                                              'Chưa chọn ca làm việc',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w600,
-                                                color: Color(0xFF64748B),
-                                              ),
-                                            ),
-                                    ),
-
-                                    if (_isLoadingPoints)
-                                      const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
+                        ),
+                        child: TextField(
+                          controller: _addressSearchCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'Tìm địa chỉ (VD: Nguyễn Xiển, Thủ Đức)...',
+                            prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF2563EB)),
+                            suffixIcon: _isSearchingAddress
+                                ? const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                  )
+                                : (_addressSearchCtrl.text.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear, size: 18),
+                                        onPressed: () {
+                                          _addressSearchCtrl.clear();
+                                          setState(() => _addressSearchResults = []);
+                                        },
                                       )
-                                    else
-                                      const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B), size: 22),
-                                  ],
-                                ),
-                              ),
-                            ),
+                                    : null),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 14),
                           ),
+                          onChanged: _onAddressSearchChanged,
                         ),
                       ),
 
-                      const SizedBox(width: 8),
-
-                      // Nút [+] Thao tác nhanh
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F172A),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: _openQuickActionMenu,
-                            child: const Center(
-                              child: Icon(Icons.add_rounded, color: Colors.white, size: 26),
-                            ),
+                      // Danh sách kết quả gợi ý địa chỉ Geocoding
+                      if (_addressSearchResults.isNotEmpty)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
                           ),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            padding: EdgeInsets.zero,
+                            itemCount: _addressSearchResults.length > 4 ? 4 : _addressSearchResults.length,
+                            separatorBuilder: (_, __) => const Divider(height: 1),
+                            itemBuilder: (ctx, idx) {
+                              final item = _addressSearchResults[idx];
+                              return ListTile(
+                                dense: true,
+                                leading: const Icon(Icons.place_outlined, color: Color(0xFF2563EB), size: 18),
+                                title: Text(item.displayName, style: const TextStyle(fontSize: 12)),
+                                onTap: () => _selectSearchResult(item),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Thanh điều khiển ghim dưới đáy
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 20,
+              child: SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 4))],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            side: const BorderSide(color: Color(0xFFCBD5E1)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: _cancelPinningMode,
+                          child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: ElevatedButton(
+                          key: const Key('btn_confirm_crosshair'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF2563EB),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: () => _showAssignPhoneDialog(_crosshairCoord),
+                          child: const Text('XÁC NHẬN VỊ TRÍ NÀY', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            )
-          else
-            // Khi đang ở chế độ ghim: Thẻ thông tin khách hàng đang ghim
+            ),
+          ],
+
+          // 3. THANH ĐIỀU HƯỚNG TRÊN CÙNG KHI Ở CHẾ ĐỘ XEM BÌNH THƯỜNG (TASK 017: THU MẢNH CAO <= 52PX, CÔ LẬP REPAINT BOUNDARY)
+          if (!_isPinningMode)
             Positioned(
               top: 0,
               left: 0,
               right: 0,
-              child: _buildPinningHeaderCard(),
-            ),
-
-          // CẢNH BÁO TILE LỖI NẾU CÓ
-          if (_hasTileError)
-            Positioned(
-              top: _isPinningMode ? 106 : 76,
-              left: 14,
-              right: 14,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF59E0B),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Không tải được tile trực tuyến. Dữ liệu ghim và tọa độ vẫn an toàn.',
-                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+              child: RepaintBoundary(
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                    child: Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.96),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2))],
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          // 4. CÁC NÚT ĐIỀU KHIỂN BẢN ĐỒ GÓC PHẢI (44x44)
-          Positioned(
-            right: 14,
-            top: _isPinningMode ? 106 : 76,
-            child: Column(
-              children: [
-                _buildMapToolButton(
-                  icon: Icons.my_location_rounded,
-                  tooltip: 'Vị trí của tôi',
-                  isLoading: _isLocatingShipper,
-                  iconColor: const Color(0xFF2563EB),
-                  onTap: () {
-                    if (_shipperLocation != null) {
-                      _mapController.move(_shipperLocation!, 17.5);
-                      if (_isPinningMode) {
-                        setState(() {
-                          _currentCrosshairCoord = _shipperLocation!;
-                        });
-                      }
-                    } else {
-                      _getShipperLocation();
-                    }
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildMapToolButton(
-                  icon: Icons.layers_outlined,
-                  tooltip: 'Đổi kiểu bản đồ',
-                  iconColor: const Color(0xFF0F172A),
-                  onTap: _switchMapType,
-                ),
-                if (!_isPinningMode) ...[
-                  const SizedBox(height: 8),
-                  _buildMapToolButton(
-                    icon: Icons.crop_free_rounded,
-                    tooltip: 'Xem toàn bộ điểm',
-                    iconColor: const Color(0xFF0F172A),
-                    onTap: _fitMapBounds,
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          // 5. THẺ THÔNG TIN ĐIỂM GIAO KHI CHẠM MARKER (CHỈ HIỂN THỊ KHI KHÔNG GHIM)
-          if (!_isPinningMode && _selectedPoint != null)
-            Positioned(
-              left: 14,
-              right: 14,
-              bottom: 84,
-              child: _buildSelectedPointDetailCard(_selectedPoint!),
-            ),
-
-          // 6. THẺ THÔNG BÁO KHI CHƯA CÓ CA LÀM VIỆC NÀO
-          if (!_isPinningMode && _activeShift == null && !_isLoadingShifts)
-            Positioned(
-              left: 20,
-              right: 20,
-              bottom: 84,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.map_outlined, color: Color(0xFF64748B), size: 36),
-                    const SizedBox(height: 8),
-                    Text(
-                      _errorMessage != null ? 'Lỗi tải ca làm việc' : 'Chưa chọn ca làm việc nào',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _errorMessage ?? 'Bác tài hãy chọn một ca có sẵn hoặc tạo ca mới để bắt đầu giao hàng.',
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF2563EB),
-                              side: const BorderSide(color: Color(0xFFBFDBFE)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            onPressed: _openShiftPickerSheet,
-                            child: const Text('Chọn ca', style: TextStyle(fontWeight: FontWeight.w600)),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F172A),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                            onPressed: _handleCreateNewShift,
-                            child: const Text('Tạo ca mới', style: TextStyle(fontWeight: FontWeight.w600)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          // 7. KHAY KÉO TÓM TẮT ĐIỂM GIAO DƯỚI ĐÁY (COLLAPSIBLE TRAY KHI KHÔNG CHỌN MARKER VÀ KHÔNG GHIM)
-          if (!_isPinningMode && _selectedPoint == null && _activeShift != null)
-            Positioned(
-              left: 14,
-              bottom: 20,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(24),
-                onTap: () {
-                  setState(() => _isSummaryTrayExpanded = !_isSummaryTrayExpanded);
-                  _showShiftSummaryListSheet();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.96),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 6, offset: const Offset(0, 2)),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.list_alt_rounded, size: 18, color: Color(0xFF2563EB)),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_activeShift!.deliveryPoints.length} điểm',
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                      ),
-                      const Text(' · ', style: TextStyle(color: Color(0xFFCBD5E1))),
-                      _buildDotBadge(count: validPoints.length, color: const Color(0xFF10B981)),
-                      if (noLocationPoints.isNotEmpty) ...[
-                        const SizedBox(width: 4),
-                        _buildDotBadge(count: noLocationPoints.length, color: const Color(0xFFF59E0B)),
-                      ],
-                      const SizedBox(width: 4),
-                      const Icon(Icons.expand_less_rounded, size: 18, color: Color(0xFF64748B)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          // 8. NÚT HÀNH ĐỘNG "CHỌN VỊ TRÍ" GÓC DƯỚI BÊN PHẢI (KHI KHÔNG GHIM)
-          if (!_isPinningMode)
-            Positioned(
-              right: 14,
-              bottom: 18,
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F172A),
-                    foregroundColor: Colors.white,
-                    elevation: 4,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                  ),
-                  icon: const Icon(Icons.add_location_alt_rounded, size: 20),
-                  label: const Text(
-                    'CHỌN VỊ TRÍ',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.3),
-                  ),
-                  onPressed: _handleFloatingCrosshairPicker,
-                ),
-              ),
-            ),
-
-          // 9. CHẾ ĐỘ GHIM: THANH THAO TÁC XÁC NHẬN / HỦY Ở CUỐI MÀN HÌNH
-          if (_isPinningMode)
-            Positioned(
-              left: 14,
-              right: 14,
-              bottom: 18,
-              child: _buildPinningActionBar(),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapToolButton({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onTap,
-    Color iconColor = const Color(0xFF0F172A),
-    bool isLoading = false,
-  }) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Center(
-            child: isLoading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
-                  )
-                : Icon(icon, color: iconColor, size: 22),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Mở Bottom Sheet danh sách tóm tắt toàn bộ điểm giao trong ca
-  void _showShiftSummaryListSheet() {
-    if (_activeShift == null) return;
-    final points = _activeShift!.deliveryPoints;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (sheetCtx) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.6,
-          minChildSize: 0.35,
-          maxChildSize: 0.88,
-          builder: (_, scrollCtrl) {
-            return Column(
-              children: [
-                // Drag handle
-                Container(
-                  width: 36,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)),
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.local_shipping_rounded, color: Color(0xFF2563EB), size: 22),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Điểm giao ca ${_activeShift!.shiftCode}',
-                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                      ),
-                      const Spacer(),
-                      Text('${points.length} khách', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-                    ],
-                  ),
-                ),
-
-                const Divider(height: 14, color: Color(0xFFE2E8F0)),
-
-                Expanded(
-                  child: ListView.separated(
-                    controller: scrollCtrl,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: points.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, idx) {
-                      final point = points[idx];
-                      return _buildSummaryPointItem(point, sheetCtx);
-                    },
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildSummaryPointItem(ShiftDeliveryPointModel point, BuildContext sheetCtx) {
-    Color badgeBg;
-    Color badgeText;
-    switch (point.locationStatus) {
-      case LocationStatus.verified:
-        badgeBg = const Color(0xFFDCFCE7);
-        badgeText = const Color(0xFF15803D);
-        break;
-      case LocationStatus.temporary:
-        badgeBg = const Color(0xFFFEF3C7);
-        badgeText = const Color(0xFFD97706);
-        break;
-      case LocationStatus.noLocation:
-        badgeBg = const Color(0xFFF1F5F9);
-        badgeText = const Color(0xFF64748B);
-        break;
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () {
-            Navigator.pop(sheetCtx);
-            setState(() => _selectedPoint = point);
-            if (point.hasValidCoordinates) {
-              _mapController.move(point.latLng!, 17.5);
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        point.customerName,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(6)),
-                      child: Text(
-                        point.locationStatus.displayName,
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: badgeText),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text('${point.customerPhone} · ${point.customerAddress}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-
-                if (point.locationNotes != null && point.locationNotes!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text('Ghi chú: ${point.locationNotes}', style: const TextStyle(fontSize: 11, color: Color(0xFF334155), fontStyle: FontStyle.italic)),
-                ],
-
-                // Nếu chưa có vị trí -> Nút "Định vị ngay"
-                if (!point.hasValidCoordinates) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 36,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F172A),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      icon: const Icon(Icons.add_location_alt_rounded, size: 16),
-                      label: const Text('Định vị ngay', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                      onPressed: () {
-                        Navigator.pop(sheetCtx);
-                        _startPinningMode(point);
-                      },
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Thẻ chi tiết khi chạm marker: Có ẢNH THỰC TẾ NỔI BẬT (170px, tap phóng to),
-  /// placeholder khi chưa có ảnh + nút Chụp ngay, thông tin, ghi chú nổi bật, nút Gọi/Đường đi/Sửa.
-  Widget _buildSelectedPointDetailCard(ShiftDeliveryPointModel point) {
-    Color badgeBg;
-    Color badgeText;
-    IconData badgeIcon;
-
-    switch (point.locationStatus) {
-      case LocationStatus.verified:
-        badgeBg = const Color(0xFFDCFCE7);
-        badgeText = const Color(0xFF15803D);
-        badgeIcon = Icons.check_circle_rounded;
-        break;
-      case LocationStatus.temporary:
-        badgeBg = const Color(0xFFFEF3C7);
-        badgeText = const Color(0xFFD97706);
-        badgeIcon = Icons.pin_drop_rounded;
-        break;
-      case LocationStatus.noLocation:
-        badgeBg = const Color(0xFFF1F5F9);
-        badgeText = const Color(0xFF64748B);
-        badgeIcon = Icons.location_off_rounded;
-        break;
-    }
-
-    final hasPhoto = point.photoUrl != null && point.photoUrl!.isNotEmpty;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 1. KHU VỰC ẢNH VỊ TRÍ NỔI BẬT (CHIỀU CAO 170PX)
-          if (hasPhoto)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-              child: SizedBox(
-                height: 170,
-                width: double.infinity,
-                child: FutureBuilder<Map<String, String>>(
-                  key: ValueKey('main_photo_${point.id}_${point.photoUrl}_$_photoCacheVersion'),
-                  future: ApiService.getPhotoAuthInfo(
-                    point.photoUrl!,
-                    bustCache: true,
-                    cacheVersion: _photoCacheVersion,
-                  ),
-                  builder: (ctx, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Container(
-                        color: const Color(0xFFF1F5F9),
-                        child: const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
-                        ),
-                      );
-                    }
-
-                    if (snapshot.hasError || !snapshot.hasData) {
-                      return _buildPhotoPlaceholder(point);
-                    }
-
-                    final authInfo = snapshot.data!;
-                    final photoUrlWithAuth = authInfo['url'] ?? '';
-                    final token = authInfo['token'];
-
-                    return GestureDetector(
-                      onTap: () {
-                        FullscreenImageViewer.show(
-                          context,
-                          photoUrl: point.photoUrl!,
-                          title: point.customerName,
-                          cacheVersion: _photoCacheVersion,
-                        );
-                      },
-                      child: Image.network(
-                        photoUrlWithAuth,
-                        key: ValueKey('main_img_${point.id}_$photoUrlWithAuth'),
-                        headers: {
-                          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-                        },
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildPhotoPlaceholder(point),
-                        loadingBuilder: (ctx, child, progress) {
-                          if (progress == null) {
-                            return Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                child,
-                                Positioned(
-                                  right: 10,
-                                  bottom: 10,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.6),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.zoom_in_rounded, color: Colors.white, size: 14),
-                                        SizedBox(width: 4),
-                                        Text('Chạm để phóng to', style: TextStyle(color: Colors.white, fontSize: 11)),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                          return Container(
-                            color: const Color(0xFFF1F5F9),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                value: progress.expectedTotalBytes != null
-                                    ? progress.cumulativeBytesLoaded / progress.expectedTotalBytes!
-                                    : null,
-                                strokeWidth: 2,
-                                color: const Color(0xFF2563EB),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ),
-            )
-          else
-            _buildPhotoPlaceholder(point),
-
-          // 2. THÔNG TIN KHÁCH HÀNG & GHI CHÚ
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Tên, SĐT & Nút đóng
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            point.customerName,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              const Icon(Icons.phone_rounded, size: 13, color: Color(0xFF2563EB)),
-                              const SizedBox(width: 4),
-                              Text(
-                                point.customerPhone,
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF2563EB)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(6)),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(badgeIcon, size: 12, color: badgeText),
-                          const SizedBox(width: 4),
-                          Text(
-                            point.locationStatus.displayName,
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: badgeText),
+                          const Icon(Icons.pin_drop_rounded, color: Color(0xFF2563EB), size: 20),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Bản đồ vị trí đã lưu',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // Nút đổi nền bản đồ
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            icon: const Icon(Icons.layers_rounded, color: Color(0xFF64748B), size: 20),
+                            tooltip: 'Đổi kiểu bản đồ',
+                            onPressed: _switchMapType,
+                          ),
+                          // Nút làm mới
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF64748B), size: 20),
+                            tooltip: 'Tải lại vị trí',
+                            onPressed: _loadMasterData,
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    InkWell(
-                      onTap: () => setState(() => _selectedPoint = null),
-                      borderRadius: BorderRadius.circular(20),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(Icons.close_rounded, size: 18, color: Color(0xFF94A3B8)),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-                Text(
-                  point.customerAddress,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-
-                if (point.hasValidCoordinates) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tọa độ: ${point.latitude!.toStringAsFixed(6)}, ${point.longitude!.toStringAsFixed(6)}',
-                    style: const TextStyle(fontSize: 11, fontFamily: 'monospace', color: Color(0xFF64748B)),
                   ),
-                ],
+                ),
+              ),
+            ),
 
-                // Khung ghi chú nhận diện nổi bật (cổng nhà, màu cửa...)
-                if (point.locationNotes != null && point.locationNotes!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
+          // Banner thông báo lỗi nếu có
+          if (_errorMessage != null && !_isPinningMode)
+            Positioned(
+              top: 75,
+              left: 14,
+              right: 14,
+              child: SafeArea(
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFFFEE2E2),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Row(
                       children: [
-                        const Icon(Icons.note_alt_outlined, size: 16, color: Color(0xFF2563EB)),
+                        const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 18),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            point.locationNotes!,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                            _errorMessage!,
+                            style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 12),
                           ),
+                        ),
+                        IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFB91C1C)),
+                          onPressed: () => setState(() => _errorMessage = null),
                         ),
                       ],
                     ),
                   ),
-                ],
-
-                const SizedBox(height: 12),
-                const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                const SizedBox(height: 10),
-
-                // Hàng nút thao tác nhanh: [Gọi], [Đường đi], [Sửa vị trí / Ảnh]
-                Row(
-                  children: [
-                    // Nút Gọi
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF2563EB),
-                        side: const BorderSide(color: Color(0xFFBFDBFE)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      ),
-                      icon: const Icon(Icons.phone_rounded, size: 15),
-                      label: const Text('Gọi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                      onPressed: () => _makePhoneCall(point.customerPhone),
-                    ),
-                    const SizedBox(width: 8),
-
-                    // Nút Chỉ đường
-                    if (point.hasValidCoordinates) ...[
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF15803D),
-                          side: const BorderSide(color: Color(0xFFBBF7D0)),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        ),
-                        icon: const Icon(Icons.directions_rounded, size: 15),
-                        label: const Text('Đường đi', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        onPressed: () => ApiService.openExternalNavigation(point.latitude!, point.longitude!),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-
-                    // Nút Sửa vị trí / Ảnh
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F172A),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        ),
-                        icon: const Icon(Icons.edit_location_alt_rounded, size: 16),
-                        label: const Text(
-                          'Sửa vị trí / Ảnh',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                        onPressed: () => _openPhotoManagementSheet(point),
-                      ),
-                    ),
-                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+
+          // 4. CÁC NÚT ĐIỀU KHIỂN NỔI BÊN PHẢI (GPS VÀ PHÓNG TO/THU NHỎ)
+          if (!_isPinningMode)
+            Positioned(
+              right: 14,
+              top: 100,
+              child: Column(
+                children: [
+                  FloatingActionButton.small(
+                    heroTag: 'master_map_gps',
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF2563EB),
+                    elevation: 3,
+                    onPressed: _getShipperLocation,
+                    child: _isLocatingShipper
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.my_location_rounded),
+                  ),
+                  const SizedBox(height: 8),
+                  FloatingActionButton.small(
+                    heroTag: 'master_map_fit_bounds',
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF475569),
+                    elevation: 3,
+                    onPressed: _fitLocationsBounds,
+                    child: const Icon(Icons.fit_screen_rounded),
+                  ),
+                ],
+              ),
+            ),
+
+          // 5. THẺ CHI TIẾT ĐIỂM ĐÃ LƯU (CÔ LẬP VỚI REPAINT BOUNDARY)
+          if (!_isPinningMode && _selectedLocation != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: RepaintBoundary(
+                child: PointDetailBottomSheet(
+                  customerId: _selectedLocation!.customerId,
+                  customerName: _selectedLocation!.customerName,
+                  customerPhone: _selectedLocation!.customerPhone,
+                  customerAddress: _selectedLocation!.customerAddress,
+                  locationStatusText: 'ĐÃ XÁC NHẬN',
+                  statusBadgeBg: const Color(0xFFDCFCE7),
+                  statusBadgeTextColor: const Color(0xFF15803D),
+                  statusBadgeIcon: Icons.check_circle_rounded,
+                  identificationNotes: _selectedLocation!.identificationNotes,
+                  latitude: _selectedLocation!.latitude,
+                  longitude: _selectedLocation!.longitude,
+                  initialPhotos: _selectedLocation!.photos,
+                  legacyImageUrl: _selectedLocation!.imageUrl,
+                  onCall: () => _makePhoneCall(_selectedLocation!.customerPhone),
+                  onDirections: () {
+                    ApiService.openExternalNavigation(
+                      _selectedLocation!.latitude,
+                      _selectedLocation!.longitude,
+                    );
+                  },
+                  onRepin: () {
+                    final loc = _selectedLocation!;
+                    setState(() {
+                      _selectedLocation = null;
+                      _repinTarget = loc;
+                      _crosshairCoord = LatLng(loc.latitude, loc.longitude);
+                      _isPinningMode = true;
+                    });
+                    try {
+                      _mapController.move(_crosshairCoord, 17.5);
+                    } catch (_) {}
+                  },
+                  onPhotosUpdated: (updatedPhotos) {
+                    setState(() {
+                      _selectedLocation = _selectedLocation!.copyWith(
+                        photos: updatedPhotos,
+                        photoCount: updatedPhotos.length,
+                      );
+                      final idx = _savedLocations.indexWhere((l) => l.customerId == _selectedLocation!.customerId);
+                      if (idx != -1) {
+                        _savedLocations[idx] = _savedLocations[idx].copyWith(
+                          photos: updatedPhotos,
+                          photoCount: updatedPhotos.length,
+                        );
+                      }
+                    });
+                  },
+                  onClose: () => setState(() => _selectedLocation = null),
+                ),
+              ),
+            ),
+
+          // 6. CỘT ICON DỌC Ở MÉP PHẢI PHÍA DƯỚI (VÙNG NGÓN CÁI, CÔ LẬP REPAINT BOUNDARY) (TASK 017 - MỤC A & TASK 019)
+          // Từ dưới lên: Ghim vị trí mới (60px, #2563EB) | Tạo ca (52px, #0F172A) | Ca làm việc (52px, trắng viền xám)
+          // Khoảng cách >= 12px, có Tooltip & Semantics label đầy đủ, ẩn khi mở tâm ngắm hoặc mở thẻ chi tiết
+          if (!_isPinningMode && _selectedLocation == null)
+            Positioned(
+              right: 16,
+              bottom: 20,
+              child: RepaintBoundary(
+                child: SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // 1. Nút "Ca làm việc" (trên cùng của cột, nút tròn 52px, nền trắng viền xám)
+                      Semantics(
+                        label: 'Ca làm việc',
+                        button: true,
+                        child: Tooltip(
+                          message: 'Ca làm việc',
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              key: const Key('btn_open_shift_picker'),
+                              borderRadius: BorderRadius.circular(26),
+                              onTap: _handleOpenShiftPicker,
+                              child: Container(
+                                width: 52,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: const Color(0xFFCBD5E1), width: 1.5),
+                                  boxShadow: const [
+                                    BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.work_history_rounded,
+                                    size: 24,
+                                    color: Color(0xFF2563EB),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // 2. Nút "Tạo ca" (ở giữa cột, nút tròn 52px, nền Navy #0F172A)
+                      Semantics(
+                        label: 'Tạo ca',
+                        button: true,
+                        child: Tooltip(
+                          message: 'Tạo ca',
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              key: const Key('btn_create_shift_from_map'),
+                              borderRadius: BorderRadius.circular(26),
+                              onTap: _handleCreateShift,
+                              child: Container(
+                                width: 52,
+                                height: 52,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF0F172A),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 3)),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.add_task_rounded,
+                                    size: 24,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // 3. Nút "Ghim vị trí mới" (dưới cùng của cột, to nhất 60px, màu xanh #2563EB)
+                      Semantics(
+                        label: 'Ghim vị trí mới',
+                        button: true,
+                        child: Tooltip(
+                          message: 'Ghim vị trí mới',
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              key: const Key('btn_pin_new_location'),
+                              borderRadius: BorderRadius.circular(30),
+                              onTap: _startPinningMode,
+                              child: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF2563EB),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(color: Color(0x662563EB), blurRadius: 10, offset: Offset(0, 4)),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.add_location_alt_rounded,
+                                    size: 28,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // Loading overlay
+          if (_isLoading)
+            const IgnorePointer(
+              child: Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
         ],
       ),
-    );
-  }
-
-  /// Placeholder khi điểm giao chưa có ảnh
-  Widget _buildPhotoPlaceholder(ShiftDeliveryPointModel point) {
-    return Container(
-      height: 90,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
-      ),
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.photo_camera_outlined, size: 20, color: Color(0xFF94A3B8)),
-            const SizedBox(width: 8),
-            const Text('Chưa có ảnh vị trí', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-            const SizedBox(width: 12),
-            TextButton.icon(
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF2563EB),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              ),
-              icon: const Icon(Icons.add_a_photo_outlined, size: 16),
-              label: const Text('Chụp ngay', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-              onPressed: () => _openPhotoManagementSheet(point),
-            ),
-          ],
-        ),
-      ),
-    );
+    ),
+  );
   }
 }

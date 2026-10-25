@@ -410,3 +410,76 @@ Bảo toàn 100% dữ liệu gốc bị lỗi từ v1 mà không xóa dữ liệ
 ### 4.6. Migration [05-add-customers-updated-at.sql](file:///d:/flutter create delivery_marker_app/init-db/05-add-customers-updated-at.sql)
 - Bổ sung an toàn cột `updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP` cho bảng `customers` (sử dụng `ADD COLUMN IF NOT EXISTS`).
 - Đảm bảo lưu vết chính xác thời điểm cập nhật thông tin tên, số điện thoại, địa chỉ khách hàng từ Danh bạ độc lập.
+
+---
+
+## 10. Đặc Tả Bảng Ảnh Khách Hàng (MULTI-PHOTO-AND-THUMB-UI-015A)
+
+### 10.1. Bảng `customer_photos` (Lưu Trữ Đa Ảnh Theo Khách Hàng)
+Ảnh được gắn trực tiếp theo `customer_id`, cho phép mọi trạng thái vị trí (`VERIFIED`, `TEMPORARY`, hay chưa có vị trí `NO_LOCATION`) đều có thể lưu trữ và hiển thị nhiều ảnh chụp thực tế tại điểm giao.
+
+- `id UUID PRIMARY KEY DEFAULT uuid_generate_v4()`
+- `customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE`: Khóa ngoại liên kết khách hàng.
+- `image_url VARCHAR(500) NOT NULL`: Tên tệp hoặc đường dẫn tương đối của ảnh lưu trong `/uploads` (ví dụ: `uploads/cust-photo-uuid.jpg`).
+- `created_by UUID NOT NULL REFERENCES users(id)`: Khóa ngoại ghi nhận shipper hoặc user đã tải ảnh lên.
+- `created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP`: Thời điểm tải ảnh lên.
+- `deleted_at TIMESTAMPTZ NULL`: Dấu vết xóa mềm. Khi bị xóa, trường này nhận giá trị `NOW()`. Tệp ảnh vật lý trên đĩa **không** bị xóa để bảo toàn chứng từ kiểm toán (`audit_logs`).
+
+### 10.2. Chỉ Mục Tối Ưu Hóa (Indexes)
+- `idx_customer_photos_customer_active`: Chỉ mục kép `(customer_id, created_at DESC) WHERE deleted_at IS NULL` phục vụ truy vấn danh sách ảnh còn hoạt động theo khách với tốc độ $O(1)$.
+- `idx_customer_photos_created_by`: Chỉ mục `(created_by)` phục vụ truy vấn và kiểm tra quyền sở hữu ảnh của shipper.
+- `idx_customer_photos_image_url`: Chỉ mục `(image_url)` phục vụ xác thực nhanh khi `servePhoto` phục vụ file tĩnh.
+
+### 10.3. Migration Idempotent [06-create-customer-photos.sql](file:///d:/flutter create delivery_marker_app/init-db/06-create-customer-photos.sql)
+- Tạo bảng `customer_photos` bằng cú pháp an toàn `CREATE TABLE IF NOT EXISTS`.
+- **Chuyển đổi dữ liệu ảnh cũ:**
+  - Sao chép toàn bộ ảnh hợp lệ hiện có trong `saved_locations.image_url` và `shift_delivery_points.image_url` sang `customer_photos`.
+  - Sử dụng mệnh đề `WHERE NOT EXISTS` đối soát theo `(customer_id, image_url)` đảm bảo tính idempotent: có thể chạy lại script nhiều lần mà không bao giờ nhân đôi bản ghi.
+  - Giữ nguyên các cột `image_url` cũ trong `saved_locations` và `shift_delivery_points` để đảm bảo tương thích ngược 100%.
+
+### 10.4. Giới Hạn & Ràng Buộc Nghiệp Vụ
+1. **Giới hạn số lượng:** Tối đa 10 ảnh đang hoạt động (`deleted_at IS NULL`) cho mỗi khách hàng (`HTTP 400 Bad Request` nếu vượt quá).
+2. **Giới hạn dung lượng:** Tối đa 5MB cho mỗi tệp tải lên.
+3. **Định dạng cho phép:** Chỉ chấp nhận `image/jpeg`, `image/png`, `image/webp`. Backend kiểm tra chữ ký nhị phân (magic bytes) ở đầu tệp thay vì chỉ dựa vào đuôi mở rộng, phòng chống upload mã độc.
+4. **Phân quyền thao tác:**
+   - Xem ảnh: Shipper có phân quyền trong khu vực của khách (`checkCustomerAreaScope`).
+   - Xóa ảnh: Chỉ chính người đã tải ảnh đó lên (`created_by`) hoặc tài khoản `ADMIN`.
+
+---
+
+## 11. Bổ Sung Tên Ca Làm Việc & Thêm Điểm Hàng Loạt (SHIFT-FROM-MAP-AND-BULK-PASTE-015B)
+
+### 11.1. Migration Idempotent [07-add-shift-name.sql](file:///d:/flutter create delivery_marker_app/init-db/07-add-shift-name.sql)
+- Bổ sung an toàn cột `shift_name VARCHAR(100) NULL` vào bảng `shifts` bằng cú pháp `ALTER TABLE shifts ADD COLUMN IF NOT EXISTS shift_name VARCHAR(100) NULL;`.
+- Giữ nguyên cột định danh hệ thống `shift_code` (`SHF-YYYYMMDD-XXX`).
+- Ca cũ không có tên (`shift_name IS NULL`) thì hiển thị `shift_code`.
+- Tạo chỉ mục `CREATE INDEX IF NOT EXISTS idx_shifts_shift_name ON shifts(shift_name);` phục vụ tra cứu nhanh.
+
+### 11.2. Thao Tác Thêm Điểm Giao Hàng Loạt (Bulk Insert Transaction)
+- Thao tác thêm hàng loạt số điện thoại (`POST /api/v1/shifts/:id/points/bulk`) thực thi trong một `BEGIN ... COMMIT` transaction nguyên tử:
+  - Nếu xảy ra lỗi hệ thống nghiêm trọng, toàn bộ lô bị rollback, không để lại dữ liệu dở dang (orphan data).
+  - Tách số và chuẩn hóa từ văn bản thô theo xuống dòng, dấu phẩy, dấu chấm phẩy; lọc trùng lặp; giới hạn tối đa 200 số / lần.
+  - Phân loại rõ ràng 4 nhóm:
+    1. `added`: Điểm mới được thêm vào ca (trạng thái `VERIFIED` nếu khách đã có vị trí lưu, hoặc `NO_LOCATION` nếu chưa có).
+    2. `alreadyInShift`: Điểm đã có sẵn trong ca làm việc, không thêm trùng lặp.
+    3. `rejected`: Số bị từ chối kèm lý do (`INVALID_FORMAT` nếu sai định dạng, `OUT_OF_AREA` nếu khách thuộc khu vực ngoài quyền phụ trách). Các số khác trong lô vẫn được tiếp tục xử lý bình thường.
+    4. `summary`: Tổng kết số lượng từng nhóm.
+  - Đối với số điện thoại chưa tồn tại trong hệ thống: Tự động tạo hồ sơ khách hàng mới nhanh (`Khách [SĐT]`, `Chưa cập nhật địa chỉ`) gắn vào khu vực phụ trách mặc định của shipper. Nếu shipper phụ trách nhiều khu vực mà chưa chọn `areaId`, transaction rollback và yêu cầu chọn trước.
+  - Ghi vết kiểm toán: Ghi đúng 1 dòng `audit_logs` với `action = 'BULK_ADD_POINTS'` lưu trữ tổng kết số lượng của toàn bộ lô.
+
+---
+
+## 12. Trạng Thái Áp Dụng Lên CSDL Môi Trường Chính (`delivery_db`)
+
+| Migration File | Mô Tả | Trạng Thái Áp Dụng `delivery_db` | Thời Điểm Thực Thi | Bản Sao Lưu Trước Khi Chạy |
+| :--- | :--- | :--- | :--- | :--- |
+| `01-init-db.sql` | Schema ban đầu (Roles, Users, Areas, Customers, Saved Locations, History, Audit Logs) | **ĐÃ ÁP DỤNG** | 22/10/2026 | Khởi tạo ban đầu |
+| `02-add-photo-and-fix-history.sql` | Cột `image_url` và trigger `trg_saved_locations_history` | **ĐÃ ÁP DỤNG** | 22/10/2026 | Docker init-db |
+| `03-seed-demo-data.sql` | Dữ liệu mẫu (Tạp hóa Hai Thu, Users, Areas) | **ĐÃ ÁP DỤNG** | 22/10/2026 | Docker init-db |
+| `04-create-shifts-and-delivery-points.sql` | Bảng `shifts` và `shift_delivery_points` | **ĐÃ ÁP DỤNG** | 23/10/2026 | Docker init-db |
+| `05-add-customers-updated-at.sql` | Cột `customers.updated_at` | **ĐÃ ÁP DỤNG** | 23/10/2026 | Docker init-db |
+| [06-create-customer-photos.sql](file:///d:/flutter create delivery_marker_app/init-db/06-create-customer-photos.sql) | Bảng `customer_photos` đa ảnh theo khách, nạp 4 ảnh cũ, 3 chỉ mục | **ĐÃ ÁP DỤNG** | **25/10/2026 15:15:00** | `D:\db_backups\delivery_db_backup_20261025_151305.sql` (172 KB) |
+| [07-add-shift-name.sql](file:///d:/flutter create delivery_marker_app/init-db/07-add-shift-name.sql) | Cột `shifts.shift_name VARCHAR(100)` và chỉ mục `idx_shifts_shift_name` | **ĐÃ ÁP DỤNG** | **25/10/2026 15:15:07** | `D:\db_backups\delivery_db_backup_20261025_151305.sql` (172 KB) |
+
+
+

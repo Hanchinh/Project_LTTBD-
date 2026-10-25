@@ -408,9 +408,166 @@ Tất cả các lệnh dưới đây đã được thực thi trực tiếp trê
     - Điểm ghim tọa độ tạm: `"Đã ghim vị trí · Chờ xác minh"`.
     - Điểm chưa có tọa độ: `"Chưa ghim vị trí"`.
 
+### 3.12. Nghiệm Thu Chức Năng Xóa Ca Làm Việc & Thống Nhất Tên Trường Dữ Liệu (TASK: SHIFT-DELETE-AND-FIELD-FIX-011)
+
+- **Kết quả lệnh kiểm thử tự động:**
+  - `npm --prefix backend test`: **96/96 unit tests passed (100%)** qua 5 test suites bao gồm:
+    * `TASK: SHIFT-DELETE-AND-FIELD-FIX-011 - Delete Shift & Field Mappings Unit Tests`:
+      - Cho phép Shipper xóa ca của chính mình.
+      - Chặn 403 Forbidden khi Shipper cố tình xóa ca của shipper khác.
+      - Cho phép ADMIN xóa bất kỳ ca làm việc nào.
+      - Cách ly dữ liệu: Xóa `shifts` và `shift_delivery_points`, không đụng `customers`, `saved_locations`, `location_history`.
+      - Ghi nhật ký audit log với hành động `DELETE_SHIFT`.
+      - Thống nhất `shiftDate` và `workDate` trong `createShift`.
+      - Bổ sung `summary` trong phản hồi `addPointToShift`.
+      - Thống nhất `locationNotes` / `identificationNotes` và `photoUrl` / `imageUrl` / `imageBase64`.
+  - `npm --prefix backend run build`: Biên dịch TypeScript thành công (`tsc` exit 0).
+  - `flutter analyze`: **No issues found** (0 warning, 0 error).
+  - `flutter test`: **65/65 tests passed (100%)**, bao gồm 4 kịch bản kiểm thử trong [shift_delete_and_field_fix_011_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/shift_delete_and_field_fix_011_test.dart).
+- **Xác minh trực tiếp trên API sống và Container PostGIS Database:**
+  1. **Đăng nhập:** Tài khoản Shipper `0901111111` nhận JWT token hợp lệ.
+  2. **Tạo ca bằng `shiftDate`:** `POST /api/v1/shifts` với `{ shiftDate: '2026-10-25' }` -> HTTP 201 Created, mã ca `SHF-20261025-002`, trả về đầy đủ cả `shiftDate` và `workDate`.
+  3. **Thêm điểm kèm `summary`:** `POST /api/v1/shifts/:id/points` -> HTTP 201 Created, trả về đối tượng `summary: {"totalPoints":1,"verifiedCount":1,"temporaryCount":0,"noLocationCount":0}` và `locationNotes`.
+  4. **Ghim tạm với `locationNotes`:** `PUT /api/v1/shifts/:id/points/:pointId/temporary-location` với `{ locationNotes: 'Gần cột điện số 4' }` -> HTTP 200, phản hồi trả về cả `locationNotes` và `identificationNotes`.
+  5. **Xác minh với `locationNotes` & `photoUrl`:** `POST /api/v1/shifts/:id/points/:pointId/verify-location` -> HTTP 200, phản hồi trả về cả `locationNotes` và `photoUrl`.
+  6. **Xóa ca làm việc:** `DELETE /api/v1/shifts/:id` -> HTTP 200, `Đã xóa ca làm việc SHF-20261025-002 thành công`, `deletedPointsCount: 1`.
+  7. **Kiểm tra ca đã xóa:** Gọi lại `DELETE /api/v1/shifts/:id` -> HTTP 404 `Không tìm thấy ca làm việc yêu cầu`.
+  8. **Kiểm tra CSDL & Audit Logs:**
+     - Query `audit_logs`: Bản ghi `DELETE_SHIFT | shifts | {"status": "PREPARING", "shiftCode": "SHF-20261025-002", "deletedPointsCount": 1}` đã được lưu thành công.
+     - **Lưu ý sự cố:** Do chạy bước 5 (`verify-location`) trên `delivery_db`, dữ liệu `saved_locations` của KH_001 đã bị thay đổi sang giá trị test. Toàn bộ dữ liệu này đã được khôi phục về nguyên trạng trong Task FIX-TEST-DATA-011B.
+
+### 3.13. Khôi Phục Dữ Liệu Gốc KH_001 & Kiểm Kê Dữ Liệu Test (TASK: FIX-TEST-DATA-011B)
+
+- **1. Khôi phục `saved_locations` của KH_001 (`c0000000-0000-0000-0000-000000000001`):**
+  - Thực thi câu lệnh `UPDATE` tiêu chuẩn khôi phục về giá trị hạt giống trong [01-init-db.sql](file:///d:/flutter create delivery_marker_app/init-db/01-init-db.sql):
+    * `latitude`: `10.8422150`
+    * `longitude`: `106.8181230`
+    * `gps_accuracy`: `4.5`
+    * `identification_notes`: `'Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân.'`
+    * `image_url`: `NULL`
+  - Trigger `trg_saved_locations_history` tự động lưu lại trạng thái trước khi khôi phục vào `location_history` (`id: 48f3cbc1-9c5d-49a8-87fc-c3ec64fa319e`).
+  - **Bảo toàn 100%:** Tuyệt đối không xóa bất kỳ dòng nào trong bảng `location_history`.
+- **2. Bảng đối chiếu giá trị TRƯỚC và SAU khi khôi phục:**
+  | Thuộc Tính | Trước Khi Khôi Phục (Bị Test 011 ghi đè) | Sau Khi Khôi Phục (Khôi phục chuẩn) | Gốc trong 01-init-db.sql |
+  | :--- | :--- | :--- | :--- |
+  | `latitude` | `10.8422500` | `10.8422150` | `10.8422150` |
+  | `longitude` | `106.8181500` | `106.8181230` | `106.8181230` |
+  | `gps_accuracy` | `0` | `4.5` | `4.5` |
+  | `identification_notes` | `'Cổng sắt hoa văn đã xác minh'` | `'Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân.'` | `'Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân.'` |
+  | `image_url` | `'/api/v1/photos/test_verified.jpg'` | `NULL` | `NULL` |
+  | `updated_at` | `2026-10-25 04:05:20.016031+00` | `2026-10-25 04:16:42.770613+00` | Seed khởi tạo |
+
+### 3.14. Đồng Bộ Điểm Giao Ca SHF-20261025-001 & Chốt Chặn Cách Ly CSDL (TASK: FIX-TEST-DATA-011C)
+
+- **1. Đồng bộ điểm giao `d4e38099-e8de-4b1d-9006-b3481cd35b21` và `saved_locations`:**
+  - Cập nhật điểm giao và `saved_locations` khớp hoàn toàn: tọa độ gốc `(10.8422150, 106.8181230)`, ghi chú gốc `'Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân.'` và khôi phục ảnh thực tế `6ffc3833-1f78-48c8-8624-3041f25449f9.jpg` (thay cho `test_verified.jpg` giả).
+  - Không xóa bất kỳ dòng nào trong `location_history` và `audit_logs`.
+- **2. Báo cáo cơ chế đồng bộ đa ca:**
+  - Phát hiện tại [shifts.controller.ts:L928-L946](file:///d:/flutter create delivery_marker_app/backend/src/controllers/shifts.controller.ts#L928-L946), mệnh đề UPDATE liên ca cập nhật mọi điểm giao cùng `customer_id` thuộc các ca có trạng thái `PREPARING` hoặc `IN_PROGRESS` của shipper khi gọi `verifyPointLocation`.
+- **3. Chốt chặn bảo vệ CSDL chính (Guardrail Validation):**
+  - Tạo script [setup-test-db.ts](file:///d:/flutter create delivery_marker_app/backend/scripts/setup-test-db.ts) khởi tạo CSDL test riêng `test_isolated_seed_db`.
+  - Cài đặt `assertSafeDatabaseForTests` trong [db.ts](file:///d:/flutter create delivery_marker_app/backend/src/db.ts) chặn 100% kết nối tới `delivery_db` khi ở môi trường test.
+  - Kiểm thử tự động [database-guard.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/database-guard.spec.ts) đạt 6/6 tests passed. Tổng bộ test Backend đạt **102/102 tests passed (100%)**.
+
+### 3.15. Kiểm Thử Tích Hợp Luồng Xác Nhận & Xóa Vị Trí Cách Ly (TASK: LOCATION-RULES-012)
+
+- **1. Thiết lập CSDL test cách ly (`test_isolated_seed_db`):**
+  - Lệnh: `npm --prefix backend run test:integration` (gọi `setup-test-db.ts` nạp lại toàn bộ schema PostGIS và seed chuẩn vào `test_isolated_seed_db`).
+  - Kiểm chứng an toàn: `assertSafeDatabaseForTests` ngăn chặn và ném lỗi tức thì nếu bất kỳ kết nối kiểm thử nào trỏ tới `delivery_db`.
+- **2. Kịch bản kiểm thử tích hợp thực tế ([location-rules-012.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/location-rules-012.integration.spec.ts)):**
+  - **Rule 4 (Xác nhận vị trí từ Danh bạ):**
+    * Bấm xác nhận tại Danh bạ -> Ghi tọa độ chuẩn vào `saved_locations`.
+    * Tự động đồng bộ các điểm giao của khách trong ca đang chạy (`PREPARING`/`IN_PROGRESS`) sang trạng thái `VERIFIED`.
+    * Ghi `audit_logs` với action `VERIFY_LOCATION_FROM_DIRECTORY`, ghi nhận trường `updatedShiftPointsCount`.
+  - **Rule 5 (Shipper xóa vị trí đã lưu của chính mình):**
+    * Từ chối `403 Forbidden` khi Shipper cố xóa vị trí do người khác tạo hoặc thuộc khu vực ngoài quyền hạn.
+    * Cho phép xóa khi vị trí do chính Shipper tạo/sửa và thuộc khu vực quản lý.
+    * Xóa bản ghi trong `saved_locations`.
+    * Tách `saved_location_id = NULL` trong `location_history` trước khi xóa, bảo toàn 100% dữ liệu lịch sử đối soát.
+    * Các điểm giao của khách trong ca đang chạy tự động chuyển về `NO_LOCATION`, tọa độ/ghi chú/ảnh về `NULL`.
+    * Ghi `audit_logs` action `DELETE_LOCATION` kèm `{ revertedShiftPointsCount }`.
+- **3. Kịch bản kiểm thử giao diện Flutter ([location_rules_012_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/location_rules_012_test.dart)):**
+  - Crosshair Location Picker mở từ ca: chỉ hiện "Lưu vị trí tạm", không còn "Xác minh cổng nhà".
+  - Crosshair Location Picker mở từ danh bạ: hiện "Xác nhận vị trí".
+  - Mô hình dữ liệu phân định rõ: `TEMPORARY` chỉ ở `ShiftDeliveryPointModel`, `CustomerDirectoryModel` đại diện cho vị trí đã xác nhận, không có cột trạng thái thừa.
+- **4. Kết quả thực thi kiểm thử:**
+  - `npm --prefix backend run test:integration`: **2 test suites passed, 9 tests passed (100%)**.
+  - `npm --prefix backend test`: **7 test suites passed, 105 tests passed (100%)**.
+  - `flutter test`: **8 test suites passed, 69 tests passed (100%)**.
+  - Live database `delivery_db`: 100% nguyên vẹn, 0 ghi/sửa/xóa từ test.
+
+### 3.16. Kiểm Thử Nghiệm Thu TASK: QUICK-ADD-CUSTOMER-013 (Thêm Nhanh Khách Hàng, Chuẩn Hóa SĐT & Chống Trùng Lặp)
+
+- **1. Thiết lập CSDL kiểm thử cô lập (`test_isolated_seed_db`):**
+  - Sử dụng script `setup-test-db.ts` nạp PostGIS schema và seed sạch. Chốt chặn `assertSafeDatabaseForTests` bảo vệ 100% CSDL `delivery_db`.
+- **2. Kịch bản kiểm thử tích hợp Backend ([quick-add-customer-013.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/quick-add-customer-013.integration.spec.ts)):**
+  - **Kịch bản 1 — Chỉ bắt buộc SĐT:** Khi chỉ gửi `phoneNumber`, backend tự động đặt tên mặc định `"Khách [SĐT]"`, địa chỉ mặc định `"Chưa cập nhật địa chỉ"` và tự động gán khu vực theo phân công của shipper (`assignedAreaIds`).
+  - **Kịch bản 2 — Nhập thông tin tùy chọn:** Khi gửi kèm tên, địa chỉ, ghi chú, backend lưu đúng giá trị người dùng nhập.
+  - **Kịch bản 3 — Chống trùng lặp SĐT:** Khi gửi SĐT đã có sẵn trong CSDL (`0988000001`), backend không trả về lỗi 409 Conflict mà trả về `200 OK` kèm `isExisting: true` và dữ liệu khách hàng hiện hữu; xác minh số lượng bản ghi trong CSDL vẫn là 1.
+  - **Kịch bản 4 — API khu vực:** `GET /api/v1/areas/my-areas` trả về đúng danh sách khu vực được phân công của shipper đang đăng nhập.
+- **3. Kịch bản kiểm thử giao diện & chuẩn hóa Flutter ([quick_add_customer_013_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/quick_add_customer_013_test.dart)):**
+  - **Chuẩn hóa SĐT:** Kiểm thử `normalizeCustomerPhone` loại bỏ khoảng trắng, dấu ngoặc, gạch ngang, xử lý đầu `+84`/`84` -> `0...`, thiếu số 0 (`988...` -> `0988...`), giữ nguyên số ngắn/dài bất thường để cảnh báo.
+  - **Giao diện tối giản:** Chỉ 1 ô SĐT hiển thị với `autofocus: true`, `keyboardType: TextInputType.phone`, `textInputAction: TextInputAction.done`.
+  - **Mục tùy chọn ẩn:** Các trường Tên, Địa chỉ, Ghi chú ban đầu ẩn; bấm `"Thêm thông tin"` mới mở rộng.
+  - **Hiển thị live:** Gõ SĐT cập nhật ngay nhãn `"Số đã chuẩn hóa: XXXXXXXXXX (10 số)"`.
+  - **Cảnh báo SĐT != 10 chữ số:** Khi gõ số ngắn (ví dụ 6 số) và bấm `"TẠO"`, xuất hiện AlertDialog `"Số này có X chữ số ($cleanPhone), bạn có chắc?"` với 2 nút `"HỦY"` và `"TIẾP TỤC"`.
+  - **Validate trống:** Bấm `"TẠO"` khi ô SĐT trống hiển thị SnackBar cảnh báo.
+- **4. Kết quả thực thi kiểm thử:**
+  - `npm --prefix backend run test:integration`: **3 test suites passed, 17 tests passed (100%)**.
+  - `npm --prefix backend test`: **8 test suites passed, 112 tests passed (100%)**. TypeScript biên dịch 0 lỗi (`tsc`).
+  - `flutter test`: **9 test suites passed, 75 tests passed (100%)**.
+  - `flutter analyze`: **0 issues found**.
+  - `docker compose up -d --build backend`: Thành công, `delivery_backend_api` started, `delivery_postgis_db` giữ nguyên.
+  - Kiểm tra API sống: `GET http://localhost:3000/api/docs/` trả về **200 OK**.
+
+### 3.6. Biên Bản Kiểm Thử Đợt Nghiệm Thu Task 015B (25/10/2026): Tạo Ca Từ Bản Đồ & Dán Hàng Loạt SĐT
+
+- **1. Thiết lập CSDL kiểm thử cô lập (`test_isolated_seed_db`):**
+  - Áp dụng migration `07-add-shift-name.sql` (`shift_name VARCHAR(100) NULL` & `idx_shifts_shift_name`).
+- **2. Kịch bản kiểm thử tích hợp Backend ([shift-bulk-015b.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/shift-bulk-015b.integration.spec.ts)):**
+  - **Tạo ca có tên:** Gửi `shiftName: "Ca sáng Quận 1"`, trả về đúng tên ca đã trim; `shift_code` sinh chuẩn.
+  - **Tạo ca không có tên:** Gửi rỗng hoặc null, trả về `shiftName: null`, các API sau hiển thị fallback `shift_code`.
+  - **Cập nhật tên ca (PATCH /shifts/:id/name):** Chủ ca đổi tên thành công; shipper khác đổi ca của shipper A bị từ chối `403 Forbidden`. Ghi nhận `audit_logs` `UPDATE_SHIFT_NAME`.
+  - **Tách SĐT đa định dạng:** Chuỗi `rawText` chứa xuống dòng, dấu phẩy, chấm phẩy, khoảng trắng giữa số, dấu chấm giữa số (`0908 911 111`, `+84 908 911 111`, `0908.911.111`) được chuẩn hóa thành 10 chữ số bắt đầu bằng `0`.
+  - **Lọc trùng:** Các số trùng trong chuỗi chỉ xử lý 1 lần.
+  - **Giới hạn 200 số:** Danh sách vượt quá 200 số bị từ chối toàn bộ với mã `400 Bad Request`.
+  - **Phân nhóm chính xác 4 nhóm:**
+    - `VERIFIED`: Khách đã có vị trí lưu.
+    - `NO_LOCATION`: Khách đã có nhưng chưa có vị trí.
+    - Tự động tạo khách nhanh: Khách mới với tên `"Khách [SĐT]"`, địa chỉ `"Chưa cập nhật địa chỉ"`, tự động gán khu vực hợp lệ duy nhất của shipper.
+    - `OUT_OF_AREA`: Khách nằm ngoài khu vực của shipper bị từ chối riêng lẻ trong `rejected`, không làm hỏng cả lô.
+    - `alreadyInShift`: Số đã có trong ca được phân loại riêng, không thêm trùng.
+  - **Yêu cầu chọn khu vực khi đa khu vực:** Shipper phụ trách nhiều khu vực nếu gửi SĐT mới mà chưa chọn `areaId` sẽ bị từ chối `400` yêu cầu chọn khu vực trước, không tự ý chọn bừa khu vực đầu.
+  - **Ghi log kiểm toán:** 1 dòng duy nhất trong `audit_logs` với action `BULK_ADD_POINTS` cho cả lô.
+- **3. Kịch bản kiểm thử giao diện & Widget Flutter ([shift_bulk_015b_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/shift_bulk_015b_test.dart)):**
+  - **Tạo ca từ bản đồ chính:** Nút "Tạo ca" kích thước `>= 56px`, mở `CreateShiftBottomSheet`, ô nhập tự focus, gợi ý placeholder ca sáng/chiều, nút "TẠO" kích thước `>= 56px`.
+  - **Dán danh sách SĐT trong bản đồ ca:** Nút "DÁN DANH SÁCH SĐT" kích thước `>= 56px`, mở `BulkPastePhoneSheet`, nút "DÁN TỪ BỘ NHỚ TẠM" một chạm, live badge đếm số hợp lệ và cảnh báo số sai định dạng.
+  - **Hiển thị 2 nhóm kết quả:**
+    - "Đã có vị trí (x)": marker hiển thị trên bản đồ ca.
+    - "Chưa có vị trí - cần xác nhận (y)": danh sách kéo lên được, mỗi dòng có nút "GHIM TÂM NGẮM" kích thước `>= 56px` kích hoạt luồng ghim vị trí `TEMPORARY`.
+    - Danh sách từ chối kèm lý do rõ ràng.
+- **4. Kết quả thực thi kiểm thử:**
+  - `npm --prefix backend run test:integration`: **6 test suites passed, 54 tests passed (100%)**.
+  - `npm --prefix backend test`: **11 test suites passed, 149 tests passed (100%)**. TypeScript biên dịch 0 lỗi (`tsc`).
+  - `flutter test`: **13 test suites passed, 87 tests passed (100%)**.
+  - `flutter analyze`: **0 issues found**.
+  - `docker compose up -d --build backend`: Thành công, container `delivery_backend_api` chạy ổn định, `delivery_postgis_db` giữ nguyên.
+  - Kiểm tra API sống: `GET http://localhost:3000/api/docs/` trả về **200 OK**.
+  - Build APK Debug: `flutter build apk --debug` thành công (`build\app\outputs\flutter-apk\app-debug.apk`, dung lượng 184.7 MB).
+  - CSDL `delivery_db`: 100% nguyên vẹn, 0 request ghi dữ liệu nào vào API sống hay DB sống.
+
 ---
 
-## 4. Lỗ Hổng Kiểm Thử Hiện Tại & Đề Xuất Bổ Sung (Testing Gaps)
+## 4. Quy Chuẩn Cách Ly Kiểm Thử (Strict Testing Isolation Policy)
+
+> **QUY TẮC BẮT BUỘC:**
+> 1. **Cách ly hoàn toàn CSDL chính (`delivery_db`):** Tuyệt đối **NGHIÊM CẤM** chạy bất kỳ bài test tích hợp (Integration Test), E2E test hoặc kịch bản kiểm thử có thao tác ghi/sửa/xóa (`INSERT`, `UPDATE`, `DELETE`) trên database chính `delivery_db`.
+> 2. **Sử dụng CSDL test riêng (`test_isolated_seed_db`):** Mọi test tích hợp có ghi dữ liệu phải khởi tạo một database test riêng hoặc database tạm thời được seed dữ liệu mẫu độc lập và tự động dọn dẹp sau khi chạy xong.
+> 3. **Bảo toàn tính toàn vẹn kiểm toán (Audit Integrity):** Không bao giờ xóa tùy tiện các dòng trong `location_history` hoặc `audit_logs` trên môi trường chính.
+
+---
+
+## 5. Lỗ Hổng Kiểm Thử Hiện Tại & Đề Xuất Bổ Sung (Testing Gaps)
 
 1. **Bộ test Backend đã mở rộng:**
    - [backend/test/location.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/location.spec.ts) đã được bổ sung kiểm thử cho:
@@ -419,4 +576,4 @@ Tất cả các lệnh dưới đây đã được thực thi trực tiếp trê
      - Từ chối các định dạng file thực thi độc hại (`.exe`, `.sh`, `.svg`).
      - Kiểm tra logic bảo toàn bản ghi lịch sử `location_history` khi gỡ liên kết với vị trí gốc.
 2. **Integration Test với CSDL PostGIS sống:**
-   - Cần cấu hình test runner kết nối trực tiếp container PostgreSQL PostGIS để kiểm tra các hàm SQL không gian `ST_MakePoint`, `ST_Distance` và trigger `trg_saved_locations_history` trên dữ liệu thực tế.
+   - Cần cấu hình test runner kết nối trực tiếp container PostgreSQL PostGIS để kiểm tra các hàm SQL không gian `ST_MakePoint`, `ST_Distance` và trigger `trg_saved_locations_history` trên dữ liệu thực tế (chạy trên database test cách ly).

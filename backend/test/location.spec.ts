@@ -27,7 +27,7 @@ export function normalizePhoneNumber(raw: string): string {
 }
 
 export function isValidPhotoFilename(filename: string): boolean {
-  const safeFilenameRegex = /^[0-9a-fA-F-]{36}\.(jpg|jpeg|png|webp)$/;
+  const safeFilenameRegex = /^(cust-photo-)?[0-9a-fA-F-]{36}\.(jpg|jpeg|png|webp)$/;
   return safeFilenameRegex.test(filename);
 }
 
@@ -85,6 +85,12 @@ describe('Core Unit Tests - Delivery Marker System', () => {
       expect(isValidPhotoFilename('a0000000-0000-0000-0000-000000000001.jpg')).toBe(true);
       expect(isValidPhotoFilename('123e4567-e89b-12d3-a456-426614174000.png')).toBe(true);
       expect(isValidPhotoFilename('b0000000-1111-2222-3333-444444444444.webp')).toBe(true);
+    });
+
+    it('should accept filenames with cust-photo- prefix', () => {
+      expect(isValidPhotoFilename('cust-photo-a0000000-0000-0000-0000-000000000001.jpg')).toBe(true);
+      expect(isValidPhotoFilename('cust-photo-123e4567-e89b-12d3-a456-426614174000.png')).toBe(true);
+      expect(isValidPhotoFilename('cust-photo-b0000000-1111-2222-3333-444444444444.webp')).toBe(true);
     });
 
     it('should strictly reject path traversal attempts (../ or ..\\)', () => {

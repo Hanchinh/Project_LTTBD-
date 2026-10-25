@@ -228,7 +228,7 @@ INSERT INTO customers (id, customer_code, full_name, phone_number, address_text,
 
 -- SAVED_LOCATIONS (Vị trí đã lưu cho KH_001 và KH_004, các khách khác chưa lưu vị trí để test giao diện "Chưa có vị trí")
 -- KH_001: Tọa độ Long Thạnh Mỹ (10.8422, 106.8181)
-INSERT INTO saved_locations (id, customer_id, geom, latitude, longitude, gps_accuracy, identification_notes, created_by, updated_by) VALUES
+INSERT INTO saved_locations (id, customer_id, geom, latitude, longitude, gps_accuracy, identification_notes, created_by, updated_by, image_url) VALUES
 ('e0000000-0000-0000-0000-000000000001',
  'c0000000-0000-0000-0000-000000000001',
  ST_SetSRID(ST_MakePoint(106.8181230, 10.8422150), 4326),
@@ -237,7 +237,8 @@ INSERT INTO saved_locations (id, customer_id, geom, latitude, longitude, gps_acc
  4.5,
  'Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân.',
  'd0000000-0000-0000-0000-000000000001',
- 'd0000000-0000-0000-0000-000000000001'),
+ 'd0000000-0000-0000-0000-000000000001',
+ '/api/v1/photos/00000000-0000-0000-0000-000000000001.jpg'),
 
 -- KH_004: Tọa độ Tân Phú (10.8510, 106.8020)
 ('e0000000-0000-0000-0000-000000000004',
@@ -248,7 +249,8 @@ INSERT INTO saved_locations (id, customer_id, geom, latitude, longitude, gps_acc
  6.0,
  'Rẽ trái ở cột điện hạ thế thứ 2, nhà 3 tầng mái thái gỗ đỏ.',
  'd0000000-0000-0000-0000-000000000002',
- 'd0000000-0000-0000-0000-000000000002');
+ 'd0000000-0000-0000-0000-000000000002',
+ NULL);
 
 -- ORDERS (Đơn hàng trong ca)
 INSERT INTO orders (id, order_code, customer_id, shipper_id, area_id, status) VALUES

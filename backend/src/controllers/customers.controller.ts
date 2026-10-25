@@ -58,11 +58,19 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
       paramIndex++;
     }
 
-    // Lọc theo trạng thái ảnh
+    // Lọc theo trạng thái ảnh (kiểm tra cả customer_photos và saved_locations)
     if (hasPhoto === 'true') {
-      whereClauses.push(`sl.image_url IS NOT NULL AND sl.image_url != ''`);
+      whereClauses.push(`(
+        EXISTS (SELECT 1 FROM customer_photos cp WHERE cp.customer_id = c.id AND cp.deleted_at IS NULL)
+        OR (sl.image_url IS NOT NULL AND sl.image_url != '')
+        OR (latest_sdp.image_url IS NOT NULL AND latest_sdp.image_url != '')
+      )`);
     } else if (hasPhoto === 'false') {
-      whereClauses.push(`(sl.image_url IS NULL OR sl.image_url = '')`);
+      whereClauses.push(`(
+        NOT EXISTS (SELECT 1 FROM customer_photos cp WHERE cp.customer_id = c.id AND cp.deleted_at IS NULL)
+        AND (sl.image_url IS NULL OR sl.image_url = '')
+        AND (latest_sdp.image_url IS NULL OR latest_sdp.image_url = '')
+      )`);
     }
 
     const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -90,7 +98,10 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
         latest_sdp.longitude as sdp_longitude,
         latest_sdp.identification_notes as sdp_notes,
         latest_sdp.image_url as sdp_image_url,
-        latest_sdp.updated_at as sdp_updated_at
+        latest_sdp.updated_at as sdp_updated_at,
+        cp_stats.photo_count,
+        cp_stats.latest_photo_url,
+        cp_stats.photos_json
       FROM customers c
       JOIN areas a ON a.id = c.area_id
       LEFT JOIN saved_locations sl ON sl.customer_id = c.id
@@ -101,6 +112,22 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
         ORDER BY sdp.updated_at DESC
         LIMIT 1
       ) latest_sdp ON true
+      LEFT JOIN LATERAL (
+        SELECT 
+          COUNT(*)::int as photo_count,
+          (ARRAY_AGG(cp.image_url ORDER BY cp.created_at DESC))[1] as latest_photo_url,
+          JSON_AGG(
+            JSON_BUILD_OBJECT(
+              'id', cp.id,
+              'customerId', cp.customer_id,
+              'imageUrl', cp.image_url,
+              'createdBy', cp.created_by,
+              'createdAt', cp.created_at
+            ) ORDER BY cp.created_at DESC
+          ) FILTER (WHERE cp.id IS NOT NULL) as photos_json
+        FROM customer_photos cp
+        WHERE cp.customer_id = c.id AND cp.deleted_at IS NULL
+      ) cp_stats ON true
       ${whereSQL}
       ORDER BY c.updated_at DESC, c.created_at DESC
     `;
@@ -153,6 +180,12 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
         photoUrl = row.sdp_image_url;
       }
 
+      const activePhotos = row.photos_json || [];
+      const cpPhotoCount = parseInt(row.photo_count, 10) || 0;
+      // Ưu tiên ảnh mới nhất từ customer_photos, nếu không có mới dùng sdp_image_url hoặc saved_locations image_url
+      const effectivePhotoUrl = row.latest_photo_url || photoUrl;
+      const totalPhotoCount = cpPhotoCount > 0 ? cpPhotoCount : (effectivePhotoUrl ? 1 : 0);
+
       return {
         id: row.id,
         customerCode: row.customer_code,
@@ -166,7 +199,9 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
         latitude: lat,
         longitude: lng,
         identificationNotes: notes,
-        imageUrl: photoUrl,
+        imageUrl: effectivePhotoUrl,
+        photoCount: totalPhotoCount,
+        photos: activePhotos,
         savedLocationId: locId,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -247,6 +282,16 @@ export const getCustomerDetail = async (req: AuthenticatedRequest, res: Response
       [id]
     );
 
+    // Lấy danh sách ảnh từ customer_photos
+    const photosRes = await query(
+      `SELECT id, customer_id as "customerId", image_url as "imageUrl", created_by as "createdBy", created_at as "createdAt"
+       FROM customer_photos
+       WHERE customer_id = $1 AND deleted_at IS NULL
+       ORDER BY created_at DESC`,
+      [id]
+    );
+    const activePhotos = photosRes.rows;
+
     const hasSaved = locRes.rows.length > 0;
     const loc = hasSaved ? locRes.rows[0] : null;
 
@@ -269,7 +314,7 @@ export const getCustomerDetail = async (req: AuthenticatedRequest, res: Response
           longitude: parseFloat(sdp.longitude),
           gpsAccuracy: sdp.gps_accuracy ? parseFloat(sdp.gps_accuracy) : (loc.gps_accuracy ? parseFloat(loc.gps_accuracy) : 0),
           identificationNotes: sdp.identification_notes || loc.identification_notes,
-          imageUrl: sdp.image_url || loc.image_url,
+          imageUrl: (activePhotos.length > 0 ? activePhotos[0].imageUrl : (sdp.image_url || loc.image_url)),
           createdAt: sdp.created_at,
           updatedAt: sdp.updated_at,
           updatedByName: loc.updated_by_name,
@@ -283,7 +328,7 @@ export const getCustomerDetail = async (req: AuthenticatedRequest, res: Response
           longitude: parseFloat(loc.longitude),
           gpsAccuracy: loc.gps_accuracy ? parseFloat(loc.gps_accuracy) : 0,
           identificationNotes: loc.identification_notes,
-          imageUrl: loc.image_url,
+          imageUrl: (activePhotos.length > 0 ? activePhotos[0].imageUrl : loc.image_url),
           createdAt: loc.created_at,
           updatedAt: loc.updated_at,
           updatedByName: loc.updated_by_name,
@@ -298,7 +343,7 @@ export const getCustomerDetail = async (req: AuthenticatedRequest, res: Response
         longitude: parseFloat(loc.longitude),
         gpsAccuracy: loc.gps_accuracy ? parseFloat(loc.gps_accuracy) : 0,
         identificationNotes: loc.identification_notes,
-        imageUrl: loc.image_url,
+        imageUrl: (activePhotos.length > 0 ? activePhotos[0].imageUrl : loc.image_url),
         createdAt: loc.created_at,
         updatedAt: loc.updated_at,
         updatedByName: loc.updated_by_name,
@@ -313,7 +358,7 @@ export const getCustomerDetail = async (req: AuthenticatedRequest, res: Response
         longitude: parseFloat(sdp.longitude),
         gpsAccuracy: sdp.gps_accuracy ? parseFloat(sdp.gps_accuracy) : 0,
         identificationNotes: sdp.identification_notes,
-        imageUrl: sdp.image_url,
+        imageUrl: (activePhotos.length > 0 ? activePhotos[0].imageUrl : sdp.image_url),
         createdAt: sdp.created_at,
         updatedAt: sdp.updated_at,
         updatedByName: null,
@@ -344,7 +389,12 @@ export const getCustomerDetail = async (req: AuthenticatedRequest, res: Response
           areaName: customer.area_name,
           createdAt: customer.created_at,
           updatedAt: customer.updated_at,
+          photoCount: activePhotos.length,
+          photos: activePhotos,
+          imageUrl: activePhotos.length > 0 ? activePhotos[0].imageUrl : (activeLoc ? activeLoc.imageUrl : null),
         },
+        photos: activePhotos,
+        photoCount: activePhotos.length,
         locationStatus,
         savedLocation: activeLoc,
         locationHistory: histRes.rows.map((r) => ({
@@ -403,24 +453,62 @@ export const createCustomer = async (req: AuthenticatedRequest, res: Response) =
   try {
     await client.query('BEGIN');
 
-    // Kiểm tra số điện thoại đã tồn tại chưa
-    const existingRes = await client.query('SELECT id, full_name FROM customers WHERE phone_number = $1', [cleanPhone]);
-    if (existingRes.rows.length > 0) {
+    // TASK: QUICK-ADD-013B: Nếu areaId gửi lên không thuộc khu vực shipper được phân công thì trả 403, không âm thầm đổi sang khu vực khác
+    if (areaId && user?.roleName !== 'ADMIN' && !assignedAreaIds.includes(areaId)) {
       await client.query('ROLLBACK');
-      return res.status(409).json({
+      return res.status(403).json({
         success: false,
-        message: `Số điện thoại ${cleanPhone} đã tồn tại trong hệ thống (Khách hàng: ${existingRes.rows[0].full_name})`,
-        customerId: existingRes.rows[0].id,
+        message: 'Khu vực được chỉ định không thuộc khu vực bạn được phân công phụ trách',
+      });
+    }
+
+    // Kiểm tra số điện thoại đã tồn tại chưa
+    const existingRes = await client.query(
+      `SELECT c.id, c.customer_code, c.full_name, c.phone_number, c.address_text, c.area_id, c.created_at, c.updated_at,
+              sl.id as saved_location_id, sl.latitude, sl.longitude, sl.identification_notes, sl.image_url,
+              a.name as area_name
+       FROM customers c
+       LEFT JOIN saved_locations sl ON sl.customer_id = c.id
+       LEFT JOIN areas a ON a.id = c.area_id
+       WHERE c.phone_number = $1`,
+      [cleanPhone]
+    );
+
+    if (existingRes.rows.length > 0) {
+      await client.query('COMMIT');
+      const existing = existingRes.rows[0];
+      return res.status(200).json({
+        success: true,
+        isExisting: true,
+        message: `Số điện thoại ${cleanPhone} đã tồn tại (Khách hàng: ${existing.full_name})`,
+        data: {
+          id: existing.id,
+          customerCode: existing.customer_code,
+          fullName: existing.full_name,
+          phoneNumber: existing.phone_number,
+          addressText: existing.address_text,
+          areaId: existing.area_id,
+          areaName: existing.area_name || '',
+          locationStatus: (existing.latitude && existing.longitude) ? 'VERIFIED' : 'NO_LOCATION',
+          hasLocation: !!(existing.latitude && existing.longitude),
+          latitude: existing.latitude ? parseFloat(existing.latitude) : null,
+          longitude: existing.longitude ? parseFloat(existing.longitude) : null,
+          identificationNotes: existing.identification_notes,
+          imageUrl: existing.image_url,
+          savedLocationId: existing.saved_location_id,
+          createdAt: existing.created_at,
+          updatedAt: existing.updated_at,
+        },
       });
     }
 
     // Xác định khu vực hợp lệ
     let targetAreaId: string | null = null;
-    if (areaId && (user?.roleName === 'ADMIN' || assignedAreaIds.includes(areaId))) {
+    if (areaId) {
       targetAreaId = areaId;
     } else if (assignedAreaIds.length > 0) {
       targetAreaId = assignedAreaIds[0];
-    } else {
+    } else if (user?.roleName === 'ADMIN') {
       const areaQ = await client.query('SELECT id FROM areas ORDER BY created_at ASC LIMIT 1');
       targetAreaId = areaQ.rows[0]?.id || null;
     }
@@ -430,8 +518,9 @@ export const createCustomer = async (req: AuthenticatedRequest, res: Response) =
       return res.status(400).json({ success: false, message: 'Không xác định được khu vực phân công' });
     }
 
-    const custName = fullName && fullName.trim() ? fullName.trim() : `Khách hàng ${cleanPhone}`;
-    const custAddress = addressText && addressText.trim() ? addressText.trim() : 'Chưa có địa chỉ chi tiết';
+    // TASK: QUICK-ADD-CUSTOMER-013: Mặc định tên "Khách [SĐT]", địa chỉ "Chưa cập nhật địa chỉ"
+    const custName = (fullName && fullName.trim()) ? fullName.trim() : `Khách ${cleanPhone}`;
+    const custAddress = (addressText && addressText.trim()) ? addressText.trim() : 'Chưa cập nhật địa chỉ';
     const custCode = `KH_${cleanPhone.slice(-6)}_${Date.now().toString().slice(-4)}`;
 
     const newCustRes = await client.query(

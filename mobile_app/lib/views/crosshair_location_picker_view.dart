@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/shift_model.dart';
 import '../services/api_service.dart';
+import '../services/map_tile_cache_service.dart';
 
 class CrosshairLocationPickerResult {
   final double latitude;
@@ -38,6 +39,7 @@ class CrosshairLocationPickerView extends StatefulWidget {
 
 class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerView> {
   final MapController _mapController = MapController();
+  final TileProvider _tileProvider = CancellableDiskCachedTileProvider();
   late LatLng _currentCrosshairCenter;
   LatLng? _shipperLocation;
   bool _isLoadingGps = false;
@@ -329,56 +331,61 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
         children: [
           // 1. Bản đồ có thể kéo/pan/zoom tự do
           Positioned.fill(
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: _currentCrosshairCenter,
-                initialZoom: 17.5,
-                maxZoom: 19.0,
-                minZoom: 10.0,
-                onMapReady: () => _isMapReady = true,
-                onPositionChanged: (position, hasGesture) {
-                  // Cập nhật tọa độ tâm ngắm live khi kéo bản đồ
-                  if (position.center != null) {
-                    setState(() {
-                      _currentCrosshairCenter = position.center!;
-                    });
-                  }
-                },
-              ),
-              children: [
-                TileLayer(
-                  key: const ValueKey('crosshair_picker_tile'),
-                  urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                  fallbackUrl: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.example.delivery_marker_mobile',
+            child: RepaintBoundary(
+              child: FlutterMap(
+                mapController: _mapController,
+                options: MapOptions(
+                  initialCenter: _currentCrosshairCenter,
+                  initialZoom: 17.5,
+                  maxZoom: 19.0,
+                  minZoom: 10.0,
+                  onMapReady: () => _isMapReady = true,
+                  onPositionChanged: (position, hasGesture) {
+                    // Cập nhật tọa độ tâm ngắm live khi kéo bản đồ
+                    if (position.center != null) {
+                      setState(() {
+                        _currentCrosshairCenter = position.center!;
+                      });
+                    }
+                  },
                 ),
-                // Hiển thị marker vị trí GPS của shipper (nếu có)
-                if (_shipperLocation != null)
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: _shipperLocation!,
-                        width: 48,
-                        height: 48,
-                        child: Center(
-                          child: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2563EB),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 3),
-                              boxShadow: const [
-                                BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
-                              ],
+                children: [
+                  TileLayer(
+                    key: const ValueKey('crosshair_picker_tile'),
+                    urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                    fallbackUrl: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+                    userAgentPackageName: 'com.example.delivery_marker_mobile',
+                    panBuffer: 1,
+                    keepBuffer: 2,
+                    tileProvider: _tileProvider,
+                  ),
+                  // Hiển thị marker vị trí GPS của shipper (nếu có)
+                  if (_shipperLocation != null)
+                    MarkerLayer(
+                      markers: [
+                        Marker(
+                          point: _shipperLocation!,
+                          width: 48,
+                          height: 48,
+                          child: Center(
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2563EB),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 3),
+                                boxShadow: const [
+                                  BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-              ],
+                      ],
+                    ),
+                ],
+              ),
             ),
           ),
 
@@ -604,6 +611,36 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Banner Đang ghim lại cho khách hàng
+                    Container(
+                      key: const Key('repin_customer_banner'),
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFBFDBFE)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.push_pin_rounded, size: 16, color: Color(0xFF2563EB)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Đang ghim lại cho: ${widget.point.customerName} - ${widget.point.customerPhone}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1D4ED8),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                     // Thông tin khách hàng & Trạng thái hiện tại
                     Row(
                       children: [
@@ -729,7 +766,9 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
                                     )
                                   : const Icon(Icons.check_rounded, size: 20),
                               label: Text(
-                                _isSaving ? 'Đang lưu...' : 'Xác nhận vị trí',
+                                _isSaving
+                                    ? 'Đang lưu...'
+                                    : (widget.shiftId.isNotEmpty ? 'Lưu vị trí tạm' : 'Xác nhận vị trí'),
                                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                               ),
                               onPressed: _isSaving

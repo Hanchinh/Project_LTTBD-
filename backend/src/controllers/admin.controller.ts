@@ -13,6 +13,31 @@ export const getAreas = async (req: AuthenticatedRequest, res: Response) => {
   }
 };
 
+// GET /api/v1/areas/my-areas - Lấy danh sách khu vực được phân công của shipper hiện tại
+export const getMyAreas = async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user?.userId;
+  const roleName = req.user?.roleName;
+
+  try {
+    if (roleName === 'ADMIN') {
+      const result = await query('SELECT id, code, name FROM areas ORDER BY name ASC');
+      return res.json({ success: true, data: result.rows });
+    }
+
+    const result = await query(
+      `SELECT a.id, a.code, a.name
+       FROM user_areas ua
+       JOIN areas a ON a.id = ua.area_id
+       WHERE ua.user_id = $1
+       ORDER BY a.name ASC`,
+      [userId]
+    );
+    return res.json({ success: true, data: result.rows });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, message: 'Lỗi lấy danh sách khu vực phân công', error: error.message });
+  }
+};
+
 export const createArea = async (req: AuthenticatedRequest, res: Response) => {
   const { code, name } = req.body;
   if (!code || !name) {

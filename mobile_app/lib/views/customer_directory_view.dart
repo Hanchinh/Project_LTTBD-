@@ -1,11 +1,12 @@
-import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../models/customer_model.dart';
 import '../models/shift_model.dart';
 import '../services/api_service.dart';
 import '../widgets/fullscreen_image_viewer.dart';
+import '../widgets/quick_add_customer_sheet.dart';
+import '../widgets/authenticated_image.dart';
+import '../widgets/customer_photos_strip_widget.dart';
 import 'crosshair_location_picker_view.dart';
 
 class CustomerDirectoryView extends StatefulWidget {
@@ -164,196 +165,15 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
     }
   }
 
-  void _openCreateCustomerSheet() {
-    final phoneCtrl = TextEditingController();
-    final nameCtrl = TextEditingController();
-    final addressCtrl = TextEditingController();
-    final notesCtrl = TextEditingController();
-    bool isSaving = false;
+  Future<void> _openCreateCustomerSheet() async {
+    final customer = await showQuickAddCustomerBottomSheet(context);
+    if (customer == null) return;
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (bSheetCtx) {
-        return StatefulBuilder(
-          builder: (ctx, setModalState) {
-            final bottomInset = MediaQuery.of(bSheetCtx).viewInsets.bottom;
-            return Padding(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        const Icon(Icons.person_add_rounded, color: Color(0xFF2563EB), size: 24),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Thêm khách hàng mới',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
-                          onPressed: () => Navigator.pop(bSheetCtx),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 20, color: Color(0xFFE2E8F0)),
-                    const Text('SỐ ĐIỆN THOẠI *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: phoneCtrl,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        hintText: 'Nhập số điện thoại (VD: 0901234567)',
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        prefixIcon: const Icon(Icons.phone_rounded, size: 20, color: Color(0xFF64748B)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('TÊN KHÁCH HÀNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: nameCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Ví dụ: Anh Nam, Chị Linh...',
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        prefixIcon: const Icon(Icons.person_outline_rounded, size: 20, color: Color(0xFF64748B)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('ĐỊA CHỈ GIAO HÀNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: addressCtrl,
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        hintText: 'Số nhà, tên đường, phường/xã...',
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        prefixIcon: const Icon(Icons.location_on_outlined, size: 20, color: Color(0xFF64748B)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    const Text('GHI CHÚ NHẬN DIỆN VỊ TRÍ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: notesCtrl,
-                      decoration: InputDecoration(
-                        hintText: 'Ví dụ: Cổng sắt màu xanh, gần tiệm sửa xe...',
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        prefixIcon: const Icon(Icons.note_alt_outlined, size: 20, color: Color(0xFF64748B)),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF64748B),
-                              side: const BorderSide(color: Color(0xFFCBD5E1)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            onPressed: () => Navigator.pop(bSheetCtx),
-                            child: const Text('HỦY', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                            ),
-                            icon: isSaving
-                                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Icon(Icons.check_rounded, size: 20),
-                            label: Text(isSaving ? 'ĐANG LƯU...' : 'TẠO KHÁCH HÀNG', style: const TextStyle(fontWeight: FontWeight.bold)),
-                            onPressed: isSaving
-                                ? null
-                                : () async {
-                                    final phone = phoneCtrl.text.trim();
-                                    if (phone.isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Vui lòng nhập số điện thoại'), backgroundColor: Color(0xFFEF4444)),
-                                      );
-                                      return;
-                                    }
+    if (!mounted) return;
+    await _fetchCustomers();
 
-                                    setModalState(() => isSaving = true);
-                                    try {
-                                      final created = await ApiService.createCustomer(
-                                        phoneNumber: phone,
-                                        fullName: nameCtrl.text.trim(),
-                                        addressText: addressCtrl.text.trim(),
-                                        identificationNotes: notesCtrl.text.trim(),
-                                      );
-
-                                      if (!mounted || !bSheetCtx.mounted) return;
-                                      Navigator.pop(bSheetCtx);
-
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Đã tạo khách hàng ${created.fullName}!'),
-                                          backgroundColor: const Color(0xFF10B981),
-                                        ),
-                                      );
-
-                                      _fetchCustomers();
-                                    } catch (e) {
-                                      if (bSheetCtx.mounted) setModalState(() => isSaving = false);
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Lỗi: $e'), backgroundColor: const Color(0xFFEF4444)),
-                                        );
-                                      }
-                                    }
-                                  },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+    // TASK: QUICK-ADD-CUSTOMER-013: Mở luôn hồ sơ khách hàng đó (dù mới tạo hay đã tồn tại)
+    _openCustomerDetailEdit(customer);
   }
 
   void _openCustomerDetailEdit(CustomerDirectoryModel customer) {
@@ -485,21 +305,31 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: FutureBuilder<Map<String, String>>(
-                              future: ApiService.getPhotoAuthInfo(customer.imageUrl!),
-                              builder: (ctx, snap) {
-                                if (snap.hasData) {
-                                  return Image.network(
-                                    snap.data!['url']!,
-                                    headers: {
-                                      if (snap.data!['token']!.isNotEmpty) 'Authorization': 'Bearer ${snap.data!['token']}',
-                                    },
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, size: 22, color: Color(0xFF94A3B8)),
-                                  );
-                                }
-                                return const Center(child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5)));
-                              },
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                AuthenticatedImage(
+                                  photoUrl: customer.imageUrl!,
+                                  fit: BoxFit.cover,
+                                  errorWidget: const Icon(Icons.broken_image_rounded, size: 22, color: Color(0xFF94A3B8)),
+                                ),
+                                if (customer.photoCount > 1)
+                                  Positioned(
+                                    right: 2,
+                                    bottom: 2,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black87,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        '${customer.photoCount}',
+                                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -819,11 +649,8 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
   double? _currentLat;
   double? _currentLng;
   String? _currentPhotoUrl;
-  String? _newPhotoBase64;
-  bool _photoWasDeleted = false;
 
   bool _isSaving = false;
-  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -847,44 +674,66 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
     super.dispose();
   }
 
-  Future<void> _pickImage(ImageSource source) async {
+  Future<void> _confirmAndDeleteLocation() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xác nhận xóa vị trí đã lưu?'),
+        content: Text(
+          'Vị trí cổng nhà đã lưu của khách hàng "${_nameController.text.trim()}" sẽ bị xóa khỏi hồ sơ hệ thống.\n\n'
+          'Các điểm giao trong ca đang chạy của khách này sẽ quay về trạng thái "Chưa có vị trí".\n\n'
+          'Lịch sử đối soát trước đây vẫn được lưu trữ an toàn trong hệ thống.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xóa vị trí'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isSaving = true);
     try {
-      final picked = await _picker.pickImage(
-        source: source,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 80,
+      await ApiService.deleteCustomerLocation(_customer.id);
+
+      setState(() {
+        _currentLat = null;
+        _currentLng = null;
+        _currentPhotoUrl = null;
+      });
+
+      PaintingBinding.instance.imageCache.clear();
+      PaintingBinding.instance.imageCache.clearLiveImages();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã xóa vị trí đã lưu thành công (lịch sử đối soát được bảo toàn)'),
+          backgroundColor: Color(0xFF10B981),
+        ),
       );
 
-      if (picked != null) {
-        final bytes = await picked.readAsBytes();
-        if (bytes.lengthInBytes > 5 * 1024 * 1024) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Ảnh quá lớn (vượt quá 5MB). Vui lòng chọn ảnh khác.'), backgroundColor: Colors.red),
-          );
-          return;
-        }
-
-        final base64Str = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-        setState(() {
-          _newPhotoBase64 = base64Str;
-          _photoWasDeleted = false;
-        });
-      }
+      final updated = await ApiService.getCustomerDetail(_customer.id);
+      widget.onCustomerUpdated?.call(updated);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi chọn ảnh: $e')));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi: $e'), backgroundColor: const Color(0xFFEF4444)),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-  }
-
-  void _deletePhoto() {
-    setState(() {
-      _currentPhotoUrl = null;
-      _newPhotoBase64 = null;
-      _photoWasDeleted = true;
-    });
   }
 
   void _openCrosshairPicker() async {
@@ -951,8 +800,6 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
           latitude: _currentLat!,
           longitude: _currentLng!,
           identificationNotes: notes.isNotEmpty ? notes : 'Vị trí đã lưu',
-          imageBase64: _newPhotoBase64,
-          deletePhoto: _photoWasDeleted,
         );
 
         PaintingBinding.instance.imageCache.clear();
@@ -1004,16 +851,16 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. Khung Ảnh thực tế của vị trí
+            // 1. Ảnh khách hàng (Multi-photo strip)
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1026,140 +873,32 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                       ),
                       const Spacer(),
-                      if (_currentPhotoUrl != null || _newPhotoBase64 != null)
-                        TextButton.icon(
-                          style: TextButton.styleFrom(foregroundColor: const Color(0xFFEF4444)),
-                          icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                          label: const Text('Xóa ảnh', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          onPressed: _deletePhoto,
-                        ),
+                      Text(
+                        'Tối đa 10 ảnh',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-
-                  // Khung hiển thị ảnh
-                  if (_newPhotoBase64 != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.memory(
-                        base64Decode(_newPhotoBase64!.split(',').last),
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                  else if (_currentPhotoUrl != null)
-                    GestureDetector(
-                      onTap: () {
-                        FullscreenImageViewer.show(
-                          context,
-                          photoUrl: _currentPhotoUrl!,
-                          title: _nameController.text,
-                        );
-                      },
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: FutureBuilder<Map<String, String>>(
-                          future: ApiService.getPhotoAuthInfo(_currentPhotoUrl!, bustCache: true),
-                          builder: (ctx, snap) {
-                            if (snap.hasData) {
-                              return Stack(
-                                children: [
-                                  Image.network(
-                                    snap.data!['url']!,
-                                    headers: {
-                                      if (snap.data!['token']!.isNotEmpty) 'Authorization': 'Bearer ${snap.data!['token']}',
-                                    },
-                                    height: 180,
-                                    width: double.infinity,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      height: 120,
-                                      color: const Color(0xFFF1F5F9),
-                                      alignment: Alignment.center,
-                                      child: const Text('Lỗi tải ảnh'),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    right: 8,
-                                    bottom: 8,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(6)),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white),
-                                          SizedBox(width: 4),
-                                          Text('Chạm để phóng to', style: TextStyle(color: Colors.white, fontSize: 11)),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }
-                            return Container(
-                              height: 180,
-                              color: const Color(0xFFF1F5F9),
-                              child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            );
-                          },
-                        ),
-                      ),
-                    )
-                  else
-                    Container(
-                      height: 120,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFE2E8F0), style: BorderStyle.solid),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.image_not_supported_outlined, size: 36, color: Colors.grey.shade400),
-                          const SizedBox(height: 6),
-                          Text('Chưa có ảnh mặt tiền vị trí này', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-                        ],
-                      ),
-                    ),
-
                   const SizedBox(height: 12),
-
-                  // Nút Chụp / Chọn ảnh
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF0F172A),
-                            side: const BorderSide(color: Color(0xFFCBD5E1)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                          ),
-                          icon: const Icon(Icons.camera_alt_rounded, size: 18, color: Color(0xFF2563EB)),
-                          label: const Text('Chụp ảnh mới', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                          onPressed: () => _pickImage(ImageSource.camera),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF0F172A),
-                            side: const BorderSide(color: Color(0xFFCBD5E1)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                          ),
-                          icon: const Icon(Icons.photo_library_rounded, size: 18, color: Color(0xFF64748B)),
-                          label: const Text('Chọn từ máy', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                          onPressed: () => _pickImage(ImageSource.gallery),
-                        ),
-                      ),
-                    ],
+                  CustomerPhotosStripWidget(
+                    customerId: _customer.id,
+                    customerName: _customer.fullName,
+                    initialPhotos: _customer.photos,
+                    legacyImageUrl: _customer.imageUrl,
+                    height: 145,
+                    canAddPhoto: true,
+                    canDeletePhoto: true,
+                    onPhotosUpdated: (photos) {
+                      setState(() {
+                        _currentPhotoUrl = photos.isNotEmpty ? photos.first.imageUrl : null;
+                        _customer = _customer.copyWith(
+                          photos: photos,
+                          photoCount: photos.length,
+                          imageUrl: _currentPhotoUrl,
+                        );
+                      });
+                      widget.onCustomerUpdated?.call(_customer);
+                    },
                   ),
                 ],
               ),
@@ -1241,6 +980,18 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
                     children: [
                       const Text('TỌA ĐỘ & GHI CHÚ VỊ TRÍ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
                       const Spacer(),
+                      if (_currentLat != null && _currentLng != null) ...[
+                        TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFFEF4444),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          ),
+                          icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                          label: const Text('Xóa vị trí', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                          onPressed: _isSaving ? null : _confirmAndDeleteLocation,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2563EB),

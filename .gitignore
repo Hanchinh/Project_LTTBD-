@@ -73,3 +73,9 @@ mobile_app/.widget_preview/
 # NOTE: Lockfiles (package-lock.json, mobile_app/pubspec.lock) are deliberately TRACKED.
 
 project_context.txt
+
+backend/.env
+backend/uploads/
+*.apk
+*.dump
+backups/

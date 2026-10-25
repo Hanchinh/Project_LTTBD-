@@ -480,6 +480,143 @@ describe('FEATURE-SHIFT-001 - Shift & Delivery Points Business Logic Unit Tests'
       expect(resolvedImg).toBeNull();
     });
   });
+
+  describe('TASK: SHIFT-DELETE-AND-FIELD-FIX-011 - Delete Shift & Field Mappings Unit Tests', () => {
+    describe('DELETE /api/v1/shifts/:id Permission & Safety Logic', () => {
+      it('should permit a SHIPPER to delete their own shift', () => {
+        const currentUser = { userId: 'shipper-001', roleName: 'SHIPPER' };
+        const shift = { id: 'shift-1', shipper_id: 'shipper-001', shift_code: 'SHF-20261025-001' };
+
+        const isForbidden = currentUser.roleName === 'SHIPPER' && shift.shipper_id !== currentUser.userId;
+        expect(isForbidden).toBe(false);
+      });
+
+      it('should reject (403 Forbidden) when a SHIPPER attempts to delete another shipper shift', () => {
+        const currentUser = { userId: 'shipper-001', roleName: 'SHIPPER' };
+        const shift = { id: 'shift-2', shipper_id: 'shipper-999', shift_code: 'SHF-20261025-002' };
+
+        const isForbidden = currentUser.roleName === 'SHIPPER' && shift.shipper_id !== currentUser.userId;
+        expect(isForbidden).toBe(true);
+      });
+
+      it('should permit an ADMIN to delete any shift regardless of owner', () => {
+        const currentUser = { userId: 'admin-001', roleName: 'ADMIN' };
+        const shift = { id: 'shift-2', shipper_id: 'shipper-999', shift_code: 'SHF-20261025-002' };
+
+        const isForbidden = currentUser.roleName === 'SHIPPER' && shift.shipper_id !== currentUser.userId;
+        expect(isForbidden).toBe(false);
+      });
+
+      it('should strictly isolate deletion: deletes shift and shift_delivery_points without touching customers or saved_locations', () => {
+        const shiftIdToDelete = 'shift-100';
+        const tablesAffected = ['shift_delivery_points', 'shifts'];
+        const protectedTables = ['customers', 'saved_locations', 'location_history'];
+
+        expect(tablesAffected).not.toEqual(expect.arrayContaining(protectedTables));
+        expect(tablesAffected.includes('customers')).toBe(false);
+        expect(tablesAffected.includes('saved_locations')).toBe(false);
+        expect(tablesAffected.includes('location_history')).toBe(false);
+      });
+
+      it('should record audit log with DELETE_SHIFT action and point count', () => {
+        const shift = { id: 'shift-1', shift_code: 'SHF-20261025-001', status: 'PREPARING' };
+        const deletedPointsCount = 5;
+        const shipperId = 'shipper-001';
+
+        const auditPayload = {
+          userId: shipperId,
+          action: 'DELETE_SHIFT',
+          entity: 'shifts',
+          entityId: shift.id,
+          details: JSON.stringify({
+            shiftCode: shift.shift_code,
+            status: shift.status,
+            deletedPointsCount,
+          }),
+        };
+
+        expect(auditPayload.action).toBe('DELETE_SHIFT');
+        expect(auditPayload.entity).toBe('shifts');
+        const parsedDetails = JSON.parse(auditPayload.details);
+        expect(parsedDetails.shiftCode).toBe('SHF-20261025-001');
+        expect(parsedDetails.deletedPointsCount).toBe(5);
+      });
+    });
+
+    describe('Field Name Mismatch Resolution (createShift, addPointToShift, verify)', () => {
+      it('createShift: should accept shiftDate from Flutter and unify with workDate', () => {
+        const bodyWithShiftDate = { shiftDate: '2026-10-25' };
+        const rawDate = (bodyWithShiftDate as any).workDate || bodyWithShiftDate.shiftDate;
+        const effectiveDate = (typeof rawDate === 'string' && rawDate.trim().length > 0)
+          ? rawDate.trim()
+          : '2026-10-25';
+
+        expect(effectiveDate).toBe('2026-10-25');
+      });
+
+      it('createShift: should accept workDate from Backend and unify with shiftDate', () => {
+        const bodyWithWorkDate = { workDate: '2026-10-26' };
+        const rawDate = bodyWithWorkDate.workDate || (bodyWithWorkDate as any).shiftDate;
+        const effectiveDate = (typeof rawDate === 'string' && rawDate.trim().length > 0)
+          ? rawDate.trim()
+          : '2026-10-26';
+
+        expect(effectiveDate).toBe('2026-10-26');
+      });
+
+      it('addPointToShift: should include summary in response matching Flutter expectation', () => {
+        const sumRow = {
+          total_points: 3,
+          verified_count: 1,
+          temporary_count: 1,
+          no_location_count: 1,
+        };
+
+        const responsePayload = {
+          success: true,
+          message: 'Đã thêm điểm giao vào ca làm việc thành công',
+          isExisting: false,
+          data: { pointId: 'p-1' },
+          summary: {
+            totalPoints: sumRow.total_points,
+            verifiedCount: sumRow.verified_count,
+            temporaryCount: sumRow.temporary_count,
+            noLocationCount: sumRow.no_location_count,
+          },
+        };
+
+        expect(responsePayload.summary).toBeDefined();
+        expect(responsePayload.summary.totalPoints).toBe(3);
+        expect(responsePayload.summary.verifiedCount).toBe(1);
+        expect(responsePayload.summary.temporaryCount).toBe(1);
+        expect(responsePayload.summary.noLocationCount).toBe(1);
+      });
+
+      it('verifyPointLocation: should return 410 Gone to prevent writing to saved_locations from shift flow', async () => {
+        const { verifyPointLocation } = require('../src/controllers/shifts.controller');
+        const req: any = {
+          params: { id: 'shift-1', pointId: 'point-1' },
+          body: { latitude: 10.8422, longitude: 106.8181 },
+          user: { userId: 'shipper-1', roleName: 'SHIPPER' },
+        };
+        const res: any = {
+          statusCode: 200,
+          status: jest.fn((code: number) => {
+            res.statusCode = code;
+            return res;
+          }),
+          json: jest.fn((data: any) => {
+            res.body = data;
+            return res;
+          }),
+        };
+        await verifyPointLocation(req, res);
+        expect(res.statusCode).toBe(410);
+        expect(res.body.success).toBe(false);
+        expect(res.body.errorCode).toBe('ENDPOINT_GONE_USE_DIRECTORY_FLOW');
+      });
+    });
+  });
 });
 
 

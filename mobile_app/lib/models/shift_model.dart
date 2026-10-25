@@ -1,4 +1,5 @@
 import 'package:latlong2/latlong.dart';
+import 'customer_photo_model.dart';
 
 enum ShiftStatus {
   preparing,
@@ -148,6 +149,8 @@ class ShiftDeliveryPointModel {
   final String? locationType;
   final String? locationNotes;
   final String? photoUrl;
+  final int photoCount;
+  final List<CustomerPhotoModel> photos;
   final String? deliveryNotes;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -171,6 +174,8 @@ class ShiftDeliveryPointModel {
     this.locationType,
     this.locationNotes,
     this.photoUrl,
+    this.photoCount = 0,
+    this.photos = const [],
     this.deliveryNotes,
     this.createdAt,
     this.updatedAt,
@@ -178,7 +183,7 @@ class ShiftDeliveryPointModel {
 
   bool get hasValidCoordinates => latitude != null && longitude != null;
 
-  bool get hasPhoto => photoUrl != null && photoUrl!.trim().isNotEmpty;
+  bool get hasPhoto => (photoCount > 0) || (photoUrl != null && photoUrl!.trim().isNotEmpty);
 
   LatLng? get latLng => hasValidCoordinates ? LatLng(latitude!, longitude!) : null;
 
@@ -191,11 +196,24 @@ class ShiftDeliveryPointModel {
 
     final cust = json['customer'] is Map<String, dynamic> ? json['customer'] as Map<String, dynamic> : null;
     final area = cust != null && cust['area'] is Map<String, dynamic> ? cust['area'] as Map<String, dynamic> : null;
+    final custId = json['customerId']?.toString() ?? cust?['id']?.toString() ?? '';
+
+    final rawPhotos = json['photos'];
+    List<CustomerPhotoModel> parsedPhotos = [];
+    if (rawPhotos is List) {
+      parsedPhotos = rawPhotos
+          .whereType<Map<String, dynamic>>()
+          .map((p) => CustomerPhotoModel.fromJson(p, defaultCustomerId: custId))
+          .toList();
+    }
+
+    final pCount = int.tryParse(json['photoCount']?.toString() ?? '') ?? parsedPhotos.length;
+    final resolvedPhotoUrl = json['photoUrl']?.toString() ?? json['imageUrl']?.toString();
 
     return ShiftDeliveryPointModel(
       id: json['id']?.toString() ?? json['pointId']?.toString() ?? '',
       shiftId: json['shiftId']?.toString() ?? json['shift_id']?.toString() ?? '',
-      customerId: json['customerId']?.toString() ?? cust?['id']?.toString() ?? '',
+      customerId: custId,
       customerName: json['customerName']?.toString() ?? cust?['fullName']?.toString() ?? cust?['name']?.toString() ?? 'Khách hàng',
       customerPhone: json['customerPhone']?.toString() ?? cust?['phoneNumber']?.toString() ?? cust?['phone']?.toString() ?? '',
       customerAddress: json['customerAddress']?.toString() ?? cust?['addressText']?.toString() ?? cust?['address']?.toString() ?? '',
@@ -210,7 +228,9 @@ class ShiftDeliveryPointModel {
       longitude: parseCoord(json['longitude']),
       locationType: json['locationType']?.toString(),
       locationNotes: json['locationNotes']?.toString() ?? json['identificationNotes']?.toString(),
-      photoUrl: json['photoUrl']?.toString() ?? json['imageUrl']?.toString(),
+      photoUrl: resolvedPhotoUrl,
+      photoCount: pCount > 0 ? pCount : (resolvedPhotoUrl != null && resolvedPhotoUrl.isNotEmpty ? 1 : 0),
+      photos: parsedPhotos,
       deliveryNotes: json['deliveryNotes']?.toString(),
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
       updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt'].toString()) : null,
@@ -236,6 +256,8 @@ class ShiftDeliveryPointModel {
     String? locationType,
     String? locationNotes,
     String? photoUrl,
+    int? photoCount,
+    List<CustomerPhotoModel>? photos,
     String? deliveryNotes,
   }) {
     return ShiftDeliveryPointModel(
@@ -257,6 +279,8 @@ class ShiftDeliveryPointModel {
       locationType: locationType ?? this.locationType,
       locationNotes: locationNotes ?? this.locationNotes,
       photoUrl: photoUrl ?? this.photoUrl,
+      photoCount: photoCount ?? this.photoCount,
+      photos: photos ?? this.photos,
       deliveryNotes: deliveryNotes ?? this.deliveryNotes,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -267,6 +291,7 @@ class ShiftDeliveryPointModel {
 class ShiftModel {
   final String id;
   final String shiftCode;
+  final String? shiftName;
   final String shiftDate;
   final String shipperId;
   final ShiftStatus status;
@@ -281,6 +306,7 @@ class ShiftModel {
   ShiftModel({
     required this.id,
     required this.shiftCode,
+    this.shiftName,
     required this.shiftDate,
     required this.shipperId,
     required this.status,
@@ -293,6 +319,9 @@ class ShiftModel {
     List<ShiftDeliveryPointModel>? deliveryPoints,
   })  : summary = summary ?? ShiftSummaryModel(),
         deliveryPoints = deliveryPoints ?? [];
+
+  /// Tên hiển thị của ca: ưu tiên shiftName nếu có, ca cũ hiển thị shiftCode
+  String get displayTitle => (shiftName != null && shiftName!.trim().isNotEmpty) ? shiftName!.trim() : shiftCode;
 
   factory ShiftModel.fromJson(Map<String, dynamic> json) {
     List<ShiftDeliveryPointModel> points = [];
@@ -309,6 +338,7 @@ class ShiftModel {
     return ShiftModel(
       id: json['id']?.toString() ?? '',
       shiftCode: json['shiftCode']?.toString() ?? '',
+      shiftName: json['shiftName']?.toString() ?? json['shift_name']?.toString(),
       shiftDate: cleanDate,
       shipperId: json['shipperId']?.toString() ?? json['shipper']?['id']?.toString() ?? '',
       status: ShiftStatus.fromString(json['status']?.toString()),
@@ -325,6 +355,7 @@ class ShiftModel {
   ShiftModel copyWith({
     String? id,
     String? shiftCode,
+    String? shiftName,
     String? shiftDate,
     String? shipperId,
     ShiftStatus? status,
@@ -339,6 +370,7 @@ class ShiftModel {
     return ShiftModel(
       id: id ?? this.id,
       shiftCode: shiftCode ?? this.shiftCode,
+      shiftName: shiftName ?? this.shiftName,
       shiftDate: shiftDate ?? this.shiftDate,
       shipperId: shipperId ?? this.shipperId,
       status: status ?? this.status,
@@ -349,6 +381,126 @@ class ShiftModel {
       notes: notes ?? this.notes,
       summary: summary ?? this.summary,
       deliveryPoints: deliveryPoints ?? this.deliveryPoints,
+    );
+  }
+}
+
+class BulkAddSummary {
+  final int total;
+  final int addedCount;
+  final int alreadyInShiftCount;
+  final int rejectedCount;
+
+  BulkAddSummary({
+    this.total = 0,
+    this.addedCount = 0,
+    this.alreadyInShiftCount = 0,
+    this.rejectedCount = 0,
+  });
+
+  factory BulkAddSummary.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return BulkAddSummary();
+    return BulkAddSummary(
+      total: int.tryParse(json['total']?.toString() ?? '0') ?? 0,
+      addedCount: int.tryParse(json['addedCount']?.toString() ?? '0') ?? 0,
+      alreadyInShiftCount: int.tryParse(json['alreadyInShiftCount']?.toString() ?? '0') ?? 0,
+      rejectedCount: int.tryParse(json['rejectedCount']?.toString() ?? '0') ?? 0,
+    );
+  }
+}
+
+class AlreadyInShiftItem {
+  final String phone;
+  final String pointId;
+  final String customerId;
+  final String customerName;
+  final String locationStatus;
+
+  AlreadyInShiftItem({
+    required this.phone,
+    required this.pointId,
+    required this.customerId,
+    required this.customerName,
+    required this.locationStatus,
+  });
+
+  factory AlreadyInShiftItem.fromJson(Map<String, dynamic> json) {
+    return AlreadyInShiftItem(
+      phone: json['phone']?.toString() ?? '',
+      pointId: json['pointId']?.toString() ?? '',
+      customerId: json['customerId']?.toString() ?? '',
+      customerName: json['customerName']?.toString() ?? '',
+      locationStatus: json['locationStatus']?.toString() ?? '',
+    );
+  }
+}
+
+class RejectedPhoneItem {
+  final String phone;
+  final String reason;
+  final String message;
+
+  RejectedPhoneItem({
+    required this.phone,
+    required this.reason,
+    required this.message,
+  });
+
+  factory RejectedPhoneItem.fromJson(Map<String, dynamic> json) {
+    return RejectedPhoneItem(
+      phone: json['phone']?.toString() ?? '',
+      reason: json['reason']?.toString() ?? '',
+      message: json['message']?.toString() ?? '',
+    );
+  }
+}
+
+class BulkAddPointsResult {
+  final List<ShiftDeliveryPointModel> added;
+  final List<AlreadyInShiftItem> alreadyInShift;
+  final List<RejectedPhoneItem> rejected;
+  final BulkAddSummary summary;
+
+  BulkAddPointsResult({
+    required this.added,
+    required this.alreadyInShift,
+    required this.rejected,
+    required this.summary,
+  });
+
+  factory BulkAddPointsResult.fromJson(Map<String, dynamic> json) {
+    final rawAdded = json['added'];
+    List<ShiftDeliveryPointModel> addedList = [];
+    if (rawAdded is List) {
+      addedList = rawAdded
+          .whereType<Map<String, dynamic>>()
+          .map((p) => ShiftDeliveryPointModel.fromJson(p))
+          .toList();
+    }
+
+    final rawAlready = json['alreadyInShift'];
+    List<AlreadyInShiftItem> alreadyList = [];
+    if (rawAlready is List) {
+      alreadyList = rawAlready
+          .whereType<Map<String, dynamic>>()
+          .map((item) => AlreadyInShiftItem.fromJson(item))
+          .toList();
+    }
+
+    final rawRejected = json['rejected'];
+    List<RejectedPhoneItem> rejectedList = [];
+    if (rawRejected is List) {
+      rejectedList = rawRejected
+          .whereType<Map<String, dynamic>>()
+          .map((item) => RejectedPhoneItem.fromJson(item))
+          .toList();
+    }
+
+    return BulkAddPointsResult(
+      added: addedList,
+      alreadyInShift: alreadyList,
+      rejected: rejectedList,
+      summary: BulkAddSummary.fromJson(json['summary'] as Map<String, dynamic>?),
     );
   }
 }

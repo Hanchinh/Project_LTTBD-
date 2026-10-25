@@ -216,14 +216,23 @@ export const saveOrUpdateCustomerLocation = async (req: AuthenticatedRequest, re
         resultLocationId = updateRes.rows[0].id;
       }
 
-      // Synchronize full coordinates, notes, status, and image with active shift_delivery_points
+      // Synchronize photo with customer_photos if a new photo was uploaded
+      if (finalImageUrl && imageBase64) {
+        await client.query(
+          `INSERT INTO customer_photos (customer_id, image_url, created_by)
+           VALUES ($1, $2, $3)`,
+          [customerId, finalImageUrl, userId]
+        );
+      }
+
+      // Synchronize full coordinates, notes, status, and image with active shift_delivery_points of confirming shipper
       const userRole = req.user?.roleName;
-      let syncCondition = `(s.status = 'PREPARING' OR (s.status = 'IN_PROGRESS' AND s.shipper_id = $9))`;
+      let syncCondition = `s.shipper_id = $9 AND (s.status = 'PREPARING' OR s.status = 'IN_PROGRESS')`;
       if (userRole === 'ADMIN') {
         syncCondition = `(s.status = 'PREPARING' OR s.status = 'IN_PROGRESS')`;
       }
 
-      await client.query(
+      const syncRes = await client.query(
         `UPDATE shift_delivery_points sdp
          SET latitude = $1,
              longitude = $2,
@@ -240,17 +249,22 @@ export const saveOrUpdateCustomerLocation = async (req: AuthenticatedRequest, re
         [targetLat, targetLng, targetLat, targetLng, gpsAccuracy || 0, targetNotes, finalImageUrl, customerId, userId]
       );
 
-      // If photo was explicitly deleted, ensure all shift delivery points for this customer have image_url = NULL
+      const updatedShiftPointsCount = syncRes.rowCount || 0;
+
+      // If photo was explicitly deleted, ensure matching active shift delivery points have image_url = NULL
       if (deletePhoto === true) {
         await client.query(
-          `UPDATE shift_delivery_points
+          `UPDATE shift_delivery_points sdp
            SET image_url = NULL, updated_at = NOW()
-           WHERE customer_id = $1`,
-          [customerId]
+           FROM shifts s
+           WHERE sdp.shift_id = s.id
+             AND sdp.customer_id = $1
+             AND ${syncCondition}`,
+          userRole === 'ADMIN' ? [customerId] : [customerId, userId]
         );
       }
 
-      // Write audit log within the same transaction
+      // Write audit log within the same transaction (AGENTS.md rule 2.5 - Audit Integrity)
       await client.query(
         `INSERT INTO audit_logs (user_id, action, entity, entity_id, details) VALUES ($1, $2, $3, $4, $5)`,
         [
@@ -265,6 +279,7 @@ export const saveOrUpdateCustomerLocation = async (req: AuthenticatedRequest, re
             gpsAccuracy: gpsAccuracy || 0,
             notes: targetNotes,
             hasPhoto: !!finalImageUrl,
+            updatedShiftPointsCount,
           }),
         ]
       );
@@ -282,6 +297,7 @@ export const saveOrUpdateCustomerLocation = async (req: AuthenticatedRequest, re
           gpsAccuracy: gpsAccuracy || 0,
           identificationNotes: targetNotes,
           imageUrl: finalImageUrl,
+          updatedShiftPointsCount,
         },
       });
     } catch (dbError: any) {
@@ -372,8 +388,24 @@ export const lookupCustomerByPhone = async (req: AuthenticatedRequest, res: Resp
       [customer.id]
     );
 
+    // Lookup customer photos (up to 3 first, and total count)
+    const photosRes = await query(
+      `SELECT id, image_url as "imageUrl", created_at as "createdAt"
+       FROM customer_photos
+       WHERE customer_id = $1 AND deleted_at IS NULL
+       ORDER BY created_at DESC`,
+      [customer.id]
+    );
+
     const hasSaved = locRes.rows.length > 0;
     const loc = hasSaved ? locRes.rows[0] : null;
+
+    let photoCount = photosRes.rows.length;
+    let photos = photosRes.rows.slice(0, 3);
+    if (photoCount === 0 && loc?.image_url) {
+      photoCount = 1;
+      photos = [{ id: 'legacy', imageUrl: loc.image_url, createdAt: loc.created_at }];
+    }
 
     return res.json({
       success: true,
@@ -391,6 +423,8 @@ export const lookupCustomerByPhone = async (req: AuthenticatedRequest, res: Resp
           },
         },
         hasSavedLocation: hasSaved,
+        photoCount,
+        photos,
         location: loc
           ? {
               id: loc.id,
@@ -399,6 +433,8 @@ export const lookupCustomerByPhone = async (req: AuthenticatedRequest, res: Resp
               gpsAccuracy: parseFloat(loc.gps_accuracy),
               identificationNotes: loc.identification_notes,
               imageUrl: loc.image_url,
+              photoCount,
+              photos,
               updatedBy: loc.updated_by_name,
               updatedAt: loc.updated_at,
             }
@@ -421,8 +457,8 @@ export const servePhoto = async (req: AuthenticatedRequest, res: Response) => {
     return res.status(401).json({ success: false, message: 'Yêu cầu xác thực tài khoản' });
   }
 
-  // Strict validation of filename: only uuid + extension, preventing any ../ directory traversal
-  const safeFilenameRegex = /^[0-9a-fA-F-]{36}\.(jpg|jpeg|png|webp)$/;
+  // Strict validation of filename: only uuid or cust-photo-uuid + extension, preventing any ../ directory traversal
+  const safeFilenameRegex = /^(cust-photo-)?[0-9a-fA-F-]{36}\.(jpg|jpeg|png|webp)$/;
   if (!safeFilenameRegex.test(filename)) {
     return res.status(400).json({ success: false, message: 'Tên tệp không hợp lệ' });
   }
@@ -444,6 +480,8 @@ export const servePhoto = async (req: AuthenticatedRequest, res: Response) => {
          SELECT customer_id FROM location_history WHERE image_url LIKE '%' || $1
          UNION
          SELECT customer_id FROM shift_delivery_points WHERE image_url LIKE '%' || $1
+         UNION
+         SELECT customer_id FROM customer_photos WHERE image_url LIKE '%' || $1 AND deleted_at IS NULL
        ) photo_refs
        JOIN customers c ON c.id = photo_refs.customer_id`,
       [filename]
@@ -541,3 +579,231 @@ export const getLocationHistory = async (req: AuthenticatedRequest, res: Respons
     return res.status(500).json({ success: false, message: 'Lỗi lấy lịch sử vị trí', error: error.message });
   }
 };
+
+// 7. DELETE /api/v1/customers/:customerId/location - Shipper/Admin xóa vị trí đã lưu của khách hàng
+export const deleteCustomerLocation = async (req: AuthenticatedRequest, res: Response) => {
+  const { customerId } = req.params;
+  const userId = req.user?.userId;
+  const userRole = req.user?.roleName;
+
+  if (!userId) {
+    return res.status(401).json({ success: false, message: 'Chưa xác thực người dùng' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Kiểm tra vị trí đã lưu có tồn tại không
+    const locRes = await client.query(
+      `SELECT sl.id, sl.customer_id, sl.image_url, sl.created_by, sl.updated_by, c.area_id
+       FROM saved_locations sl
+       JOIN customers c ON c.id = sl.customer_id
+       WHERE sl.customer_id = $1`,
+      [customerId]
+    );
+
+    if (locRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Khách hàng này chưa có vị trí đã lưu' });
+    }
+
+    const loc = locRes.rows[0];
+    const locationId = loc.id;
+    const customerAreaId = loc.area_id;
+
+    // 2. Phân quyền:
+    // ADMIN được xóa mọi vị trí.
+    // SHIPPER chỉ được xóa vị trí do chính mình lưu (created_by hoặc updated_by) VÀ thuộc khu vực mình phụ trách.
+    if (userRole === 'SHIPPER') {
+      const isOwner = loc.created_by === userId || loc.updated_by === userId;
+      if (!isOwner) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({
+          success: false,
+          message: 'Bạn chỉ có quyền xóa vị trí do chính mình tạo hoặc cập nhật',
+        });
+      }
+
+      // Kiểm tra khu vực phụ trách
+      const areaCheck = await client.query(
+        `SELECT 1 FROM user_areas WHERE user_id = $1 AND area_id = $2`,
+        [userId, customerAreaId]
+      );
+      if (areaCheck.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({
+          success: false,
+          message: 'Khách hàng không thuộc khu vực bạn được phân công phụ trách',
+        });
+      }
+    }
+
+    // 3. Bảo toàn kiểm toán: Tách liên kết saved_location_id trong location_history trước khi xóa
+    await client.query(
+      `UPDATE location_history SET saved_location_id = NULL WHERE saved_location_id = $1`,
+      [locationId]
+    );
+
+    // 4. Xóa bản ghi trong saved_locations
+    await client.query(`DELETE FROM saved_locations WHERE id = $1`, [locationId]);
+
+    // 5. Điểm giao trong các ca đang chuẩn bị hoặc đang chạy của khách đó quay về NO_LOCATION
+    // QUY TẮC MỚI (TASK 012B):
+    // a. Chỉ đưa về NO_LOCATION những điểm giao đang VERIFIED. Điểm giao TEMPORARY phải được GIỮ NGUYÊN.
+    // b. Giới hạn theo ca của chính shipper đang xóa (và ca PREPARING/IN_PROGRESS).
+    let shiftRevertCondition = `s.shipper_id = $2 AND (s.status = 'PREPARING' OR s.status = 'IN_PROGRESS')`;
+    if (userRole === 'ADMIN') {
+      shiftRevertCondition = `(s.status = 'PREPARING' OR s.status = 'IN_PROGRESS')`;
+    }
+
+    const revertRes = await client.query(
+      `UPDATE shift_delivery_points sdp
+       SET location_status = 'NO_LOCATION',
+           latitude = NULL,
+           longitude = NULL,
+           geom = NULL,
+           gps_accuracy = 0,
+           identification_notes = NULL,
+           image_url = NULL,
+           updated_at = NOW()
+       FROM shifts s
+       WHERE sdp.shift_id = s.id
+         AND sdp.customer_id = $1
+         AND sdp.location_status = 'VERIFIED'
+         AND ${shiftRevertCondition}`,
+      userRole === 'ADMIN' ? [customerId] : [customerId, userId]
+    );
+
+    const revertedShiftPointsCount = revertRes.rowCount || 0;
+
+    // 6. Ghi nhật ký audit_logs (AGENTS.md rule 2.5 - Audit Integrity)
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, entity, entity_id, details)
+       VALUES ($1, 'DELETE_LOCATION', 'SAVED_LOCATION', $2, $3)`,
+      [
+        userId,
+        locationId,
+        JSON.stringify({
+          customerId,
+          deletedByRole: userRole,
+          revertedShiftPointsCount,
+        }),
+      ]
+    );
+
+    await client.query('COMMIT');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Xóa vị trí đã lưu thành công (lịch sử đối soát được bảo toàn)',
+      data: {
+        locationId,
+        customerId,
+        revertedShiftPointsCount,
+      },
+    });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi máy chủ khi xóa vị trí khách hàng',
+      error: error.message,
+    });
+  } finally {
+    client.release();
+  }
+};
+
+/**
+ * TASK: MASTER-MAP-014: Lấy danh sách toàn bộ vị trí đã lưu do chính shipper đăng nhập tạo/cập nhật
+ * Trả về danh sách điểm kèm tên, SĐT, ảnh, ghi chú để vẽ marker trên bản đồ chính độc lập với ca.
+ */
+export const getMySavedLocations = async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user?.userId;
+  const roleName = req.user?.roleName;
+
+  try {
+    let queryText = `
+      SELECT 
+        sl.id as location_id,
+        sl.latitude,
+        sl.longitude,
+        sl.gps_accuracy,
+        sl.identification_notes,
+        sl.image_url,
+        sl.created_at,
+        sl.updated_at,
+        c.id as customer_id,
+        c.customer_code,
+        c.full_name as customer_name,
+        c.phone_number as customer_phone,
+        c.address_text as customer_address,
+        a.id as area_id,
+        a.name as area_name,
+        COALESCE(cp_agg.photo_count, 0) as photo_count,
+        COALESCE(cp_agg.photos, '[]'::json) as photos
+      FROM saved_locations sl
+      JOIN customers c ON c.id = sl.customer_id
+      JOIN areas a ON a.id = c.area_id
+      LEFT JOIN LATERAL (
+        SELECT 
+          COUNT(*)::int as photo_count,
+          (
+            SELECT COALESCE(json_agg(photo_item), '[]'::json)
+            FROM (
+              SELECT id, image_url as "imageUrl", created_at as "createdAt"
+              FROM customer_photos
+              WHERE customer_id = sl.customer_id AND deleted_at IS NULL
+              ORDER BY created_at DESC
+              LIMIT 3
+            ) photo_item
+          ) as photos
+        FROM customer_photos
+        WHERE customer_id = sl.customer_id AND deleted_at IS NULL
+      ) cp_agg ON true
+    `;
+
+    const params: any[] = [];
+    if (roleName !== 'ADMIN') {
+      params.push(userId);
+      queryText += ` WHERE (sl.created_by = $1 OR sl.updated_by = $1)`;
+    }
+
+    queryText += ` ORDER BY sl.updated_at DESC`;
+
+    const result = await query(queryText, params);
+
+    return res.status(200).json({
+      success: true,
+      data: result.rows.map((row) => ({
+        id: row.location_id,
+        customerId: row.customer_id,
+        customerCode: row.customer_code,
+        customerName: row.customer_name,
+        customerPhone: row.customer_phone,
+        customerAddress: row.customer_address,
+        areaId: row.area_id,
+        areaName: row.area_name,
+        latitude: parseFloat(row.latitude),
+        longitude: parseFloat(row.longitude),
+        gpsAccuracy: parseFloat(row.gps_accuracy) || 0.0,
+        identificationNotes: row.identification_notes || '',
+        imageUrl: row.image_url || null,
+        photoCount: parseInt(row.photo_count, 10) || (row.image_url ? 1 : 0),
+        photos: (row.photos && row.photos.length > 0)
+          ? row.photos
+          : (row.image_url ? [{ id: 'legacy', imageUrl: row.image_url, createdAt: row.created_at }] : []),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi lấy danh sách vị trí đã lưu của shipper',
+      error: error.message,
+    });
+  }
+};
+
