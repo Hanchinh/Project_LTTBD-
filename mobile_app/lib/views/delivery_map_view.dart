@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/order_model.dart';
+import '../repositories/repository_provider.dart';
 import '../services/api_service.dart';
 import 'order_detail_view.dart';
 import 'save_location_view.dart';
@@ -86,7 +87,7 @@ class _DeliveryMapViewState extends State<DeliveryMapView> {
     });
 
     try {
-      final orders = await ApiService.getMyShiftOrders();
+      final orders = await RepositoryProvider.shift.getMyShiftOrders();
       if (!mounted) return;
 
       setState(() {
@@ -119,13 +120,13 @@ class _DeliveryMapViewState extends State<DeliveryMapView> {
 
   Future<void> _checkPendingSync() async {
     try {
-      final count = await ApiService.getPendingSyncCount();
+      final count = await RepositoryProvider.location.getPendingSyncCount();
       if (mounted) {
         setState(() => _pendingSyncCount = count);
       }
       if (count > 0) {
-        await ApiService.syncOfflineQueue();
-        final afterCount = await ApiService.getPendingSyncCount();
+        await RepositoryProvider.location.syncOfflineQueue();
+        final afterCount = await RepositoryProvider.location.getPendingSyncCount();
         if (mounted) {
           setState(() => _pendingSyncCount = afterCount);
         }
@@ -526,7 +527,7 @@ class _DeliveryMapViewState extends State<DeliveryMapView> {
     });
 
     try {
-      final result = await ApiService.lookupCustomerLocationByPhone(clean);
+      final result = await RepositoryProvider.customer.lookupCustomerLocationByPhone(clean);
       if (!mounted) return;
 
       setState(() {
@@ -712,7 +713,7 @@ class _DeliveryMapViewState extends State<DeliveryMapView> {
     setState(() => _isAddingOrder = true);
 
     try {
-      final res = await ApiService.addOrderToShift(customerId: custId);
+      final res = await RepositoryProvider.shift.addOrderToShift(customerId: custId);
       final order = res['order'] as OrderModel;
       final isExisting = res['isExisting'] == true;
 
@@ -787,7 +788,7 @@ class _DeliveryMapViewState extends State<DeliveryMapView> {
     );
 
     if (confirm == true) {
-      await ApiService.logout();
+      await RepositoryProvider.profile.logout();
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
@@ -1529,7 +1530,7 @@ class _DeliveryMapViewState extends State<DeliveryMapView> {
                     height: 110,
                     width: double.infinity,
                     child: FutureBuilder<Map<String, String>>(
-                      future: ApiService.getPhotoAuthInfo(loc.imageUrl!),
+                      future: RepositoryProvider.photo.getPhotoAuthInfo(loc.imageUrl!),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {
                           return Container(
@@ -1862,7 +1863,7 @@ class _DeliveryMapViewState extends State<DeliveryMapView> {
                     height: 100,
                     width: double.infinity,
                     child: FutureBuilder<Map<String, String>>(
-                      future: ApiService.getPhotoAuthInfo(loc['imageUrl']),
+                      future: RepositoryProvider.photo.getPhotoAuthInfo(loc['imageUrl']),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {
                           return Container(

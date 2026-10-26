@@ -556,6 +556,30 @@ Tất cả các lệnh dưới đây đã được thực thi trực tiếp trê
   - Build APK Debug: `flutter build apk --debug` thành công (`build\app\outputs\flutter-apk\app-debug.apk`, dung lượng 184.7 MB).
   - CSDL `delivery_db`: 100% nguyên vẹn, 0 request ghi dữ liệu nào vào API sống hay DB sống.
 
+### 3.13. Đợt Kiểm Thử Tách Lớp Dữ Liệu Local-First (LOCAL-FIRST-01-REPOSITORY-LAYER) - 26/10/2026
+
+- **Mục tiêu:** Kiểm tra toàn diện việc trừu tượng hóa tầng truy xuất dữ liệu từ `ApiService` sang các interface Repository ([CustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/customer_repository.dart), [LocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/location_repository.dart), [PhotoRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/photo_repository.dart), [ShiftRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/shift_repository.dart), [SharingRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/sharing_repository.dart), [ProfileRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/profile_repository.dart)), kiểm thử Dependency Injection qua [RepositoryProvider](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/repository_provider.dart) và đảm bảo 0 regression với 148 bài test trước đó.
+- **1. Phân tích tĩnh & Cú pháp:**
+  - Lệnh: `flutter analyze`
+  - Kết quả: **No issues found! (ran in 2.9s)** (0 errors, 0 warnings, 0 lints).
+- **2. Bộ kiểm thử mới ([local_first_repository_layer_01_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_repository_layer_01_test.dart)):**
+  - `1. RepositoryProvider mặc định khởi tạo RemoteRepository tương ứng`: **PASSED**.
+  - `2. RepositoryProvider hỗ trợ override bằng FakeRepository và reset`: **PASSED**.
+  - `3. Màn hình/Widget dùng đúng FakeShiftRepository được tiêm vào` (`CreateShiftBottomSheet`): **PASSED**.
+  - `4. RemoteProfileRepository và RemotePhotoRepository ủy quyền đúng sang ApiService`: **PASSED**.
+- **3. Toàn bộ kiểm thử Mobile App:**
+  - Lệnh: `flutter test`
+  - Kết quả: **152/152 tests passed (100%)**.
+  - Bảo toàn 100% assertions của toàn bộ test cũ, không thay đổi logic kiểm thử.
+- **4. Đóng gói & Build:**
+  - Lệnh: `flutter build apk --debug`
+  - Kết quả: **Thành công (Built build\app\outputs\flutter-apk\app-debug.apk in 27.3s)**.
+- **5. Môi trường Backend & Database:**
+  - Không thay đổi bất kỳ file nào trong `backend/` hay `admin_web/`.
+  - 0 request ghi dữ liệu vào CSDL sống `delivery_db`.
+- **6. Trạng thái kiểm thử:**
+  - **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
 ---
 
 ## 4. Quy Chuẩn Cách Ly Kiểm Thử (Strict Testing Isolation Policy)

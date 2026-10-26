@@ -4,6 +4,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/shift_model.dart';
+import '../repositories/repository_provider.dart';
 import '../services/api_service.dart';
 import 'crosshair_location_picker_view.dart';
 import '../widgets/point_detail_bottom_sheet.dart';
@@ -98,7 +99,7 @@ class _ShiftMapViewState extends State<ShiftMapView> {
     });
 
     try {
-      final shift = await ApiService.getShiftDetail(widget.shiftId);
+      final shift = await RepositoryProvider.shift.getShiftDetail(widget.shiftId);
       if (!mounted) return;
 
       setState(() {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 
 class AuthenticatedImage extends StatelessWidget {
   final String photoUrl;
@@ -28,7 +28,7 @@ class AuthenticatedImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget imageContent = FutureBuilder<Map<String, String>>(
-      future: ApiService.getPhotoAuthInfo(
+      future: RepositoryProvider.photo.getPhotoAuthInfo(
         photoUrl,
         cacheVersion: cacheVersion,
         bustCache: bustCache,

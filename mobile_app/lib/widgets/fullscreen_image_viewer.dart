@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 
 class FullscreenImageViewer extends StatefulWidget {
   final List<String> photoUrls;
@@ -99,7 +99,7 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                 final photoUrl = widget.photoUrls[index];
                 return Center(
                   child: FutureBuilder<Map<String, String>>(
-                    future: ApiService.getPhotoAuthInfo(
+                    future: RepositoryProvider.photo.getPhotoAuthInfo(
                       photoUrl,
                       cacheVersion: widget.cacheVersion,
                       bustCache: widget.cacheVersion == null,

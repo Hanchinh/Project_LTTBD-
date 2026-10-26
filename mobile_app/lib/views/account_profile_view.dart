@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
+import '../repositories/repository_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_buttons.dart';
 import 'change_password_view.dart';
@@ -33,9 +34,9 @@ class _AccountProfileViewState extends State<AccountProfileView> {
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
     try {
-      final user = await ApiService.getCurrentUser();
-      final areas = await ApiService.getMyAreas();
-      final stats = await ApiService.getMyStats();
+      final user = await RepositoryProvider.profile.getCurrentUser();
+      final areas = await RepositoryProvider.profile.getMyAreas();
+      final stats = await RepositoryProvider.profile.getMyStats();
       final baseUrl = await ApiService.getBaseUrl();
 
       if (mounted) {
@@ -228,7 +229,7 @@ class _AccountProfileViewState extends State<AccountProfileView> {
     );
 
     if (confirm == true) {
-      await ApiService.logout();
+      await RepositoryProvider.profile.logout();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const LoginView()),

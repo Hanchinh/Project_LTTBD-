@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import '../theme/app_buttons.dart';
 
 class ChangePasswordView extends StatefulWidget {
@@ -62,7 +62,7 @@ class _ChangePasswordViewState extends State<ChangePasswordView> {
     });
 
     try {
-      final res = await ApiService.changePassword(
+      final res = await RepositoryProvider.profile.changePassword(
         currentPassword: currentPass,
         newPassword: newPass,
         confirmPassword: confirmPass,

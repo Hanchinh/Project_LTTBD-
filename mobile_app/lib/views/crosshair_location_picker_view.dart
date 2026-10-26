@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/shift_model.dart';
+import '../repositories/repository_provider.dart';
 import '../services/api_service.dart';
 import '../services/map_tile_cache_service.dart';
 import '../theme/app_buttons.dart';
@@ -211,7 +212,7 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
   Future<void> _saveTemporaryLocation() async {
     setState(() => _isSaving = true);
     try {
-      final updatedPoint = await ApiService.updateTemporaryLocation(
+      final updatedPoint = await RepositoryProvider.location.updateTemporaryLocation(
         widget.shiftId,
         widget.point.id,
         latitude: _currentCrosshairCenter.latitude,

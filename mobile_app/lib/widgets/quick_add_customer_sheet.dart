@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/customer_model.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import '../theme/app_buttons.dart';
 
 /// Hàm chuẩn hóa số điện thoại theo định dạng chuẩn Việt Nam (10 chữ số)
@@ -86,15 +86,15 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
 
   Future<void> _loadAreas() async {
     try {
-      final areas = await ApiService.getMyAreas();
-      final preferred = await ApiService.getPreferredAreaId();
+      final areas = await RepositoryProvider.profile.getMyAreas();
+      final preferred = await RepositoryProvider.profile.getPreferredAreaId();
 
       bool preferredWasInvalid = false;
       if (preferred != null) {
         final isValidPreferred = areas.any((a) => a['id']?.toString() == preferred);
         if (!isValidPreferred) {
           // TASK: QUICK-ADD-013B: Khi đọc preferred_customer_area_id, so với getMyAreas(); nếu không còn hợp lệ thì xóa và hỏi chọn lại.
-          await ApiService.clearPreferredAreaId();
+          await RepositoryProvider.profile.clearPreferredAreaId();
           preferredWasInvalid = true;
         }
       }
@@ -118,7 +118,7 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
         targetId = areas.first['id']?.toString();
         targetName = areas.first['name']?.toString();
         if (targetId != null) {
-          await ApiService.setPreferredAreaId(targetId);
+          await RepositoryProvider.profile.setPreferredAreaId(targetId);
         }
       }
 
@@ -191,7 +191,7 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
         _selectedAreaName = selected['name']?.toString();
       });
       if (chosenId != null) {
-        await ApiService.setPreferredAreaId(chosenId);
+        await RepositoryProvider.profile.setPreferredAreaId(chosenId);
       }
     }
   }
@@ -271,7 +271,7 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
       final rawAddress = _addressCtrl.text.trim();
       final rawNotes = _notesCtrl.text.trim();
 
-      final created = await ApiService.createCustomer(
+      final created = await RepositoryProvider.customer.createCustomer(
         phoneNumber: cleanPhone,
         fullName: rawName.isNotEmpty ? rawName : 'Khách $cleanPhone',
         addressText: rawAddress.isNotEmpty ? rawAddress : 'Chưa cập nhật địa chỉ',

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/data_share_model.dart';
 import '../models/shift_model.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import '../theme/app_buttons.dart';
 
 /// Màn hình Quản lý Chia sẻ Dữ liệu giữa các Shipper (TASK: DATA-SHARING-BETWEEN-SHIPPERS-023)
@@ -43,7 +43,7 @@ class _DataSharingViewState extends State<DataSharingView> with SingleTickerProv
       _outgoingError = null;
     });
     try {
-      final list = await ApiService.getOutgoingShares();
+      final list = await RepositoryProvider.sharing.getOutgoingShares();
       if (mounted) {
         setState(() {
           _outgoingShares = list;
@@ -66,7 +66,7 @@ class _DataSharingViewState extends State<DataSharingView> with SingleTickerProv
       _incomingError = null;
     });
     try {
-      final list = await ApiService.getIncomingShares();
+      final list = await RepositoryProvider.sharing.getIncomingShares();
       if (mounted) {
         setState(() {
           _incomingShares = list;
@@ -219,7 +219,7 @@ class _DataSharingViewState extends State<DataSharingView> with SingleTickerProv
                                     loadingShifts = true;
                                   });
                                   try {
-                                    final shifts = await ApiService.getShifts();
+                                    final shifts = await RepositoryProvider.shift.getShifts();
                                     setModalState(() {
                                       myShifts = shifts;
                                       if (myShifts.isNotEmpty) {
@@ -338,7 +338,7 @@ class _DataSharingViewState extends State<DataSharingView> with SingleTickerProv
                           onPressed: () async {
                             if (!formKey.currentState!.validate()) return;
                             try {
-                              await ApiService.createShare(
+                              await RepositoryProvider.sharing.createShare(
                                 recipientPhone: phoneController.text.trim(),
                                 scope: scope,
                                 shiftId: selectedShiftId,
@@ -402,7 +402,7 @@ class _DataSharingViewState extends State<DataSharingView> with SingleTickerProv
 
     if (confirm == true) {
       try {
-        await ApiService.revokeShare(share.id);
+        await RepositoryProvider.sharing.revokeShare(share.id);
         _showSnackBar('Đã dừng chia sẻ dữ liệu thành công');
         _loadOutgoing();
       } catch (e) {
@@ -414,7 +414,7 @@ class _DataSharingViewState extends State<DataSharingView> with SingleTickerProv
   /// Xử lý chấp nhận lời mời
   Future<void> _handleAcceptShare(DataShareModel share) async {
     try {
-      await ApiService.acceptShare(share.id);
+      await RepositoryProvider.sharing.acceptShare(share.id);
       _showSnackBar('Đã chấp nhận lời mời chia sẻ dữ liệu');
       _loadIncoming();
     } catch (e) {
@@ -450,7 +450,7 @@ class _DataSharingViewState extends State<DataSharingView> with SingleTickerProv
 
     if (confirm == true) {
       try {
-        await ApiService.declineShare(share.id);
+        await RepositoryProvider.sharing.declineShare(share.id);
         _showSnackBar('Đã từ chối lời mời chia sẻ');
         _loadIncoming();
       } catch (e) {
@@ -524,7 +524,7 @@ class _DataSharingViewState extends State<DataSharingView> with SingleTickerProv
 
     if (confirm == true) {
       try {
-        final result = await ApiService.importSharedLocations(
+        final result = await RepositoryProvider.sharing.importSharedLocations(
           share.id,
           all: true,
           replaceExisting: replaceExisting,

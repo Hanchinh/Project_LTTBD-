@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/shift_model.dart';
 import '../models/customer_model.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import '../theme/app_buttons.dart';
 import 'create_shift_dialog.dart';
 
@@ -104,7 +104,7 @@ class _BulkPastePhoneSheetState extends State<BulkPastePhoneSheet> {
 
   Future<void> _loadAreas() async {
     try {
-      final areas = await ApiService.getMyAreas();
+      final areas = await RepositoryProvider.profile.getMyAreas();
       if (!mounted) return;
       setState(() {
         _availableAreas = areas;
@@ -198,7 +198,7 @@ class _BulkPastePhoneSheetState extends State<BulkPastePhoneSheet> {
     try {
       if (widget.isDirectoryMode) {
         // Thêm vào danh bạ khách hàng
-        final dirResult = await ApiService.createBulkCustomers(
+        final dirResult = await RepositoryProvider.customer.createBulkCustomers(
           rawText: _textCtrl.text,
           areaId: _selectedAreaId,
         );
@@ -212,7 +212,7 @@ class _BulkPastePhoneSheetState extends State<BulkPastePhoneSheet> {
         });
       } else {
         // Thêm vào ca làm việc
-        final result = await ApiService.addBulkPointsToShift(
+        final result = await RepositoryProvider.shift.addBulkPointsToShift(
           shiftId: widget.shiftId!,
           rawText: _textCtrl.text,
           areaId: _selectedAreaId,
@@ -257,7 +257,7 @@ class _BulkPastePhoneSheetState extends State<BulkPastePhoneSheet> {
     setState(() => _isAddingToShift = true);
 
     try {
-      final shifts = await ApiService.getShifts();
+      final shifts = await RepositoryProvider.shift.getShifts();
       final candidateShifts = shifts
           .where((s) => s.status == ShiftStatus.preparing || s.status == ShiftStatus.inProgress)
           .toList();
@@ -359,7 +359,7 @@ class _BulkPastePhoneSheetState extends State<BulkPastePhoneSheet> {
       }
 
       // Thêm toàn bộ SĐT vào ca đã chọn
-      final bulkAddRes = await ApiService.addBulkPointsToShift(
+      final bulkAddRes = await RepositoryProvider.shift.addBulkPointsToShift(
         shiftId: targetShift.id,
         phones: allPhones,
       );

@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/customer_model.dart';
 import '../models/location_model.dart';
 import '../models/shift_model.dart';
+import '../repositories/repository_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/quick_add_customer_sheet.dart';
 import '../widgets/point_detail_bottom_sheet.dart';
@@ -160,8 +161,8 @@ class MainMapViewState extends State<MainMapView> {
 
     try {
       final futures = await Future.wait([
-        ApiService.getMySavedLocations(),
-        ApiService.getCustomers().catchError((_) => <CustomerDirectoryModel>[]),
+        RepositoryProvider.location.getMySavedLocations(),
+        RepositoryProvider.customer.getCustomers().catchError((_) => <CustomerDirectoryModel>[]),
       ]);
 
       if (!mounted) return;
@@ -217,7 +218,7 @@ class MainMapViewState extends State<MainMapView> {
   Future<void> _loadSharedLocations() async {
     setState(() => _isLoadingShared = true);
     try {
-      final res = await ApiService.getSharedLocations();
+      final res = await RepositoryProvider.sharing.getSharedLocations();
       if (!mounted) return;
       setState(() {
         _sharedLocations = (res['locations'] as List).cast<SharedLocationPointModel>();
@@ -335,7 +336,7 @@ class MainMapViewState extends State<MainMapView> {
 
     if (confirm == true) {
       try {
-        final res = await ApiService.importSharedLocations(
+        final res = await RepositoryProvider.sharing.importSharedLocations(
           point.shareId,
           customerIds: [point.customerId],
           all: false,
@@ -1013,7 +1014,7 @@ class MainMapViewState extends State<MainMapView> {
     try {
       if (customerId == null) {
         // 1. Tra cứu khách hàng theo SĐT xem đã có trong CSDL chưa
-        final lookup = await ApiService.lookupCustomerLocationByPhone(phone);
+        final lookup = await RepositoryProvider.customer.lookupCustomerLocationByPhone(phone);
 
         if (lookup != null && lookup['customer'] != null) {
           // Khách hàng đã tồn tại trong CSDL
@@ -1062,8 +1063,8 @@ class MainMapViewState extends State<MainMapView> {
           }
         } else {
           // Khách hàng chưa có trong hệ thống -> Tự tạo hồ sơ khách hàng mới (TASK: MASTER-MAP-014 Điểm 4)
-          final preferredAreaId = await ApiService.getPreferredAreaId();
-          final newCust = await ApiService.createCustomer(
+          final preferredAreaId = await RepositoryProvider.profile.getPreferredAreaId();
+          final newCust = await RepositoryProvider.customer.createCustomer(
             phoneNumber: phone,
             fullName: fullName.isNotEmpty ? fullName : null,
             areaId: preferredAreaId,
@@ -1075,7 +1076,7 @@ class MainMapViewState extends State<MainMapView> {
       }
 
       // 2. Ghi tọa độ tâm ngắm vào saved_locations (Vị trí lưu là ĐÃ XÁC NHẬN)
-      await ApiService.updateCustomerLocationAndPhoto(
+      await RepositoryProvider.location.updateCustomerLocationAndPhoto(
         customerId: customerId,
         latitude: targetCoord.latitude,
         longitude: targetCoord.longitude,

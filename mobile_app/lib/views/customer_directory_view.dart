@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/customer_model.dart';
 import '../models/shift_model.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import '../widgets/quick_add_customer_sheet.dart';
 import '../widgets/authenticated_image.dart';
 import '../widgets/customer_photos_strip_widget.dart';
@@ -84,7 +84,7 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
         statusParam = _selectedFilter;
       }
 
-      final res = await ApiService.getCustomersResponse(
+      final res = await RepositoryProvider.customer.getCustomersResponse(
         query: _searchController.text.trim(),
         status: statusParam,
         limit: _pageSize,
@@ -119,7 +119,7 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
         statusParam = _selectedFilter;
       }
 
-      final res = await ApiService.getCustomersResponse(
+      final res = await RepositoryProvider.customer.getCustomersResponse(
         query: _searchController.text.trim(),
         status: statusParam,
         limit: _pageSize,
@@ -152,7 +152,7 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
   Future<void> _handleAddCustomerToShift(CustomerDirectoryModel customer) async {
     try {
       // 1. Tải danh sách ca hiện có của shipper
-      final shifts = await ApiService.getShifts();
+      final shifts = await RepositoryProvider.shift.getShifts();
       // Ca ứng viên: PREPARING hoặc IN_PROGRESS
       final candidateShifts = shifts
           .where((s) => s.status == ShiftStatus.preparing || s.status == ShiftStatus.inProgress)
@@ -270,7 +270,7 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
   /// Thực thi gọi API thêm khách vào ca và xử lý Hoàn tác / Trùng lặp
   Future<void> _executeAddCustomerToShift(ShiftModel shift, CustomerDirectoryModel customer) async {
     try {
-      final res = await ApiService.addPointToShift(
+      final res = await RepositoryProvider.shift.addPointToShift(
         shift.id,
         customerId: customer.id,
       );
@@ -305,7 +305,7 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
                   textColor: Colors.white,
                   onPressed: () async {
                     try {
-                      await ApiService.removePointFromShift(shift.id, point.id);
+                      await RepositoryProvider.shift.removePointFromShift(shift.id, point.id);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
@@ -369,7 +369,7 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
             _fetchCustomers(reset: true);
             if (widget.activeShift != null) {
               try {
-                final shift = await ApiService.getShiftDetail(widget.activeShift!.id);
+                final shift = await RepositoryProvider.shift.getShiftDetail(widget.activeShift!.id);
                 widget.onShiftUpdated?.call(shift);
               } catch (_) {}
             }
@@ -878,7 +878,7 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
 
     setState(() => _isSaving = true);
     try {
-      await ApiService.deleteCustomerLocation(_customer.id);
+      await RepositoryProvider.location.deleteCustomerLocation(_customer.id);
 
       setState(() {
         _currentLat = null;
@@ -897,7 +897,7 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
         ),
       );
 
-      final updated = await ApiService.getCustomerDetail(_customer.id);
+      final updated = await RepositoryProvider.customer.getCustomerDetail(_customer.id);
       widget.onCustomerUpdated?.call(updated);
     } catch (e) {
       if (!mounted) return;
@@ -959,7 +959,7 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
 
     try {
       // 1. Cập nhật thông tin khách hàng
-      await ApiService.updateCustomer(
+      await RepositoryProvider.customer.updateCustomer(
         customerId: _customer.id,
         fullName: name,
         phoneNumber: phone,
@@ -968,7 +968,7 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
 
       // 2. Nếu có cập nhật vị trí hoặc ảnh
       if (_currentLat != null && _currentLng != null) {
-        await ApiService.updateCustomerLocationAndPhoto(
+        await RepositoryProvider.location.updateCustomerLocationAndPhoto(
           customerId: _customer.id,
           latitude: _currentLat!,
           longitude: _currentLng!,
@@ -980,7 +980,7 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
       }
 
       // 3. Tải lại chi tiết mới nhất
-      final updated = await ApiService.getCustomerDetail(_customer.id);
+      final updated = await RepositoryProvider.customer.getCustomerDetail(_customer.id);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

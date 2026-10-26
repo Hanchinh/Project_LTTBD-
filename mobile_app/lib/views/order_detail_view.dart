@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/order_model.dart';
 import '../models/location_model.dart';
+import '../repositories/repository_provider.dart';
 import '../services/api_service.dart';
 import 'save_location_view.dart';
 
@@ -34,7 +35,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
     });
 
     try {
-      final result = await ApiService.lookupCustomerLocationByPhone(widget.order.customerPhone);
+      final result = await RepositoryProvider.customer.lookupCustomerLocationByPhone(widget.order.customerPhone);
       if (!mounted) return;
 
       if (result != null && result['hasSavedLocation'] == true) {
@@ -230,7 +231,7 @@ class _OrderDetailViewState extends State<OrderDetailView> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: FutureBuilder<Map<String, String>>(
-                      future: ApiService.getPhotoAuthInfo(loc.imageUrl!),
+                      future: RepositoryProvider.photo.getPhotoAuthInfo(loc.imageUrl!),
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {
                           return Container(

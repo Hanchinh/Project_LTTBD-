@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../repositories/repository_provider.dart';
 import '../services/api_service.dart';
 import '../theme/app_buttons.dart';
 import 'home_shell_view.dart';
@@ -26,7 +27,7 @@ class _LoginViewState extends State<LoginView> {
   }
 
   Future<void> _loadSavedPhone() async {
-    final savedPhone = await ApiService.getSavedLoginPhone();
+    final savedPhone = await RepositoryProvider.profile.getSavedLoginPhone();
     if (savedPhone != null && savedPhone.isNotEmpty && mounted) {
       setState(() {
         _phoneController.text = savedPhone;
@@ -78,7 +79,7 @@ class _LoginViewState extends State<LoginView> {
     final password = _passwordController.text;
 
     try {
-      final user = await ApiService.login(phone, password);
+      final user = await RepositoryProvider.profile.login(phone, password);
 
       if (!mounted) return;
 

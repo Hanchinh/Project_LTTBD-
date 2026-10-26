@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/shift_model.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import '../theme/app_buttons.dart';
 
 /// Hộp thoại tạo ca làm việc nhanh từ bản đồ chính (TASK: SHIFT-FROM-MAP-AND-BULK-PASTE-015B)
@@ -39,7 +39,7 @@ class _CreateShiftBottomSheetState extends State<CreateShiftBottomSheet> {
 
   Future<void> _checkExistingShiftsForDeduplication() async {
     try {
-      final shifts = await ApiService.getShifts();
+      final shifts = await RepositoryProvider.shift.getShifts();
       if (!mounted) return;
       final existingNames = shifts
           .map((s) => s.shiftName?.trim() ?? s.displayTitle.trim())
@@ -71,7 +71,7 @@ class _CreateShiftBottomSheetState extends State<CreateShiftBottomSheet> {
       if (nameText.isEmpty) {
         nameText = _suggestedName.isNotEmpty ? _suggestedName : ShiftModel.suggestShiftName();
       }
-      final newShift = await ApiService.createShift(
+      final newShift = await RepositoryProvider.shift.createShift(
         shiftName: nameText,
       );
       if (!mounted) return;

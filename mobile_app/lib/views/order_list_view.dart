@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
 import '../models/order_model.dart';
+import '../repositories/repository_provider.dart';
 import 'delivery_map_view.dart';
 import 'order_detail_view.dart';
 import 'login_view.dart';
@@ -24,21 +24,21 @@ class _OrderListViewState extends State<OrderListView> {
 
   void _refreshOrders() {
     setState(() {
-      _ordersFuture = ApiService.getMyShiftOrders();
+      _ordersFuture = RepositoryProvider.shift.getMyShiftOrders();
     });
     _checkPendingSync();
   }
 
   Future<void> _checkPendingSync() async {
-    final count = await ApiService.getPendingSyncCount();
+    final count = await RepositoryProvider.location.getPendingSyncCount();
     if (mounted) {
       setState(() {
         _pendingSyncCount = count;
       });
     }
     if (count > 0) {
-      await ApiService.syncOfflineQueue();
-      final afterCount = await ApiService.getPendingSyncCount();
+      await RepositoryProvider.location.syncOfflineQueue();
+      final afterCount = await RepositoryProvider.location.getPendingSyncCount();
       if (mounted) {
         setState(() {
           _pendingSyncCount = afterCount;
@@ -65,7 +65,7 @@ class _OrderListViewState extends State<OrderListView> {
     );
 
     if (confirm == true) {
-      await ApiService.logout();
+      await RepositoryProvider.profile.logout();
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,

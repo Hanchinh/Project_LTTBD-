@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/shift_model.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import 'crosshair_location_picker_view.dart';
 import 'shift_map_view.dart';
 import '../widgets/quick_add_customer_sheet.dart';
@@ -49,7 +49,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
   Future<void> _refreshShiftDetail() async {
     setState(() => _isLoading = true);
     try {
-      final updated = await ApiService.getShiftDetail(_currentShift.id);
+      final updated = await RepositoryProvider.shift.getShiftDetail(_currentShift.id);
       if (mounted) {
         setState(() {
           _currentShift = updated;
@@ -88,7 +88,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
 
     try {
       // 1. Tra cứu khách hàng qua API
-      final lookupResult = await ApiService.lookupCustomerLocationByPhone(phone);
+      final lookupResult = await RepositoryProvider.customer.lookupCustomerLocationByPhone(phone);
 
       if (lookupResult == null || lookupResult['customer'] == null) {
         // Khách hàng chưa có hồ sơ trong hệ thống: Mở luồng tạo nhanh hồ sơ (Giai đoạn B)
@@ -101,7 +101,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
       final customerId = customer['id']?.toString() ?? '';
 
       // 2. Thêm vào ca làm việc
-      final addResult = await ApiService.addPointToShift(
+      final addResult = await RepositoryProvider.shift.addPointToShift(
         _currentShift.id,
         customerId: customerId,
         deliveryNotes: 'Thêm thủ công qua SĐT $phone',
@@ -182,7 +182,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
     setState(() => _isAddingPoint = true);
 
     try {
-      final addResult = await ApiService.addPointToShift(
+      final addResult = await RepositoryProvider.shift.addPointToShift(
         _currentShift.id,
         customerId: customer.id,
         deliveryNotes: 'Thêm khách hàng qua hồ sơ',
@@ -280,7 +280,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
     if (confirm != true) return;
 
     try {
-      await ApiService.removePointFromShift(_currentShift.id, point.id);
+      await RepositoryProvider.shift.removePointFromShift(_currentShift.id, point.id);
       _refreshShiftDetail();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -304,7 +304,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
 
   Future<void> _updateShiftStatus(ShiftStatus newStatus) async {
     try {
-      final updated = await ApiService.updateShiftStatus(_currentShift.id, newStatus);
+      final updated = await RepositoryProvider.shift.updateShiftStatus(_currentShift.id, newStatus);
       if (mounted) {
         setState(() => _currentShift = updated);
         ScaffoldMessenger.of(context).showSnackBar(

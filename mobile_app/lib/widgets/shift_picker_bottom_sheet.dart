@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/shift_model.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import '../views/shift_map_view.dart';
 import 'create_shift_dialog.dart';
 import '../theme/app_buttons.dart';
@@ -54,7 +54,7 @@ class _ShiftPickerBottomSheetState extends State<ShiftPickerBottomSheet> {
     });
 
     try {
-      final list = await ApiService.getShifts();
+      final list = await RepositoryProvider.shift.getShifts();
       // Sắp xếp mới nhất trước (theo createdAt giảm dần, fallback shiftDate)
       list.sort((a, b) {
         if (a.createdAt != null && b.createdAt != null) {
@@ -155,7 +155,7 @@ class _ShiftPickerBottomSheetState extends State<ShiftPickerBottomSheet> {
 
     if (newName != null && newName.isNotEmpty && newName != shift.shiftName) {
       try {
-        final updated = await ApiService.updateShiftName(shift.id, newName);
+        final updated = await RepositoryProvider.shift.updateShiftName(shift.id, newName);
         if (!mounted) return;
         setState(() {
           final idx = _shifts.indexWhere((s) => s.id == shift.id);
@@ -218,7 +218,7 @@ class _ShiftPickerBottomSheetState extends State<ShiftPickerBottomSheet> {
 
     if (confirm == true) {
       try {
-        await ApiService.deleteShift(shift.id);
+        await RepositoryProvider.shift.deleteShift(shift.id);
         if (!mounted) return;
         setState(() {
           _shifts.removeWhere((s) => s.id == shift.id);

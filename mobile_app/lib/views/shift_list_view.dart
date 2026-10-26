@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/shift_model.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import '../widgets/create_shift_dialog.dart';
 import '../widgets/bulk_paste_phone_sheet.dart';
 import 'shift_preparation_view.dart';
@@ -40,7 +40,7 @@ class _ShiftListViewState extends State<ShiftListView> {
     });
 
     try {
-      final list = await ApiService.getShifts();
+      final list = await RepositoryProvider.shift.getShifts();
       // Sắp xếp: mới nhất trước (theo createdAt giảm dần, fallback shiftDate)
       list.sort((a, b) {
         if (a.createdAt != null && b.createdAt != null) {
@@ -177,7 +177,7 @@ class _ShiftListViewState extends State<ShiftListView> {
 
     if (newName != null && newName.isNotEmpty && newName != shift.shiftName) {
       try {
-        await ApiService.updateShiftName(shift.id, newName);
+        await RepositoryProvider.shift.updateShiftName(shift.id, newName);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -235,7 +235,7 @@ class _ShiftListViewState extends State<ShiftListView> {
 
     if (confirm == true) {
       try {
-        await ApiService.deleteShift(shift.id);
+        await RepositoryProvider.shift.deleteShift(shift.id);
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -290,7 +290,7 @@ class _ShiftListViewState extends State<ShiftListView> {
     );
 
     if (confirm == true) {
-      await ApiService.logout();
+      await RepositoryProvider.profile.logout();
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,

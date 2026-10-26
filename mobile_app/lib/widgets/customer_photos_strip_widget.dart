@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/customer_photo_model.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import 'authenticated_image.dart';
 import 'fullscreen_image_viewer.dart';
 
@@ -78,7 +78,7 @@ class _CustomerPhotosStripWidgetState extends State<CustomerPhotosStripWidget> {
     if (widget.customerId.isEmpty) return;
     setState(() => _isLoading = true);
     try {
-      final remotePhotos = await ApiService.getCustomerPhotos(widget.customerId);
+      final remotePhotos = await RepositoryProvider.photo.getCustomerPhotos(widget.customerId);
       if (mounted) {
         setState(() {
           _photos = remotePhotos;
@@ -171,7 +171,7 @@ class _CustomerPhotosStripWidgetState extends State<CustomerPhotosStripWidget> {
       final mime = (ext == 'png') ? 'image/png' : (ext == 'webp' ? 'image/webp' : 'image/jpeg');
       final base64String = 'data:$mime;base64,${base64Encode(bytes)}';
 
-      final newPhoto = await ApiService.addCustomerPhoto(widget.customerId, base64String);
+      final newPhoto = await RepositoryProvider.photo.addCustomerPhoto(widget.customerId, base64String);
 
       // Xóa cache ảnh để toàn bộ app nạp ảnh mới lập tức
       PaintingBinding.instance.imageCache.clear();
@@ -255,7 +255,7 @@ class _CustomerPhotosStripWidgetState extends State<CustomerPhotosStripWidget> {
     if (confirm != true) return;
 
     try {
-      await ApiService.deleteCustomerPhoto(widget.customerId, photo.id);
+      await RepositoryProvider.photo.deleteCustomerPhoto(widget.customerId, photo.id);
 
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();

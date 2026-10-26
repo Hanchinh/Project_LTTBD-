@@ -12,7 +12,7 @@
 | **Database (PostGIS)** | Đạt ([01-init-db.sql](file:///d:/flutter create delivery_marker_app/init-db/01-init-db.sql), [02-add-photo-and-fix-history.sql](file:///d:/flutter create delivery_marker_app/init-db/02-add-photo-and-fix-history.sql), [04-create-shifts-and-delivery-points.sql](file:///d:/flutter create delivery_marker_app/init-db/04-create-shifts-and-delivery-points.sql)) | Đạt (Schema PostGIS, Trigger ảnh, Quản lý Ca làm việc & Điểm giao) | Đã bổ sung bảng `shifts` và `shift_delivery_points`, hỗ trợ 3 trạng thái vị trí `VERIFIED`, `TEMPORARY`, `NO_LOCATION`, kích hoạt extension `unaccent` |
 | **Backend API** | Đạt ([app.ts](file:///d:/flutter create delivery_marker_app/backend/src/app.ts), TypeScript 5.4.5) | **Đạt** (66/66 tests: [shifts.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/shifts.spec.ts), [orders.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/orders.spec.ts), [location.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/location.spec.ts), [auth.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/auth.spec.ts)) | Hoạt động 23 endpoints (bao gồm Geocoding Search, Tạo nhanh khách hàng & thêm vào ca, 8 API Ca làm việc, ghim tạm, xác minh cổng nhà) |
 | **Admin Web** | Đạt ([client.ts](file:///d:/flutter create delivery_marker_app/admin_web/src/api/client.ts), TypeScript 5.2.2) | Đã cập nhật UI hỗ trợ ảnh và tạo tài khoản mới | Hoạt động 5 trang giao diện chính, đã cấu hình [nginx.conf](file:///d:/flutter create delivery_marker_app/admin_web/nginx.conf) |
-| **Mobile App (Flutter)** | Đạt chuẩn Flutter/Dart SDK `>=3.0.0 <4.0.0` | **Đạt** (Kiểm thử tự động: [shift_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/shift_test.dart), [widget_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/widget_test.dart), [sqlite_migration_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/sqlite_migration_test.dart)) | **Đã kích hoạt:** Tạo nhanh khách hàng chưa có hồ sơ, Tìm kiếm địa chỉ bằng Geocoding trong bộ chọn tâm ngắm, Bản đồ ca làm thật, loại bỏ marker demo |
+| **Mobile App (Flutter)** | Đạt chuẩn Flutter/Dart SDK `>=3.0.0 <4.0.0`, build APK debug thành công ([app-debug.apk](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/build/app/outputs/flutter-apk/app-debug.apk)) | **Đạt** (152/152 tests: [local_first_repository_layer_01_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_repository_layer_01_test.dart), [ui_overflow_fix_024_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/ui_overflow_fix_024_test.dart), [shift_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/shift_test.dart), [widget_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/widget_test.dart)) | **Đã kích hoạt:** Tách hoàn toàn tầng Repository (Local-First 01), Tạo nhanh khách hàng chưa có hồ sơ, Tìm kiếm địa chỉ bằng Geocoding trong bộ chọn tâm ngắm, Bản đồ ca làm thật |
 
 ---
 
@@ -1358,6 +1358,90 @@
   * `flutter test`: **148/148 tests passed** (100% đạt).
 - **Trạng Thái Kiểm Thử Thiết Bị Thực Tế:**
   * **ĐÃ TEST trên widget test tự động / CHƯA thử trên điện thoại thật.**
+
+---
+
+## 15. Tách Lớp Dữ Liệu Phục Vụ Kiến Trúc Local-First (LOCAL-FIRST-01-REPOSITORY-LAYER)
+
+> **Nhánh:** `local-first`  
+> **Mục tiêu:** Tách triệt để sự phụ thuộc trực tiếp vào `ApiService` sang các lớp Repository trừu tượng, mở đường cho việc lưu trữ dữ liệu hoàn toàn trên thiết bị (SQLite/Drift/Isar/local database) mà không bắt buộc đăng nhập hay phụ thuộc backend API trực tuyến. Backend và Admin Web giữ nguyên để sẵn sàng đồng bộ sau này.
+
+### 15.1. Bảng Khảo Sát Gọi ApiService & Phân Nhóm Repository
+
+Chi tiết phân tích toàn bộ 101 điểm gọi trong `mobile_app/lib` được lưu tại [docs/LOCAL_FIRST_PLAN.md](file:///d:/flutter%20create%20delivery_marker_app/docs/LOCAL_FIRST_PLAN.md). Toàn bộ được chia làm 6 nhóm trừu tượng chính:
+
+| Nhóm Repository | Interface Trừu Tượng | Triển Khai Remote (Wrapper ApiService) | Số Phương Thức Nghiệp Vụ |
+| :--- | :--- | :--- | :--- |
+| **Khách Hàng (Customer)** | [CustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/customer_repository.dart) | [RemoteCustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_customer_repository.dart) | 6 (getCustomers, getCustomersResponse, getCustomerDetail, createCustomer, createBulkCustomers, updateCustomer, lookupCustomerLocationByPhone) |
+| **Vị Trí & Tọa Độ (Location)** | [LocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/location_repository.dart) | [RemoteLocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_location_repository.dart) | 8 (saveLocation, deleteLocation, getNearbyMarkers, getLocationsInBounds, getAreas, updateTemporaryLocation, verifyHomeGate, recordDeliveryAttempt) |
+| **Hình Ảnh (Photo)** | [PhotoRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/photo_repository.dart) | [RemotePhotoRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_photo_repository.dart) | 4 (getCustomerPhotos, addCustomerPhoto, deleteCustomerPhoto, getPhotoAuthInfo) |
+| **Ca Làm Việc (Shift)** | [ShiftRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/shift_repository.dart) | [RemoteShiftRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_shift_repository.dart) | 10 (getShifts, getShiftDetail, createShift, updateShiftName, updateShiftStatus, deleteShift, addPointToShift, addBulkPointsToShift, removePointFromShift, getMyShiftOrders, addOrderToShift) |
+| **Chia Sẻ Dữ Liệu (Sharing)** | [SharingRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/sharing_repository.dart) | [RemoteSharingRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_sharing_repository.dart) | 4 (createShare, getIncomingShares, getOutgoingShares, revokeShare) |
+| **Tài Khoản & Hồ Sơ (Profile)** | [ProfileRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/profile_repository.dart) | [RemoteProfileRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_profile_repository.dart) | 5 (login, logout, getProfile, changePassword, getSavedLoginPhone) |
+
+### 15.2. Cấu Trúc Service Locator (RepositoryProvider)
+
+- Tệp: [repository_provider.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/repository_provider.dart)
+- Đặc điểm:
+  - Siêu nhẹ, thuần Dart/Flutter, không dùng thêm thư viện cồng kềnh.
+  - Cung cấp getter tĩnh đến 6 nhóm repository: `RepositoryProvider.customer`, `RepositoryProvider.location`, `RepositoryProvider.photo`, `RepositoryProvider.shift`, `RepositoryProvider.sharing`, `RepositoryProvider.profile`.
+  - Mặc định trỏ đến các `Remote...Repository` $\rightarrow$ Hành vi của App với Backend được giữ nguyên 100%.
+  - Hỗ trợ phương thức `overrideRepositories(...)` và `reset()` phục vụ kiểm thử đơn vị hoặc cắm `Local...Repository` trong các bước tiếp theo.
+
+### 15.3. Các Màn Hình & Widget Đã Chuyển Đổi Sang Repository
+
+Tất cả các màn hình, sheet và widget nghiệp vụ trong `mobile_app/lib` đã được chuyển đổi hoàn toàn sang gọi qua `RepositoryProvider`:
+1. **Hình ảnh:**
+   - [customer_photos_strip_widget.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/customer_photos_strip_widget.dart)
+   - [authenticated_image.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/authenticated_image.dart)
+   - [fullscreen_image_viewer.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/fullscreen_image_viewer.dart)
+2. **Tài khoản / Hồ sơ:**
+   - [login_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/login_view.dart)
+   - [account_profile_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/account_profile_view.dart)
+   - [change_password_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/change_password_view.dart)
+3. **Ca làm việc:**
+   - [shift_list_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/shift_list_view.dart)
+   - [create_shift_dialog.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/create_shift_dialog.dart)
+   - [shift_picker_bottom_sheet.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/shift_picker_bottom_sheet.dart)
+   - [shift_preparation_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/shift_preparation_view.dart)
+   - [shift_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/shift_map_view.dart)
+4. **Chia sẻ dữ liệu:**
+   - [data_sharing_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/data_sharing_view.dart)
+5. **Khách hàng & Vị trí:**
+   - [customer_directory_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart)
+   - [quick_add_customer_sheet.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/quick_add_customer_sheet.dart)
+   - [bulk_paste_phone_sheet.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/bulk_paste_phone_sheet.dart)
+   - [crosshair_location_picker_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/crosshair_location_picker_view.dart)
+   - [save_location_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/save_location_view.dart)
+   - [main_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/main_map_view.dart)
+   - [order_list_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/order_list_view.dart)
+   - [order_detail_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/order_detail_view.dart)
+   - [delivery_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/delivery_map_view.dart)
+
+### 15.4. Các Chức Năng Còn Dùng ApiService Trực Tiếp (Hạ Tầng / OS)
+
+Đúng theo kế hoạch tại [docs/LOCAL_FIRST_PLAN.md](file:///d:/flutter%20create%20delivery_marker_app/docs/LOCAL_FIRST_PLAN.md), các lệnh không thuộc nghiệp vụ dữ liệu chính được giữ lại trên `ApiService`:
+- Quản lý cấu hình kết nối mạng/cổng API: `ApiService.getBaseUrl()`, `ApiService.setCustomBaseUrl()`, `ApiService.resetCustomBaseUrl()`.
+- Quản lý JWT Token mức phiên: `ApiService.getToken()`, `ApiService.saveToken()`.
+- Dịch vụ bản đồ bên thứ ba (OSM / Nominatim Geocoding): `ApiService.searchAddress()`.
+- Tích hợp ứng dụng điều hướng ngoài (Google Maps / Apple Maps / url_launcher): `ApiService.openExternalNavigation()`.
+
+### 15.5. Kết Quả Kiểm Thử Thực Tế (Evidence-Based Testing)
+
+- **Kiểm tra cú pháp & Lint:**
+  * Lệnh: `flutter analyze`
+  * Kết quả: **No issues found!** (ran in 2.9s)
+- **Kiểm thử tự động:**
+  * Lệnh: `flutter test`
+  * Bộ test mới: [local_first_repository_layer_01_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_repository_layer_01_test.dart) bao phủ:
+    1. `RepositoryProvider` mặc định khởi tạo đúng các `RemoteRepository`.
+    2. `RepositoryProvider` hỗ trợ tiêm `FakeRepository` và hàm `reset()` hoàn nguyên sạch sẽ.
+    3. Widget (`CreateShiftBottomSheet`) gọi đúng phương thức trên `FakeShiftRepository` được tiêm.
+    4. `RemoteProfileRepository` và `RemotePhotoRepository` ủy quyền đúng sang các hàm tương ứng của `ApiService`.
+  * Kết quả: **152/152 tests passed** (100% tests cũ và mới đều xanh, không sửa bất kỳ assertion nào trong tests cũ).
+- **Trạng Thái Kiểm Thử Thiết Bị Thực Tế:**
+  * **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
 
 
 

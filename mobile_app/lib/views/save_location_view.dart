@@ -7,7 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/location_model.dart';
-import '../services/api_service.dart';
+import '../repositories/repository_provider.dart';
 import '../theme/app_buttons.dart';
 
 class SaveLocationView extends StatefulWidget {
@@ -283,7 +283,7 @@ class _SaveLocationViewState extends State<SaveLocationView> {
         imageUrl: _existingImageUrl,
       );
 
-      final isSavedToServer = await ApiService.saveCustomerLocation(
+      final isSavedToServer = await RepositoryProvider.location.saveCustomerLocation(
         location,
         imageBase64: _base64Image,
       );
