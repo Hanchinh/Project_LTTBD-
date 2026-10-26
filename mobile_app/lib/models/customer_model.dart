@@ -11,11 +11,13 @@ class CustomerDirectoryModel {
   final String? areaId;
   final String? areaName;
   final LocationStatus locationStatus;
+  final LocationStatus locationState;
   final bool hasLocation;
   final double? latitude;
   final double? longitude;
   final String? identificationNotes;
   final String? imageUrl;
+  final String? firstThumbnailUrl;
   final int photoCount;
   final List<CustomerPhotoModel> photos;
   final String? savedLocationId;
@@ -32,24 +34,41 @@ class CustomerDirectoryModel {
     this.areaId,
     this.areaName,
     this.locationStatus = LocationStatus.noLocation,
+    LocationStatus? locationState,
     this.hasLocation = false,
     this.latitude,
     this.longitude,
     this.identificationNotes,
     this.imageUrl,
+    this.firstThumbnailUrl,
     this.photoCount = 0,
     this.photos = const [],
     this.savedLocationId,
     this.createdAt,
     this.updatedAt,
     this.isExisting = false,
-  });
+  }) : locationState = locationState ?? locationStatus;
 
   bool get hasValidCoordinates => latitude != null && longitude != null;
 
   LatLng? get latLng => hasValidCoordinates ? LatLng(latitude!, longitude!) : null;
 
-  bool get hasPhoto => photoCount > 0 || (imageUrl != null && imageUrl!.trim().isNotEmpty);
+  bool get hasPhoto => photoCount > 0 || (imageUrl != null && imageUrl!.trim().isNotEmpty) || (firstThumbnailUrl != null && firstThumbnailUrl!.trim().isNotEmpty);
+
+  String get effectivePhotoUrl => firstThumbnailUrl ?? imageUrl ?? (photos.isNotEmpty ? photos.first.imageUrl : '');
+
+  /// Định dạng số điện thoại chuẩn Việt Nam: ví dụ "0908 333 166" hoặc "090 833 3166"
+  String get formattedPhoneNumber {
+    final clean = phoneNumber.replaceAll(RegExp(r'\D'), '');
+    if (clean.length == 10 && clean.startsWith('0')) {
+      // 0908 333 166
+      return '${clean.substring(0, 4)} ${clean.substring(4, 7)} ${clean.substring(7)}';
+    } else if (clean.length == 11 && clean.startsWith('84')) {
+      final vn = '0${clean.substring(2)}';
+      return '${vn.substring(0, 4)} ${vn.substring(4, 7)} ${vn.substring(7)}';
+    }
+    return phoneNumber;
+  }
 
   factory CustomerDirectoryModel.fromJson(Map<String, dynamic> json) {
     double? parseCoord(dynamic value) {
@@ -70,6 +89,12 @@ class CustomerDirectoryModel {
         : (int.tryParse(json['photoCount']?.toString() ?? '') ?? parsedPhotos.length);
 
     final rawImageUrl = json['imageUrl']?.toString() ?? (parsedPhotos.isNotEmpty ? parsedPhotos.first.imageUrl : null);
+    final rawFirstThumb = json['firstThumbnailUrl']?.toString() ?? rawImageUrl;
+
+    final locStatus = LocationStatus.fromString(json['locationStatus']?.toString());
+    final locState = json['locationState'] != null
+        ? LocationStatus.fromString(json['locationState']?.toString())
+        : locStatus;
 
     return CustomerDirectoryModel(
       id: json['id']?.toString() ?? '',
@@ -79,12 +104,14 @@ class CustomerDirectoryModel {
       addressText: json['addressText']?.toString() ?? 'Chưa có địa chỉ chi tiết',
       areaId: json['areaId']?.toString(),
       areaName: json['areaName']?.toString(),
-      locationStatus: LocationStatus.fromString(json['locationStatus']?.toString()),
+      locationStatus: locStatus,
+      locationState: locState,
       hasLocation: json['hasLocation'] == true || (json['latitude'] != null && json['longitude'] != null),
       latitude: parseCoord(json['latitude']),
       longitude: parseCoord(json['longitude']),
       identificationNotes: json['identificationNotes']?.toString(),
       imageUrl: rawImageUrl,
+      firstThumbnailUrl: rawFirstThumb,
       photoCount: pCount,
       photos: parsedPhotos,
       savedLocationId: json['savedLocationId']?.toString(),
@@ -104,11 +131,13 @@ class CustomerDirectoryModel {
       'areaId': areaId,
       'areaName': areaName,
       'locationStatus': locationStatus.toApiString(),
+      'locationState': locationState.toApiString(),
       'hasLocation': hasLocation,
       'latitude': latitude,
       'longitude': longitude,
       'identificationNotes': identificationNotes,
       'imageUrl': imageUrl,
+      'firstThumbnailUrl': firstThumbnailUrl,
       'photoCount': photoCount,
       'photos': photos.map((p) => p.toJson()).toList(),
       'savedLocationId': savedLocationId,
@@ -127,11 +156,13 @@ class CustomerDirectoryModel {
     String? areaId,
     String? areaName,
     LocationStatus? locationStatus,
+    LocationStatus? locationState,
     bool? hasLocation,
     double? latitude,
     double? longitude,
     String? identificationNotes,
     String? imageUrl,
+    String? firstThumbnailUrl,
     int? photoCount,
     List<CustomerPhotoModel>? photos,
     String? savedLocationId,
@@ -148,11 +179,13 @@ class CustomerDirectoryModel {
       areaId: areaId ?? this.areaId,
       areaName: areaName ?? this.areaName,
       locationStatus: locationStatus ?? this.locationStatus,
+      locationState: locationState ?? this.locationState,
       hasLocation: hasLocation ?? this.hasLocation,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       identificationNotes: identificationNotes ?? this.identificationNotes,
       imageUrl: imageUrl ?? this.imageUrl,
+      firstThumbnailUrl: firstThumbnailUrl ?? this.firstThumbnailUrl,
       photoCount: photoCount ?? this.photoCount,
       photos: photos ?? this.photos,
       savedLocationId: savedLocationId ?? this.savedLocationId,
@@ -161,4 +194,64 @@ class CustomerDirectoryModel {
       isExisting: isExisting ?? this.isExisting,
     );
   }
+}
+
+class CustomerTabCounts {
+  final int total;
+  final int verified;
+  final int temporary;
+  final int noLocation;
+
+  const CustomerTabCounts({
+    this.total = 0,
+    this.verified = 0,
+    this.temporary = 0,
+    this.noLocation = 0,
+  });
+
+  factory CustomerTabCounts.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const CustomerTabCounts();
+    return CustomerTabCounts(
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      verified: (json['verified'] as num?)?.toInt() ?? 0,
+      temporary: (json['temporary'] as num?)?.toInt() ?? 0,
+      noLocation: (json['noLocation'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class CustomerPagination {
+  final int total;
+  final int limit;
+  final int offset;
+  final bool hasMore;
+
+  const CustomerPagination({
+    this.total = 0,
+    this.limit = 30,
+    this.offset = 0,
+    this.hasMore = false,
+  });
+
+  factory CustomerPagination.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const CustomerPagination();
+    return CustomerPagination(
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      limit: (json['limit'] as num?)?.toInt() ?? 30,
+      offset: (json['offset'] as num?)?.toInt() ?? 0,
+      hasMore: json['hasMore'] == true,
+    );
+  }
+}
+
+class CustomerDirectoryResponse {
+  final List<CustomerDirectoryModel> items;
+  final CustomerTabCounts counts;
+  final CustomerPagination pagination;
+
+  const CustomerDirectoryResponse({
+    this.items = const [],
+    this.counts = const CustomerTabCounts(),
+    this.pagination = const CustomerPagination(),
+  });
 }

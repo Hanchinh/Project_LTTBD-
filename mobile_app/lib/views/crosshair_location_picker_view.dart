@@ -39,7 +39,7 @@ class CrosshairLocationPickerView extends StatefulWidget {
 
 class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerView> {
   final MapController _mapController = MapController();
-  final TileProvider _tileProvider = CancellableDiskCachedTileProvider();
+  final TileProvider _tileProvider = createPlatformTileProvider();
   late LatLng _currentCrosshairCenter;
   LatLng? _shipperLocation;
   bool _isLoadingGps = false;

@@ -902,12 +902,117 @@
         - `A.3`: Luồng "Ghim vị trí mới" giữ hộp thoại trống và nút lưu từ chối khi chưa có SĐT.
         - `A.1, A.2`: Thẻ chi tiết kích hoạt callback `onRepin` và nút "Đổi số".
         - `A.1, A.2, A.4`: Bộ chọn tâm ngắm hiển thị banner "Đang ghim lại cho..." và cho phép lưu vị trí tạm trong ca ngay lập tức.
-      * **Flutter Full Test Suite:** `flutter test` đạt **15 test files passed, 100/100 tests passed (100%)**.
+45. **[ĐÃ HOÀN TẤT - TASK: UI-REDESIGN-DIRECTORY-AND-SHIFTS-021] Thiết Kế Lại Giao Diện Danh Bạ & Danh Sách Ca Làm Việc Theo Thiết Kế Chuẩn:**
+    - **1. Mục Tiêu & Phạm Vi (Frontend Mobile & Backend Optimization):**
+      * Cải tiến toàn diện giao diện màn hình **Danh bạ** ([customer_directory_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart)) và **Danh sách ca** ([shift_list_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_list_view.dart)) bám sát ảnh thiết kế mẫu `docs/design/danh-ba.png` và `docs/design/ca-lam-viec.png`.
+      * Bảo toàn 100% quy tắc nghiệp vụ đã chốt: `LOCATION-RULES-012`, quy trình xóa ca an toàn, dải nhiều ảnh khách hàng, bảo toàn thanh điều hướng 3 tab (`Bản đồ` / `Danh bạ` / `Ca làm việc`).
+      * Tuân thủ triệt để Design System: Màu nền `#F8FAFC`, chữ/navy `#0F172A`, phụ lục `#64748B`, viền `#E2E8F0`, màu trạng thái (xanh dương `#2563EB`, xanh lục `#10B981`, cam `#F59E0B`). Vùng chạm tối thiểu >= 48px cho toàn bộ các nút bấm và icon tương tác. Cỡ chữ chính >= 14sp, ghi chú >= 12sp. Tiếng Việt hoàn chỉnh không lỗi phông.
+    - **2. Chi Tiết Kỹ Thuật Đã Triển Khai:**
+      * **A. Tối ưu Backend Controller ([customers.controller.ts](file:///d:/flutter create delivery_marker_app/backend/src/controllers/customers.controller.ts)):**
+        - Cập nhật API `GET /api/customers` tính toán chuẩn xác `locationState` cho từng khách hàng theo 3 trạng thái:
+          * `VERIFIED`: Khách hàng có bản ghi trong `saved_locations` (`sl.id IS NOT NULL`), kể cả khi khách hàng đó đồng thời đang có điểm tạm trong ca làm việc.
+          * `TEMPORARY`: Khách hàng chưa có vị trí đã lưu (`sl.id IS NULL`), nhưng có bản ghi `shift_delivery_points` mang trạng thái `TEMPORARY` trong ca đang hoạt động (`PREPARING` hoặc `IN_PROGRESS`) của chính shipper đang truy vấn. Tuyệt đối không tính điểm tạm thuộc ca của shipper khác.
+          * `NO_LOCATION`: Các trường hợp còn lại.
+        - Bổ sung trường `firstThumbnailUrl` trỏ tới ảnh đầu tiên (ưu tiên ảnh từ `customer_photos`, kế tiếp là ảnh từ `shift_delivery_points`).
+        - Trả về đối tượng `counts: { total, verified, temporary, noLocation }` phản ánh chính xác số lượng khách theo từng nhóm trạng thái tương ứng với từ khóa tìm kiếm.
+        - Trả về đối tượng `pagination: { total, limit, offset, hasMore }` kết hợp phân trang SQL `LIMIT / OFFSET`.
+        - Hỗ trợ tìm kiếm thông minh: Không phân biệt dấu tiếng Việt (`unaccent`) và không phân biệt khoảng trắng (cho phép tìm SĐT dạng có khoảng cách như `"0908 333 166"`).
+        - Sửa lỗi câu truy vấn đếm (`countSql`): Bổ sung `sdp.image_url` vào mệnh đề `LEFT JOIN LATERAL`, giúp bộ lọc `hasPhoto=true` vận hành chuẩn xác mà không gây lỗi 500.
+      * **B. Mở rộng Model & Service Mobile App:**
+        - [customer_model.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/models/customer_model.dart): Bổ sung `locationState`, `firstThumbnailUrl`, các class `CustomerTabCounts`, `CustomerPagination`, `CustomerDirectoryResponse`. Bổ sung getter `formattedPhoneNumber` định dạng hiển thị số điện thoại cách 4-3-3 (ví dụ `0908 333 166`).
+        - [api_service.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/api_service.dart): Mở rộng `getCustomers` hỗ trợ phân trang `limit` & `offset`, bổ sung hàm `getCustomersResponse` nhận đầy đủ cấu trúc response chứa `counts` và `pagination`.
+      * **C. Thiết kế lại Màn hình Danh bạ ([customer_directory_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart)):**
+        - Tiêu đề "Danh bạ" kèm badge hiển thị tổng số khách hàng. Góc phải có nút chữ "+ Thêm số" mở hộp thoại thêm khách nhanh `showQuickAddCustomerBottomSheet` (chỉ cần SĐT).
+        - Ô tìm kiếm bo tròn với gợi ý: "Tìm số điện thoại, tên, địa chỉ...".
+        - Thanh tab cuộn ngang lọc nhanh hiển thị số đếm động từ backend: `Tất cả` | `Đã xác minh` (chấm xanh lục) | `Vị trí tạm` (chấm cam) | `Chưa có vị trí` (chấm xám).
+        - Danh sách khách hàng với từng hàng trực quan:
+          * Hộp ảnh vuông bo góc kích thước 48x48px (placeholder icon máy ảnh khi chưa có ảnh), góc dưới phải gắn chấm tròn trạng thái vị trí (xanh lục / cam / xám).
+          * Dòng 1: Số điện thoại định dạng chuẩn cách 4-3-3 in đậm kết hợp tên khách hàng (`0908 333 166 · Tên`).
+          * Dòng 2: Địa chỉ rút gọn 1 dòng với hiệu ứng cắt ngắn nếu dài.
+          * Mép phải: Nút tròn "+" với vùng chạm chuẩn >= 48px.
+        - Tương tác chạm hàng: Mở màn hình chi tiết khách hàng [CustomerDetailEditView](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/customer_detail_edit_view.dart) (giữ nguyên đầy đủ tính năng sửa thông tin, xem/thêm/xóa nhiều ảnh, tra cứu lịch sử vị trí).
+        - Tương tác nút "+":
+          * Nếu có đúng 1 ca khả dụng: Thêm trực tiếp điểm giao vào ca và hiển thị SnackBar xác nhận kèm nút "HOÀN TÁC".
+          * Nếu có nhiều ca: Mở bottom sheet chọn ca nhận điểm.
+          * Nếu chưa có ca nào: Hiển thị dialog hỏi tạo ca mới, điều hướng tới `CreateShiftBottomSheet`, sau khi tạo tự động gán khách vào ca.
+          * Nếu khách đã có sẵn trong ca: Hiển thị SnackBar "Đã có trong ca".
+        - Phân trang cuộn vô tận (`ListView.builder`, nạp 30 khách/trang), hiển thị loading indicator khi tải thêm, empty state "Chưa có khách nào" và error state kèm nút "Thử lại".
+      * **D. Thiết kế lại Màn hình Ca làm việc ([shift_list_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_list_view.dart)):**
+        - Tiêu đề "Ca làm việc" cùng nút bấm màu Navy "+ Tạo ca mới" (vùng chạm >= 48px) mở `CreateShiftBottomSheet`.
+        - Phần "ĐANG THỰC HIỆN" (tự động ẩn khi không có ca `IN_PROGRESS`):
+          * Thẻ nổi bật viền xanh bo góc hiển thị: Tiêu đề ca, mã ca, ngày tạo, số lượng điểm giao, thanh tiến độ % hoàn thành, dòng thống kê phân loại ("X Đã xác minh · Y Tạm · Z Chưa có").
+          * Nút 3 chấm "..." cung cấp menu Đổi tên ca và Xóa ca (kèm cảnh báo an toàn dữ liệu).
+          * 2 nút hành động lớn dưới đáy thẻ (chiều cao >= 48px): Nút "Dán SĐT" (trắng viền xám) mở form dán danh sách hàng loạt, và nút "Mở bản đồ" (Navy `#0F172A`) chuyển thẳng tới `ShiftMapView`.
+        - Phần "DANH SÁCH CA (n)":
+          * Hiển thị danh sách các ca còn lại sắp xếp thời gian mới nhất lên đầu.
+          * Mỗi hàng hiển thị tiêu đề, chip trạng thái (Chuẩn bị = Vàng, Đang giao = Xanh dương, Hoàn thành = Xanh lục), số điểm và thời gian, icon thùng rác (vùng chạm >= 48px, có hộp thoại xác nhận an toàn).
+        - Tài liệu hóa luồng chuyển trạng thái ca (State Transitions):
+          * Ca `PREPARING` $\rightarrow$ `IN_PROGRESS`: Được kích hoạt qua nút "BẮT ĐẦU CA" trong màn hình [ShiftPreparationView](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_preparation_view.dart).
+          * Ca `IN_PROGRESS` $\rightarrow$ `COMPLETED`: Được kích hoạt qua nút "KẾT THÚC CA" / "HOÀN THÀNH CA" trong màn hình [ShiftMapView](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_map_view.dart).
+          * Chạm vào ca `PREPARING` trong danh sách sẽ điều hướng tới `ShiftPreparationView`; chạm vào ca `IN_PROGRESS` hoặc `COMPLETED` sẽ điều hướng tới `ShiftMapView`.
+    - **3. Kết Quả Kiểm Thử Tự Động & Nghiệm Thu:**
+      * **Backend Integration Tests ([ui-redesign-021.integration.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/ui-redesign-021.integration.spec.ts)):** Đạt **4/4 tests passed (100%)** trên CSDL `test_isolated_seed_db` gọi controller thật:
+        - Kiểm tra tính toán `locationState` cho khách hàng theo đúng 3 trạng thái (`VERIFIED`, `TEMPORARY`, `NO_LOCATION`).
+        - Kiểm tra trả về đối tượng `counts` phân loại số lượng chính xác theo từng trạng thái.
+        - Kiểm tra phân trang `limit` & `offset` hoạt động chính xác kèm `pagination.hasMore`.
+        - Kiểm tra tìm kiếm SĐT không phân biệt khoảng trắng (ví dụ `"0908 333 166"` tìm ra `"0908333166"`).
+      * **Backend Full Test Suite:** `npm test` đạt **13 test suites passed, 160/160 tests passed (100%)**. TypeScript `npm run build` biên dịch 0 lỗi.
+      * **Flutter Widget Tests Mới ([ui_redesign_021_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/ui_redesign_021_test.dart)):** Đạt **7/7 tests passed (100%)**:
+        - `CustomerModel.formattedPhoneNumber`: Định dạng số điện thoại chuẩn 4-3-3.
+        - `CustomerDirectoryResponse`: Parse chính xác `counts`, `pagination`, `customers`.
+        - `CustomerDirectoryView`: Hiển thị tiêu đề, badge đếm, ô tìm kiếm, nút thêm số.
+        - `CustomerDirectoryView`: Hiển thị đúng 4 tab lọc trạng thái kèm số lượng đếm động từ backend.
+        - `CustomerDirectoryView`: Render danh sách khách hàng gồm hộp ảnh 48x48, SĐT in đậm, địa chỉ rút gọn và nút "+" có vùng chạm >= 48px.
+        - `ShiftListView`: Hiển thị tiêu đề "Ca làm việc", nút tạo ca mới và phần "ĐANG THỰC HIỆN" với đầy đủ 2 nút "Dán SĐT" và "Mở bản đồ".
+        - `ShiftListView`: Hiển thị "DANH SÁCH CA", chip trạng thái và icon thùng rác vùng chạm >= 48px.
+      * **Flutter Full Test Suite:** `flutter test` đạt **16 test files passed, 107/107 tests passed (100%)**.
       * **Flutter Static Analysis:** `flutter analyze` đạt **No issues found!** (0 cảnh báo, 0 lỗi trên toàn bộ dự án).
-      * **Backend Không Đổi:** Container backend giữ nguyên, không cần build lại.
-      * **Build Release APK MỘT LẦN DUY NHẤT:** Thực thi lệnh `flutter build apk --release`.
+      * **Dựng Lại Container Backend:** `docker compose up -d --build backend` hoàn thành MỘT LẦN duy nhất (`delivery_backend_api` Recreated & Started, `delivery_postgis_db` Healthy giữ nguyên không đụng chạm).
+      * **Kiểm Tra API Sống:** `GET http://localhost:3000/api/docs/` phản hồi **200 OK**. Tuyệt đối không gửi request ghi nào lên API sống hay `delivery_db`.
+      * **Build Release APK:** Thực thi lệnh `flutter build apk --release` MỘT LẦN duy nhất.
     - **4. Phân Định Thực Tế Kiểm Thử (Evidence-Based):**
-      * **[ĐÃ TEST]:** 100/100 automated Flutter tests passed, `flutter analyze` 0 issues, toàn bộ logic cache và repin được kiểm thử tự động.
+      * **[ĐÃ TEST]:** 160/160 backend tests passed trên `test_isolated_seed_db`, 107/107 Flutter tests passed, `flutter analyze` 0 issues, container backend live 200 OK.
       * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa nạp file release APK lên thiết bị di động vật lý ngoài thực địa.
+
+46. **[ĐÃ HOÀN TẤT - TASK: WEB-TILE-CACHE-FIX-021B] Khắc Phục Lỗi Crash Bản Đồ Khi Chạy Web (Unsupported operation: _Namespace):**
+    - **1. Mục Tiêu & Nguyên Nhân Gốc (Root Cause):**
+      * **Hiện tượng:** Khi chạy ứng dụng trên trình duyệt web (`flutter run -d chrome`), lớp bản đồ tại màn hình chính `MainMapView` bị crash đỏ với thông báo lỗi: `DartError: Unsupported operation: _Namespace`.
+      * **Nguyên nhân gốc:** `MapTileCacheService` và `CancellableDiskCachedTileProvider` (được bổ sung từ TASK 019 để tối ưu mượt trên điện thoại) sử dụng trực tiếp các API hệ thống tệp đĩa `Directory.systemTemp`, `File`, `FileImage` thuộc thư viện `dart:io`. Trên runtime JavaScript của Flutter Web (DDC/dart2js), các lớp native này không có thực thi tương ứng và lập tức ném ngoại lệ khi truy cập `_Namespace`.
+      * **Ràng buộc:** Giữ nguyên backend 100%, không đổi CSDL, không ghi dữ liệu lên `delivery_db`, giữ nguyên quy tắc không cache ảnh khách hàng, duy trì toàn vẹn bộ nhớ đệm đĩa 200MB trên Android/iOS.
+    - **2. Chi Tiết Kỹ Thuật Đã Triển Khai:**
+      * **A. Khởi tạo TileProvider Đa Nền Tảng ([map_tile_cache_service.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/map_tile_cache_service.dart)):**
+        - Xây dựng hàm factory `createPlatformTileProvider()`:
+          * Khi `kIsWeb == true`: Tự động trả về [NetworkTileProvider] tích hợp sẵn của `flutter_map`, tải mảnh bản đồ thuần mạng qua cơ chế web image, tuyệt đối KHÔNG đụng chạm `dart:io`.
+          * Khi `kIsWeb == false` (Android, iOS, Desktop): Sử dụng [CancellableDiskCachedTileProvider] hỗ trợ disk cache tối đa 200MB, giới hạn 10 HTTP requests đồng thời và hủy yêu cầu trôi khỏi khung nhìn.
+      * **B. Phòng Vệ Đa Tầng (Defensive Layering):**
+        - Trong `CancellableDiskCachedTileProvider.getImage()`: Bổ sung guard `if (kIsWeb) return NetworkImage(url, headers: headers);` phòng ngừa việc vô tình khởi tạo trực tiếp lớp này trên Web.
+        - Trong `MapTileCacheService`: Các phương thức `cacheDirectory`, `getCachedTileFile`, `cacheTileBytes`, `getCacheSizeBytes`, `_checkAndPruneCache`, `clearCache` đều được bọc bảo vệ `if (kIsWeb) return ...;` ngăn ngừa hoàn toàn việc gọi native file system trên Web.
+        - Bảo toàn 100% quy tắc lọc URL: `isMapTileUrl` và `containsCustomerPhoto` chặn tuyệt đối việc lưu trữ ảnh hiện trường, avatar hay ảnh khách hàng.
+      * **C. Áp Dụng Đồng Bộ Trên Cả 3 Màn Hình Bản Đồ:**
+        - [main_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/main_map_view.dart): Sử dụng `final TileProvider _tileProvider = createPlatformTileProvider();`.
+        - [shift_map_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/shift_map_view.dart): Sử dụng `final TileProvider _tileProvider = createPlatformTileProvider();`.
+        - [crosshair_location_picker_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/crosshair_location_picker_view.dart): Sử dụng `final TileProvider _tileProvider = createPlatformTileProvider();`.
+      * **D. Rà Soát Toàn Diện Các Vị Trí Dùng `dart:io` Khác Trong Dự Án:**
+        - [api_service.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/api_service.dart): `Platform.isAndroid` đã được bảo vệ sẵn bằng `if (!kIsWeb && Platform.isAndroid)`.
+        - [save_location_view.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/views/save_location_view.dart): Đoạn code preview ảnh chụp hiện trường trước đây dùng `File(_capturedImage!.path)` -> Đã bọc an toàn: `kIsWeb ? Image.network(_capturedImage!.path) : Image.file(File(_capturedImage!.path))`.
+        - [offline_storage_service.dart](file:///d:/flutter create delivery_marker_app/mobile_app/lib/services/offline_storage_service.dart): Hàm `migrateFromV1IfNeeded` dùng `File(v1Path)` kiểm tra file CSDL v1 -> Đã bọc `if (kIsWeb) return const MigrationResult(...)` vì Web không dùng SQLite v1 file cục bộ.
+    - **3. Kết Quả Kiểm Thử Tự Động & Nghiệm Thu:**
+      * **Flutter Widget & Unit Tests Mới ([web_tile_cache_fix_021b_test.dart](file:///d:/flutter create delivery_marker_app/mobile_app/test/web_tile_cache_fix_021b_test.dart)):** Đạt **6/6 tests passed (100%)**:
+        - `1. createPlatformTileProvider`: Trả về đúng provider tương ứng cho từng nền tảng (`NetworkTileProvider` trên web, `CancellableDiskCachedTileProvider` trên native).
+        - `2. Quy tắc lọc URL`: Giữ nguyên 100% chặn ảnh khách hàng và cho phép URL tile OSM/Google/CartoDB.
+        - `3. Phòng vệ đa tầng`: `CancellableDiskCachedTileProvider.getImage()` trả về an toàn theo nền tảng.
+        - `4. MainMapView`: Khởi tạo và render TileProvider an toàn.
+        - `5. ShiftMapView`: Khởi tạo và hiển thị an toàn.
+        - `6. CrosshairLocationPickerView`: Khởi tạo và render TileProvider an toàn.
+      * **Flutter Full Test Suite:** `flutter test` đạt **17 test files passed, 113/113 tests passed (100%)**.
+      * **Flutter Static Analysis:** `flutter analyze` đạt **No issues found!** (0 cảnh báo, 0 lỗi trên toàn bộ dự án).
+      * **Biên Dịch Flutter Web:** Thực thi `flutter build web` hoàn thành thành công 100% (`√ Built build\web`).
+      * **Xác Minh Thực Tế Trên Chrome:** Khởi chạy `flutter run -d chrome --web-port 8088`, kết nối thành công DevTools (`Starting application from main method in: org-dartlang-app:///web_entrypoint.dart`), không còn phát sinh bất kỳ lỗi `_Namespace` hay lỗi đỏ trên console.
+      * **Build Release APK:** Thực thi `flutter build apk --release` MỘT LẦN duy nhất.
+    - **4. Phân Định Thực Tế Kiểm Thử (Evidence-Based):**
+      * **[ĐÃ TEST]:** 113/113 automated Flutter tests passed, `flutter analyze` 0 issues, `flutter build web` thành công, kiểm thử runtime thực tế trên Chrome xác nhận bản đồ tải ổn định không crash.
+      * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa nạp file release APK lên thiết bị di động vật lý ngoài thực địa.
+
+
 
 

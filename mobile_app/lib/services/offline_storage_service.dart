@@ -1,4 +1,5 @@
 import 'dart:io' show File;
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:convert';
@@ -732,6 +733,15 @@ class OfflineStorageService {
     bool catchErrors = false,
     bool updatePrefs = true,
   }) async {
+    if (kIsWeb) {
+      return const MigrationResult(
+        status: MigrationStatus.success,
+        migratedCount: 0,
+        quarantinedCount: 0,
+        message: 'Nền tảng Web không sử dụng SQLite v1 file cục bộ.',
+      );
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final isMigrated = prefs.getBool('sqlite_v1_migrated') ?? false;
     final migrationStatus = prefs.getString('sqlite_v1_migration_status');

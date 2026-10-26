@@ -24,7 +24,7 @@ class ShiftMapView extends StatefulWidget {
 
 class _ShiftMapViewState extends State<ShiftMapView> {
   final MapController _mapController = MapController();
-  final CancellableDiskCachedTileProvider _tileProvider = CancellableDiskCachedTileProvider();
+  final TileProvider _tileProvider = createPlatformTileProvider();
   ShiftModel? _shift;
   bool _isLoading = true;
   String? _errorMessage;

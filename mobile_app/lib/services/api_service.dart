@@ -864,11 +864,13 @@ class ApiService {
   // CUSTOMER DIRECTORY API (MAP-FIRST-ARCHITECTURE-005)
   // =========================================================================
 
-  /// 1. Lấy danh sách khách hàng & vị trí độc lập từ danh bạ
-  static Future<List<CustomerDirectoryModel>> getCustomers({
+  /// 1. Lấy danh sách khách hàng & vị trí độc lập từ danh bạ (kèm thống kê tab và phân trang)
+  static Future<CustomerDirectoryResponse> getCustomersResponse({
     String? query,
     String? status,
     bool? hasPhoto,
+    int? limit,
+    int? offset,
   }) async {
     final token = await getToken();
     final baseUrl = await getBaseUrl();
@@ -882,6 +884,12 @@ class ApiService {
     }
     if (hasPhoto != null) {
       queryParams['hasPhoto'] = hasPhoto ? 'true' : 'false';
+    }
+    if (limit != null) {
+      queryParams['limit'] = limit.toString();
+    }
+    if (offset != null) {
+      queryParams['offset'] = offset.toString();
     }
 
     final uri = Uri.parse('$baseUrl/customers').replace(
@@ -900,13 +908,38 @@ class ApiService {
       final body = jsonDecode(response.body);
       if (response.statusCode == 200 && body['success'] == true) {
         final List data = body['data'] as List? ?? [];
-        return data.map((json) => CustomerDirectoryModel.fromJson(json)).toList();
+        final items = data.map((json) => CustomerDirectoryModel.fromJson(json)).toList();
+        final counts = CustomerTabCounts.fromJson(body['counts'] as Map<String, dynamic>?);
+        final pagination = CustomerPagination.fromJson(body['pagination'] as Map<String, dynamic>?);
+        return CustomerDirectoryResponse(
+          items: items,
+          counts: counts,
+          pagination: pagination,
+        );
       }
 
       throw Exception(body['message'] ?? 'Không thể tải danh bạ khách hàng');
     } on http.ClientException catch (_) {
       throw Exception('Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng.');
     }
+  }
+
+  /// Tương thích ngược: Lấy danh sách items khách hàng
+  static Future<List<CustomerDirectoryModel>> getCustomers({
+    String? query,
+    String? status,
+    bool? hasPhoto,
+    int? limit,
+    int? offset,
+  }) async {
+    final res = await getCustomersResponse(
+      query: query,
+      status: status,
+      hasPhoto: hasPhoto,
+      limit: limit,
+      offset: offset,
+    );
+    return res.items;
   }
 
   /// 2. Lấy chi tiết khách hàng và vị trí từ danh bạ

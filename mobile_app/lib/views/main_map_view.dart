@@ -83,8 +83,8 @@ class MainMapViewState extends State<MainMapView> {
   // Khách hàng mục tiêu khi kích hoạt luồng Ghim lại (TASK 019)
   MasterSavedLocationModel? _repinTarget;
 
-  // Tile Provider hỗ trợ Disk Cache tối đa 200MB & Cancellable (TASK 019)
-  final CancellableDiskCachedTileProvider _tileProvider = CancellableDiskCachedTileProvider();
+  // Tile Provider hỗ trợ Disk Cache tối đa 200MB & Cancellable trên mobile, fallback NetworkTileProvider trên web (TASK 021B)
+  final TileProvider _tileProvider = createPlatformTileProvider();
 
   // Tối ưu gom cụm: debounce 150ms, cache kết quả theo zoom, chỉ tính điểm trong viewport (TASK 019)
   Timer? _clusterDebounceTimer;

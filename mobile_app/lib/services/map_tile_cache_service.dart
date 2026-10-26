@@ -7,6 +7,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 
+/// Factory function khởi tạo [TileProvider] an toàn theo từng nền tảng:
+/// - Trên Web (`kIsWeb`): Sử dụng [NetworkTileProvider] thuần mạng của `flutter_map`.
+///   Tuyệt đối KHÔNG đụng chạm `dart:io` (File / Directory) để ngăn ngừa lỗi "Unsupported operation: _Namespace".
+/// - Trên Android / iOS / Desktop: Sử dụng [CancellableDiskCachedTileProvider]
+///   với bộ nhớ đệm trên đĩa tối đa 200MB, giới hạn 10 kết nối đồng thời và chặn cache ảnh khách hàng.
+TileProvider createPlatformTileProvider({
+  Map<String, String>? headers,
+  http.Client? customClient,
+}) {
+  if (kIsWeb) {
+    return NetworkTileProvider(
+      headers: headers ?? const {},
+    );
+  }
+  return CancellableDiskCachedTileProvider(
+    headers: headers,
+    customClient: customClient,
+  );
+}
+
 /// Service quản lý bộ nhớ đệm (disk cache) cho các mảnh bản đồ (Map Tiles).
 /// Tuân thủ quy chuẩn:
 /// 1. Chỉ cache các file tile bản đồ (OpenStreetMap, CartoDB, Google Maps tile).
@@ -25,6 +45,9 @@ class MapTileCacheService {
 
   /// Thư mục lưu trữ cache mảnh bản đồ
   static Directory get cacheDirectory {
+    if (kIsWeb) {
+      throw UnsupportedError('MapTileCacheService.cacheDirectory không được hỗ trợ trên nền tảng Web');
+    }
     if (_customDirectory != null) {
       if (!_customDirectory!.existsSync()) {
         _customDirectory!.createSync(recursive: true);
@@ -69,6 +92,7 @@ class MapTileCacheService {
 
   /// Lấy file đã cache (nếu có)
   static File? getCachedTileFile(String url) {
+    if (kIsWeb) return null;
     if (!isMapTileUrl(url)) return null;
     final file = File('${cacheDirectory.path}/${getFileNameForUrl(url)}');
     return file.existsSync() ? file : null;
@@ -76,7 +100,7 @@ class MapTileCacheService {
 
   /// Lưu mảnh tile vào disk cache (chỉ thực hiện với tile bản đồ)
   static Future<void> cacheTileBytes(String url, Uint8List bytes) async {
-    if (!isMapTileUrl(url)) return; // Không bao giờ cache ảnh ngoài tile bản đồ
+    if (kIsWeb || !isMapTileUrl(url)) return; // Không bao giờ cache trên Web hoặc ảnh ngoài tile bản đồ
     try {
       final file = File('${cacheDirectory.path}/${getFileNameForUrl(url)}');
       await file.writeAsBytes(bytes, flush: true);
@@ -88,6 +112,7 @@ class MapTileCacheService {
 
   /// Tính tổng dung lượng hiện tại của thư mục tile cache (bytes)
   static Future<int> getCacheSizeBytes() async {
+    if (kIsWeb) return 0;
     try {
       final dir = cacheDirectory;
       if (!dir.existsSync()) return 0;
@@ -106,6 +131,7 @@ class MapTileCacheService {
 
   /// Tự động dọn dẹp các tile cũ nhất khi vượt quá 200MB
   static Future<void> _checkAndPruneCache() async {
+    if (kIsWeb) return;
     try {
       final currentSize = await getCacheSizeBytes();
       if (currentSize <= maxCacheSizeBytes) return;
@@ -131,6 +157,7 @@ class MapTileCacheService {
 
   /// Xóa toàn bộ tile cache
   static Future<void> clearCache() async {
+    if (kIsWeb) return;
     try {
       final dir = cacheDirectory;
       if (dir.existsSync()) {
@@ -183,6 +210,11 @@ class CancellableDiskCachedTileProvider extends TileProvider {
   @override
   ImageProvider getImage(TileCoordinates coordinates, TileLayer options) {
     final url = getTileUrl(coordinates, options);
+
+    // Phòng vệ đa tầng: Nếu chạy trên Web, fallback sang NetworkImage
+    if (kIsWeb) {
+      return NetworkImage(url, headers: headers);
+    }
 
     // 1. Kiểm tra cache trên đĩa trước
     final cached = MapTileCacheService.getCachedTileFile(url);

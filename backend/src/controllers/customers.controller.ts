@@ -27,53 +27,139 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
   const user = req.user;
   if (!user) return res.status(401).json({ success: false, message: 'Chưa xác thực' });
 
-  const { q, status, hasPhoto } = req.query;
+  const { q, status, locationState: queryLocationState, hasPhoto, limit, offset } = req.query;
   const assignedAreaIds = user.assignedAreaIds || [];
+  const shipperId = user.userId;
+  const isAdmin = user.roleName === 'ADMIN';
 
   try {
-    let whereClauses: string[] = [];
-    let params: any[] = [];
+    // RBAC: Shipper chỉ thấy khách hàng trong khu vực phụ trách
+    if (user.roleName === 'SHIPPER' && assignedAreaIds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        counts: { total: 0, verified: 0, temporary: 0, noLocation: 0 },
+        pagination: { total: 0, limit: 30, offset: 0, hasMore: false },
+        total: 0,
+      });
+    }
+
+    let baseWhereClauses: string[] = [];
+    let baseParams: any[] = [];
     let paramIndex = 1;
 
-    // RBAC: Shipper chỉ thấy khách hàng trong khu vực phụ trách
     if (user.roleName === 'SHIPPER') {
-      if (assignedAreaIds.length === 0) {
-        return res.status(200).json({ success: true, data: [] });
-      }
-      whereClauses.push(`c.area_id = ANY($${paramIndex})`);
-      params.push(assignedAreaIds);
+      baseWhereClauses.push(`c.area_id = ANY($${paramIndex})`);
+      baseParams.push(assignedAreaIds);
       paramIndex++;
     }
+
+    const shipperParamIdx = paramIndex++;
+    baseParams.push(shipperId);
+
+    const isAdminParamIdx = paramIndex++;
+    baseParams.push(isAdmin);
 
     // Tìm kiếm không dấu (unaccent) theo SĐT, Tên, Địa chỉ, hoặc Ghi chú nhận diện
+    // Hỗ trợ người dùng gõ SĐT có dấu cách (VD: "0908 333 166") vẫn khớp chính xác
     if (q && typeof q === 'string' && q.trim().length > 0) {
-      const searchTerm = `%${q.trim()}%`;
-      whereClauses.push(`(
-        unaccent(c.phone_number) ILIKE unaccent($${paramIndex}) OR
-        unaccent(c.full_name) ILIKE unaccent($${paramIndex}) OR
-        unaccent(c.address_text) ILIKE unaccent($${paramIndex}) OR
-        (sl.identification_notes IS NOT NULL AND unaccent(sl.identification_notes) ILIKE unaccent($${paramIndex}))
+      const trimmedQ = q.trim();
+      const searchTerm = `%${trimmedQ}%`;
+      const cleanDigits = trimmedQ.replace(/\D/g, '');
+      const phoneSearchTerm = cleanDigits.length > 0 ? `%${cleanDigits}%` : searchTerm;
+
+      const qParamIdx = paramIndex++;
+      baseParams.push(searchTerm);
+      const phoneParamIdx = paramIndex++;
+      baseParams.push(phoneSearchTerm);
+
+      baseWhereClauses.push(`(
+        unaccent(c.phone_number) ILIKE unaccent($${qParamIdx}) OR
+        unaccent(regexp_replace(c.phone_number, '\\D', '', 'g')) ILIKE unaccent($${phoneParamIdx}) OR
+        unaccent(c.full_name) ILIKE unaccent($${qParamIdx}) OR
+        unaccent(c.address_text) ILIKE unaccent($${qParamIdx}) OR
+        (sl.identification_notes IS NOT NULL AND unaccent(sl.identification_notes) ILIKE unaccent($${qParamIdx}))
       )`);
-      params.push(searchTerm);
-      paramIndex++;
     }
 
-    // Lọc theo trạng thái ảnh (kiểm tra cả customer_photos và saved_locations)
+    // Lọc theo trạng thái ảnh
     if (hasPhoto === 'true') {
-      whereClauses.push(`(
+      baseWhereClauses.push(`(
         EXISTS (SELECT 1 FROM customer_photos cp WHERE cp.customer_id = c.id AND cp.deleted_at IS NULL)
         OR (sl.image_url IS NOT NULL AND sl.image_url != '')
-        OR (latest_sdp.image_url IS NOT NULL AND latest_sdp.image_url != '')
+        OR (shipper_sdp.image_url IS NOT NULL AND shipper_sdp.image_url != '')
       )`);
     } else if (hasPhoto === 'false') {
-      whereClauses.push(`(
+      baseWhereClauses.push(`(
         NOT EXISTS (SELECT 1 FROM customer_photos cp WHERE cp.customer_id = c.id AND cp.deleted_at IS NULL)
         AND (sl.image_url IS NULL OR sl.image_url = '')
-        AND (latest_sdp.image_url IS NULL OR latest_sdp.image_url = '')
+        AND (shipper_sdp.image_url IS NULL OR shipper_sdp.image_url = '')
       )`);
     }
 
-    const whereSQL = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const baseWhereSQL = baseWhereClauses.length > 0 ? `WHERE ${baseWhereClauses.join(' AND ')}` : '';
+
+    // 1. TÍNH TỔNG SỐ THEO TỪNG TAB TRẠNG THÁI (TASK 021 - MỤC A.3)
+    // Quy chuẩn locationState:
+    // - VERIFIED: Có bản ghi saved_locations (kể cả có điểm giao trong ca cũng là VERIFIED)
+    // - TEMPORARY: KHÔNG có saved_locations nhưng có điểm giao TEMPORARY trong ca của chính shipper
+    // - NO_LOCATION: Còn lại
+    const countSql = `
+      SELECT 
+        COUNT(*)::int as total,
+        COUNT(CASE WHEN sl.id IS NOT NULL THEN 1 END)::int as verified,
+        COUNT(CASE WHEN sl.id IS NULL AND shipper_sdp.id IS NOT NULL THEN 1 END)::int as temporary,
+        COUNT(CASE WHEN sl.id IS NULL AND shipper_sdp.id IS NULL THEN 1 END)::int as no_location
+      FROM customers c
+      LEFT JOIN saved_locations sl ON sl.customer_id = c.id
+      LEFT JOIN LATERAL (
+        SELECT sdp.id, sdp.image_url
+        FROM shift_delivery_points sdp
+        JOIN shifts s ON s.id = sdp.shift_id
+        WHERE sdp.customer_id = c.id
+          AND sdp.location_status = 'TEMPORARY'
+          AND (s.shipper_id = $${shipperParamIdx} OR $${isAdminParamIdx} = true)
+        ORDER BY sdp.updated_at DESC
+        LIMIT 1
+      ) shipper_sdp ON true
+      ${baseWhereSQL}
+    `;
+
+    const countRes = await query(countSql, baseParams);
+    const countRow = countRes.rows[0] || {};
+    const counts = {
+      total: countRow.total || 0,
+      verified: countRow.verified || 0,
+      temporary: countRow.temporary || 0,
+      noLocation: countRow.no_location || 0,
+    };
+
+    // 2. LỌC THEO TAB TRẠNG THÁI (NẾU CÓ)
+    const filterState = (status || queryLocationState)?.toString()?.toUpperCase();
+    let dataWhereClauses = [...baseWhereClauses];
+
+    if (filterState === 'VERIFIED') {
+      dataWhereClauses.push('sl.id IS NOT NULL');
+    } else if (filterState === 'TEMPORARY') {
+      dataWhereClauses.push('sl.id IS NULL AND shipper_sdp.id IS NOT NULL');
+    } else if (filterState === 'NO_LOCATION') {
+      dataWhereClauses.push('sl.id IS NULL AND shipper_sdp.id IS NULL');
+    }
+
+    const dataWhereSQL = dataWhereClauses.length > 0 ? `WHERE ${dataWhereClauses.join(' AND ')}` : '';
+
+    // 3. PHÂN TRANG (PAGINATION)
+    const limitNum = limit !== undefined ? parseInt(limit as string, 10) : 0;
+    const offsetNum = offset !== undefined ? parseInt(offset as string, 10) : 0;
+
+    let paginationSQL = '';
+    let dataParams = [...baseParams];
+    if (limitNum > 0) {
+      dataParams.push(limitNum);
+      paginationSQL += ` LIMIT $${paramIndex++}`;
+      dataParams.push(offsetNum >= 0 ? offsetNum : 0);
+      paginationSQL += ` OFFSET $${paramIndex++}`;
+    }
 
     const sql = `
       SELECT 
@@ -93,12 +179,13 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
         sl.identification_notes,
         sl.image_url,
         sl.updated_at as location_updated_at,
-        latest_sdp.location_status as sdp_status,
-        latest_sdp.latitude as sdp_latitude,
-        latest_sdp.longitude as sdp_longitude,
-        latest_sdp.identification_notes as sdp_notes,
-        latest_sdp.image_url as sdp_image_url,
-        latest_sdp.updated_at as sdp_updated_at,
+        shipper_sdp.id as sdp_id,
+        shipper_sdp.location_status as sdp_status,
+        shipper_sdp.latitude as sdp_latitude,
+        shipper_sdp.longitude as sdp_longitude,
+        shipper_sdp.identification_notes as sdp_notes,
+        shipper_sdp.image_url as sdp_image_url,
+        shipper_sdp.updated_at as sdp_updated_at,
         cp_stats.photo_count,
         cp_stats.latest_photo_url,
         cp_stats.photos_json
@@ -106,12 +193,15 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
       JOIN areas a ON a.id = c.area_id
       LEFT JOIN saved_locations sl ON sl.customer_id = c.id
       LEFT JOIN LATERAL (
-        SELECT sdp.location_status, sdp.latitude, sdp.longitude, sdp.identification_notes, sdp.image_url, sdp.updated_at
+        SELECT sdp.id, sdp.location_status, sdp.latitude, sdp.longitude, sdp.identification_notes, sdp.image_url, sdp.updated_at
         FROM shift_delivery_points sdp
+        JOIN shifts s ON s.id = sdp.shift_id
         WHERE sdp.customer_id = c.id
+          AND sdp.location_status = 'TEMPORARY'
+          AND (s.shipper_id = $${shipperParamIdx} OR $${isAdminParamIdx} = true)
         ORDER BY sdp.updated_at DESC
         LIMIT 1
-      ) latest_sdp ON true
+      ) shipper_sdp ON true
       LEFT JOIN LATERAL (
         SELECT 
           COUNT(*)::int as photo_count,
@@ -128,52 +218,32 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
         FROM customer_photos cp
         WHERE cp.customer_id = c.id AND cp.deleted_at IS NULL
       ) cp_stats ON true
-      ${whereSQL}
+      ${dataWhereSQL}
       ORDER BY c.updated_at DESC, c.created_at DESC
+      ${paginationSQL}
     `;
 
-    const result = await query(sql, params);
+    const result = await query(sql, dataParams);
 
     const data = result.rows.map((row) => {
-      let locationStatus = 'NO_LOCATION';
+      let locationState = 'NO_LOCATION';
       let lat: number | null = null;
       let lng: number | null = null;
       let notes: string | null = null;
       let photoUrl: string | null = null;
       let locId: string | null = null;
 
-      const hasSl = row.saved_location_id && row.latitude !== null && row.longitude !== null;
-      const hasSdp = row.sdp_status === 'TEMPORARY' && row.sdp_latitude !== null && row.sdp_longitude !== null;
-
-      if (hasSl && hasSdp) {
-        const slDate = new Date(row.location_updated_at).getTime();
-        const sdpDate = new Date(row.sdp_updated_at).getTime();
-        if (sdpDate > slDate) {
-          // Vị trí ghim tạm mới hơn vị trí đã lưu trước đó -> Phản ánh TEMPORARY
-          locationStatus = 'TEMPORARY';
-          lat = parseFloat(row.sdp_latitude);
-          lng = parseFloat(row.sdp_longitude);
-          // Giữ nguyên ghi chú nhận diện và ảnh cổng nhà đã lưu nếu sdp không có ghi chú riêng
-          notes = row.sdp_notes || row.identification_notes;
-          photoUrl = row.sdp_image_url || row.image_url;
-          locId = row.saved_location_id;
-        } else {
-          locationStatus = 'VERIFIED';
-          lat = parseFloat(row.latitude);
-          lng = parseFloat(row.longitude);
-          notes = row.identification_notes;
-          photoUrl = row.image_url;
-          locId = row.saved_location_id;
-        }
-      } else if (hasSl) {
-        locationStatus = 'VERIFIED';
+      if (row.saved_location_id && row.latitude !== null && row.longitude !== null) {
+        // VERIFIED: Luôn ưu tiên vị trí đã lưu của hệ thống
+        locationState = 'VERIFIED';
         lat = parseFloat(row.latitude);
         lng = parseFloat(row.longitude);
         notes = row.identification_notes;
         photoUrl = row.image_url;
         locId = row.saved_location_id;
-      } else if (hasSdp) {
-        locationStatus = 'TEMPORARY';
+      } else if (row.sdp_id && row.sdp_latitude !== null && row.sdp_longitude !== null) {
+        // TEMPORARY: Chỉ khi không có vị trí đã lưu và có điểm ghim tạm trong ca của chính shipper
+        locationState = 'TEMPORARY';
         lat = parseFloat(row.sdp_latitude);
         lng = parseFloat(row.sdp_longitude);
         notes = row.sdp_notes;
@@ -182,7 +252,7 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
 
       const activePhotos = row.photos_json || [];
       const cpPhotoCount = parseInt(row.photo_count, 10) || 0;
-      // Ưu tiên ảnh mới nhất từ customer_photos, nếu không có mới dùng sdp_image_url hoặc saved_locations image_url
+      // Ưu tiên ảnh mới nhất từ customer_photos, nếu không có mới dùng saved_locations hoặc sdp_image_url
       const effectivePhotoUrl = row.latest_photo_url || photoUrl;
       const totalPhotoCount = cpPhotoCount > 0 ? cpPhotoCount : (effectivePhotoUrl ? 1 : 0);
 
@@ -194,11 +264,13 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
         addressText: row.address_text,
         areaId: row.area_id,
         areaName: row.area_name,
-        locationStatus,
+        locationState,
+        locationStatus: locationState, // Tương thích ngược với các thành phần cũ
         hasLocation: lat !== null && lng !== null,
         latitude: lat,
         longitude: lng,
         identificationNotes: notes,
+        firstThumbnailUrl: effectivePhotoUrl,
         imageUrl: effectivePhotoUrl,
         photoCount: totalPhotoCount,
         photos: activePhotos,
@@ -208,17 +280,25 @@ export const listCustomers = async (req: AuthenticatedRequest, res: Response) =>
       };
     });
 
-    // Lọc theo status nếu có (VERIFIED, TEMPORARY, NO_LOCATION)
-    let filteredData = data;
-    if (status && typeof status === 'string' && status !== 'ALL') {
-      const targetStatus = status.toUpperCase();
-      filteredData = data.filter((c) => c.locationStatus === targetStatus);
-    }
+    const totalFilteredCount = filterState === 'VERIFIED'
+      ? counts.verified
+      : filterState === 'TEMPORARY'
+        ? counts.temporary
+        : filterState === 'NO_LOCATION'
+          ? counts.noLocation
+          : counts.total;
 
     return res.status(200).json({
       success: true,
-      data: filteredData,
-      total: filteredData.length,
+      data,
+      counts,
+      pagination: {
+        total: totalFilteredCount,
+        limit: limitNum > 0 ? limitNum : data.length,
+        offset: offsetNum >= 0 ? offsetNum : 0,
+        hasMore: limitNum > 0 ? offsetNum + data.length < totalFilteredCount : false,
+      },
+      total: data.length,
     });
   } catch (error: any) {
     return res.status(500).json({
