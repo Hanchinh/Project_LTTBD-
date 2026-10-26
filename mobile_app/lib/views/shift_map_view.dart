@@ -617,6 +617,11 @@ class _ShiftMapViewState extends State<ShiftMapView> {
                             Row(
                               children: [
                                 Text(
+                                  shift.shiftCode,
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                ),
+                                const Text(' · ', style: TextStyle(color: Color(0xFFCBD5E1))),
+                                Text(
                                   '${validPoints.length} đã ghim',
                                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
                                 ),
@@ -782,10 +787,10 @@ class _ShiftMapViewState extends State<ShiftMapView> {
                                 width: 56,
                                 height: 56,
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFF2563EB),
+                                  color: Color(0xFF0F172A),
                                   shape: BoxShape.circle,
                                   boxShadow: [
-                                    BoxShadow(color: Color(0x662563EB), blurRadius: 10, offset: Offset(0, 4)),
+                                    BoxShadow(color: Color(0x660F172A), blurRadius: 10, offset: Offset(0, 4)),
                                   ],
                                 ),
                                 child: const Center(

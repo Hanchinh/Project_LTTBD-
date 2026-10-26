@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { pool, query } from '../db';
+import { parseAndNormalizeBulkPhones } from '../utils/phone.helper';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -788,3 +789,223 @@ export const updateCustomer = async (req: AuthenticatedRequest, res: Response) =
     });
   }
 };
+
+// 5. POST /api/v1/customers/bulk - Thêm danh sách khách hàng hàng loạt vào danh bạ (TASK: DIRECTORY-BULK-SHIFT-NAME-BLACK-BUTTONS-022A)
+export const createBulkCustomers = async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+  const userId = user?.userId;
+  const roleName = user?.roleName;
+  const assignedAreaIds = user?.assignedAreaIds || [];
+  const { rawText, phones, areaId } = req.body;
+
+  if (!rawText && (!phones || !Array.isArray(phones) || phones.length === 0)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Vui lòng cung cấp danh sách số điện thoại (phones) hoặc đoạn văn bản (rawText)',
+    });
+  }
+
+  // Parse và chuẩn hóa danh sách số điện thoại
+  const parsed = parseAndNormalizeBulkPhones(rawText, phones);
+
+  if (parsed.items.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Không tìm thấy số điện thoại nào trong dữ liệu gửi lên',
+    });
+  }
+
+  if (parsed.uniquePhones.length > 200) {
+    return res.status(400).json({
+      success: false,
+      message: `Vượt quá giới hạn tối đa 200 số điện thoại cho mỗi lần thêm hàng loạt (nhận được ${parsed.uniquePhones.length} số)`,
+    });
+  }
+
+  // Xác định khu vực áp dụng cho khách hàng mới
+  let targetAreaId: string | null = null;
+  if (areaId) {
+    if (roleName !== 'ADMIN' && !assignedAreaIds.includes(areaId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Khu vực được chỉ định không thuộc khu vực bạn được phân công phụ trách',
+      });
+    }
+    targetAreaId = areaId;
+  } else if (roleName === 'ADMIN') {
+    const areaQuery = await query('SELECT id FROM areas ORDER BY created_at ASC LIMIT 1');
+    targetAreaId = areaQuery.rows[0]?.id || null;
+  } else if (roleName === 'SHIPPER') {
+    if (assignedAreaIds.length === 1) {
+      targetAreaId = assignedAreaIds[0];
+    } else if (assignedAreaIds.length > 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bạn phụ trách nhiều khu vực. Vui lòng chọn khu vực áp dụng cho các khách hàng mới trước khi thêm danh sách SĐT',
+        requireAreaSelection: true,
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Shipper chưa được phân công khu vực phụ trách',
+      });
+    }
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const created: any[] = [];
+    const alreadyExists: any[] = [];
+    const rejected: any[] = [];
+
+    // Đưa các số sai định dạng ngay từ đầu vào rejected
+    for (const item of parsed.items) {
+      if (!item.isValid) {
+        rejected.push({
+          phone: item.original,
+          reason: 'INVALID_FORMAT',
+          message: item.reason || 'Số điện thoại không đúng định dạng (cần 10 chữ số hợp lệ)',
+        });
+      }
+    }
+
+    const validPhones = parsed.uniquePhones;
+
+    // Tìm các khách hàng đã tồn tại trong DB theo số điện thoại
+    const existingCustRes = await client.query(
+      `SELECT c.id, c.customer_code, c.full_name, c.phone_number, c.address_text, c.area_id,
+              sl.id as saved_location_id,
+              sl.latitude, sl.longitude, sl.identification_notes, sl.image_url
+       FROM customers c
+       LEFT JOIN saved_locations sl ON sl.customer_id = c.id
+       WHERE c.phone_number = ANY($1::varchar[])`,
+      [validPhones]
+    );
+
+    const existingMap = new Map<string, any>();
+    for (const row of existingCustRes.rows) {
+      existingMap.set(row.phone_number, row);
+    }
+
+    // Lấy các điểm tạm thời trong ca đang mở của shipper này (nếu khách chưa có saved_location)
+    const existingCustIds = Array.from(existingMap.values()).map(r => r.id);
+    const tempPointsSet = new Set<string>();
+    if (existingCustIds.length > 0 && userId) {
+      const tempPointsRes = await client.query(
+        `SELECT DISTINCT sdp.customer_id
+         FROM shift_delivery_points sdp
+         JOIN shifts s ON s.id = sdp.shift_id
+         WHERE s.shipper_id = $1
+           AND s.status IN ('PREPARING', 'IN_PROGRESS')
+           AND sdp.location_status = 'TEMPORARY'
+           AND sdp.customer_id = ANY($2::uuid[])`,
+        [userId, existingCustIds]
+      );
+      for (const row of tempPointsRes.rows) {
+        tempPointsSet.add(row.customer_id);
+      }
+    }
+
+    // Xử lý từng số điện thoại hợp lệ
+    for (const phone of validPhones) {
+      const existing = existingMap.get(phone);
+
+      if (existing) {
+        // Kiểm tra khu vực nếu là SHIPPER
+        if (roleName === 'SHIPPER' && !assignedAreaIds.includes(existing.area_id)) {
+          rejected.push({
+            phone,
+            reason: 'OUT_OF_AREA',
+            message: 'Khách hàng thuộc khu vực bạn không được phân công phụ trách',
+          });
+          continue;
+        }
+
+        // Tính locationState theo quy tắc LOCATION-RULES-012
+        let locationState = 'NO_LOCATION';
+        if (existing.saved_location_id) {
+          locationState = 'VERIFIED';
+        } else if (tempPointsSet.has(existing.id)) {
+          locationState = 'TEMPORARY';
+        }
+
+        alreadyExists.push({
+          id: existing.id,
+          customerCode: existing.customer_code,
+          fullName: existing.full_name,
+          phoneNumber: existing.phone_number,
+          addressText: existing.address_text,
+          areaId: existing.area_id,
+          locationState,
+          latitude: existing.latitude ? parseFloat(existing.latitude) : null,
+          longitude: existing.longitude ? parseFloat(existing.longitude) : null,
+          identificationNotes: existing.identification_notes,
+          imageUrl: existing.image_url,
+        });
+      } else {
+        // Tạo khách hàng mới
+        const custName = `Khách ${phone}`;
+        const custAddress = 'Chưa cập nhật địa chỉ';
+        const custCode = `KH_${phone.slice(-6)}_${Date.now().toString().slice(-4)}`;
+
+        const insertRes = await client.query(
+          `INSERT INTO customers (customer_code, full_name, phone_number, address_text, area_id)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id, customer_code, full_name, phone_number, address_text, area_id, created_at`,
+          [custCode, custName, phone, custAddress, targetAreaId]
+        );
+
+        const newCust = insertRes.rows[0];
+        created.push({
+          id: newCust.id,
+          customerCode: newCust.customer_code,
+          fullName: newCust.full_name,
+          phoneNumber: newCust.phone_number,
+          addressText: newCust.address_text,
+          areaId: newCust.area_id,
+          locationState: 'NO_LOCATION',
+          createdAt: newCust.created_at,
+        });
+      }
+    }
+
+    const summary = {
+      total: parsed.items.length,
+      createdCount: created.length,
+      alreadyExistsCount: alreadyExists.length,
+      rejectedCount: rejected.length,
+    };
+
+    // Ghi 1 dòng audit_logs duy nhất cho cả lô
+    await client.query(
+      `INSERT INTO audit_logs (user_id, action, entity, entity_id, details)
+       VALUES ($1, 'BULK_CREATE_CUSTOMERS', 'customers', $2, $3)`,
+      [userId || null, userId || 'system', JSON.stringify(summary)]
+    );
+
+    await client.query('COMMIT');
+
+    return res.status(200).json({
+      success: true,
+      message: `Đã xử lý danh sách SĐT: ${created.length} mới tạo, ${alreadyExists.length} đã có, ${rejected.length} bị từ chối`,
+      data: {
+        created,
+        alreadyExists,
+        rejected,
+        summary,
+      },
+    });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi thêm hàng loạt khách hàng vào danh bạ',
+      error: error.message,
+    });
+  } finally {
+    client.release();
+  }
+};
+

@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import '../models/shift_model.dart';
 import '../services/api_service.dart';
 import '../services/map_tile_cache_service.dart';
+import '../theme/app_buttons.dart';
 
 class CrosshairLocationPickerResult {
   final double latitude;
@@ -732,11 +733,7 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
                           child: SizedBox(
                             height: 48,
                             child: OutlinedButton(
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xFF64748B),
-                                side: const BorderSide(color: Color(0xFFCBD5E1)),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
+                              style: AppButtons.secondary(minHeight: 48, borderRadius: 12),
                               onPressed: _isSaving ? null : () => Navigator.pop(context),
                               child: const Text(
                                 'Hủy',
@@ -752,12 +749,7 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
                           child: SizedBox(
                             height: 48,
                             child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0F172A),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
+                              style: AppButtons.primary(minHeight: 48, borderRadius: 12),
                               icon: _isSaving
                                   ? const SizedBox(
                                       width: 18,

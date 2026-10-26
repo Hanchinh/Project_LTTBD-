@@ -14,6 +14,9 @@ import '../widgets/point_detail_bottom_sheet.dart';
 import '../widgets/create_shift_dialog.dart';
 import '../widgets/shift_picker_bottom_sheet.dart';
 import '../services/map_tile_cache_service.dart';
+import '../theme/app_buttons.dart';
+import '../models/data_share_model.dart';
+import '../widgets/customer_photos_strip_widget.dart';
 import 'shift_map_view.dart';
 
 /// Lớp đại diện cho cụm điểm (Cluster) trên Bản đồ chính
@@ -22,6 +25,14 @@ class _LocationCluster {
   final List<MasterSavedLocationModel> items;
 
   _LocationCluster({required this.center, required this.items});
+}
+
+/// Lớp đại diện cho cụm điểm được chia sẻ (TASK 023)
+class _SharedLocationCluster {
+  final LatLng center;
+  final List<SharedLocationPointModel> items;
+
+  _SharedLocationCluster({required this.center, required this.items});
 }
 
 /// Màn hình Bản đồ Chính độc lập với ca (TASK: MASTER-MAP-014)
@@ -59,6 +70,14 @@ class MainMapViewState extends State<MainMapView> {
   MasterSavedLocationModel? _selectedLocation;
   bool _isMapReady = false;
   double _currentZoom = 15.0;
+
+  // CHIA SẺ DỮ LIỆU GIỮA CÁC SHIPPER (TASK 023)
+  bool _showSharedLocations = false; // Mặc định tắt
+  List<SharedLocationPointModel> _sharedLocations = [];
+  SharedLocationPointModel? _selectedSharedLocation;
+  int _skippedOutOfAreaCount = 0;
+  bool _isLoadingShared = false;
+  bool _isOutOfAreaBannerDismissed = false;
 
   // Vị trí GPS của shipper
   LatLng? _shipperLocation;
@@ -174,11 +193,212 @@ class MainMapViewState extends State<MainMapView> {
   /// Cho phép các màn hình khác (như HomeShellView) gọi reload qua GlobalKey
   void reloadLocations() {
     _loadMasterData();
+    if (_showSharedLocations) {
+      _loadSharedLocations();
+    }
+  }
+
+  /// Bật/tắt chế độ hiển thị điểm chia sẻ (TASK 023)
+  Future<void> _toggleSharedLocations(bool enable) async {
+    setState(() {
+      _showSharedLocations = enable;
+      _isOutOfAreaBannerDismissed = false;
+      if (!enable) {
+        _selectedSharedLocation = null;
+      }
+    });
+
+    if (enable) {
+      await _loadSharedLocations();
+    }
+  }
+
+  /// Tải danh sách điểm được chia sẻ còn hiệu lực
+  Future<void> _loadSharedLocations() async {
+    setState(() => _isLoadingShared = true);
+    try {
+      final res = await ApiService.getSharedLocations();
+      if (!mounted) return;
+      setState(() {
+        _sharedLocations = (res['locations'] as List).cast<SharedLocationPointModel>();
+        _skippedOutOfAreaCount = res['skippedOutOfAreaCount'] as int? ?? 0;
+        _isLoadingShared = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingShared = false;
+      });
+    }
+  }
+
+  /// Thuật toán gom cụm cho các điểm chia sẻ (TASK 023: Gom cụm tính riêng)
+  List<_SharedLocationCluster> _clusterSharedLocations(List<SharedLocationPointModel> locations, double zoom) {
+    if (locations.isEmpty) return [];
+
+    if (zoom >= 16.5) {
+      return locations
+          .where((loc) => loc.latitude != 0.0 && loc.longitude != 0.0)
+          .map((loc) => _SharedLocationCluster(
+                center: LatLng(loc.latitude, loc.longitude),
+                items: [loc],
+              ))
+          .toList();
+    }
+
+    final double threshold = 0.065 / math.pow(2, (zoom - 10).clamp(0.0, 10.0));
+    final List<_SharedLocationCluster> clusters = [];
+
+    for (final loc in locations) {
+      if (loc.latitude == 0.0 && loc.longitude == 0.0) continue;
+      final latLng = LatLng(loc.latitude, loc.longitude);
+
+      _SharedLocationCluster? closestCluster;
+      double minDistance = double.infinity;
+
+      for (final cluster in clusters) {
+        final dLat = cluster.center.latitude - latLng.latitude;
+        final dLng = cluster.center.longitude - latLng.longitude;
+        final dist = math.sqrt(dLat * dLat + dLng * dLng);
+
+        if (dist < threshold && dist < minDistance) {
+          minDistance = dist;
+          closestCluster = cluster;
+        }
+      }
+
+      if (closestCluster != null) {
+        closestCluster.items.add(loc);
+      } else {
+        clusters.add(_SharedLocationCluster(center: latLng, items: [loc]));
+      }
+    }
+
+    return clusters;
+  }
+
+  /// Nhập 1 điểm chia sẻ cụ thể vào danh bạ của tôi
+  Future<void> _handleImportSingleSharedPoint(SharedLocationPointModel point) async {
+    bool replaceExisting = false;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text(
+                'Nhập vị trí vào của tôi',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Lưu vị trí khách hàng "${point.customerName}" vào danh sách vị trí đã lưu của bạn.',
+                    style: const TextStyle(fontSize: 14, color: Color(0xFF334155)),
+                  ),
+                  const SizedBox(height: 12),
+                  SwitchListTile(
+                    key: const Key('switch_replace_existing_single'),
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(
+                      'Ghi đè nếu đã tồn tại vị trí',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                    value: replaceExisting,
+                    activeThumbColor: AppButtons.navy,
+                    onChanged: (val) => setDialogState(() => replaceExisting = val),
+                  ),
+                ],
+              ),
+              actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              actions: [
+                TextButton(
+                  style: AppButtons.text(minHeight: 48),
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B))),
+                ),
+                ElevatedButton(
+                  key: const Key('btn_confirm_import_single_point'),
+                  style: AppButtons.primary(minHeight: 48, borderRadius: 10),
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: const Text('NHẬP VỊ TRÍ'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirm == true) {
+      try {
+        final res = await ApiService.importSharedLocations(
+          point.shareId,
+          customerIds: [point.customerId],
+          all: false,
+          replaceExisting: replaceExisting,
+        );
+        final imported = res['importedCount'] ?? 0;
+        final skipped = res['skippedCount'] ?? 0;
+
+        if (mounted) {
+          if (imported > 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Đã nhập vị trí vào danh bạ của bạn thành công!'),
+                backgroundColor: Color(0xFF0F172A),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            setState(() => _selectedSharedLocation = null);
+            _loadMasterData();
+          } else if (skipped > 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Khách hàng này đã có vị trí trong danh bạ của bạn (bỏ qua).'),
+                backgroundColor: Color(0xFF0F172A),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: const Color(0xFFDC2626),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
   }
 
   /// Tương thích ngược với lời gọi cũ từ HomeShellView
   void reloadActiveShift({bool preserveSelected = true}) {
     reloadLocations();
+  }
+
+  @visibleForTesting
+  void setSelectedSharedLocationForTesting(SharedLocationPointModel? point) {
+    setState(() {
+      _selectedLocation = null;
+      _selectedSharedLocation = point;
+    });
+  }
+
+  @visibleForTesting
+  void setOutOfAreaWarningForTesting(int skippedCount) {
+    setState(() {
+      _showSharedLocations = true;
+      _skippedOutOfAreaCount = skippedCount;
+      _isOutOfAreaBannerDismissed = false;
+    });
   }
 
   /// Căn chỉnh khung hình bản đồ bao quát các điểm đã lưu
@@ -703,11 +923,7 @@ class MainMapViewState extends State<MainMapView> {
                       height: 50,
                       child: ElevatedButton(
                         key: const Key('btn_confirm_save_location'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
+                        style: AppButtons.primary(minHeight: 50, borderRadius: 12),
                         onPressed: () async {
                           final rawPhone = phoneCtrl.text.trim();
                           if (rawPhone.isEmpty) {
@@ -744,9 +960,9 @@ class MainMapViewState extends State<MainMapView> {
                                     child: const Text('HỦY'),
                                   ),
                                   ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB)),
+                                    style: AppButtons.primary(),
                                     onPressed: () => Navigator.pop(dlgCtx, true),
-                                    child: const Text('TIẾP TỤC', style: TextStyle(color: Colors.white)),
+                                    child: const Text('TIẾP TỤC'),
                                   ),
                                 ],
                               ),
@@ -831,10 +1047,7 @@ class MainMapViewState extends State<MainMapView> {
                     child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B))),
                   ),
                   ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
-                      foregroundColor: Colors.white,
-                    ),
+                    style: AppButtons.primary(),
                     onPressed: () => Navigator.pop(dlgCtx, true),
                     child: const Text('THAY VỊ TRÍ CŨ'),
                   ),
@@ -940,10 +1153,7 @@ class MainMapViewState extends State<MainMapView> {
                 child: const Text('ĐÓNG', style: TextStyle(color: Color(0xFF64748B))),
               ),
               ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                ),
+                style: AppButtons.primary(),
                 icon: const Icon(Icons.refresh_rounded, size: 16),
                 label: const Text('THỬ LẠI'),
                 onPressed: () {
@@ -994,14 +1204,21 @@ class MainMapViewState extends State<MainMapView> {
         ? _cachedClusters
         : _clusterLocations(_savedLocations, _currentZoom);
 
+    // Tính toán các cụm marker điểm được chia sẻ nếu đang bật (TASK 023)
+    final sharedClusters = _showSharedLocations
+        ? _clusterSharedLocations(_sharedLocations, _currentZoom)
+        : <_SharedLocationCluster>[];
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: PopScope(
-        canPop: _selectedLocation == null && !_isPinningMode,
+        canPop: _selectedLocation == null && _selectedSharedLocation == null && !_isPinningMode,
         onPopInvokedWithResult: (didPop, result) {
           if (didPop) return;
           if (_selectedLocation != null) {
             setState(() => _selectedLocation = null);
+          } else if (_selectedSharedLocation != null) {
+            setState(() => _selectedSharedLocation = null);
           } else if (_isPinningMode) {
             _cancelPinningMode();
           }
@@ -1021,9 +1238,12 @@ class MainMapViewState extends State<MainMapView> {
                     minZoom: 4.0,
                     maxZoom: 18.5,
                     onTap: (tapPosition, point) {
-                      // Chạm vào vùng bản đồ trống bên ngoài thẻ để đóng thẻ (TASK 017 - Mục B.2)
+                      // Chạm vào vùng bản đồ trống bên ngoài thẻ để đóng thẻ (TASK 017 - Mục B.2 & TASK 023)
                       if (_selectedLocation != null) {
                         setState(() => _selectedLocation = null);
+                      }
+                      if (_selectedSharedLocation != null) {
+                        setState(() => _selectedSharedLocation = null);
                       }
                     },
                     onMapReady: () {
@@ -1178,6 +1398,97 @@ class MainMapViewState extends State<MainMapView> {
                     }
                   }).toList(),
                 ),
+
+              // MarkerLayer: Danh sách các marker / cụm marker ĐƯỢC CHIA SẺ (màu tím #7C3AED, TASK 023)
+              if (!_isPinningMode && _showSharedLocations)
+                MarkerLayer(
+                  markers: sharedClusters.map((cluster) {
+                    final isCluster = cluster.items.length > 1;
+
+                    if (isCluster) {
+                      // MARKER CỤM CHIA SẺ (PURPLE CLUSTER BADGE)
+                      final count = cluster.items.length;
+                      return Marker(
+                        point: cluster.center,
+                        width: 48,
+                        height: 48,
+                        child: GestureDetector(
+                          onTap: () {
+                            _mapController.move(cluster.center, (_currentZoom + 2.5).clamp(1.0, 18.0));
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF7C3AED), Color(0xFF6D28D9)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              border: Border.all(color: Colors.white, width: 3),
+                              boxShadow: const [
+                                BoxShadow(color: Color(0x667C3AED), blurRadius: 8, offset: Offset(0, 3)),
+                              ],
+                            ),
+                            child: Center(
+                              child: Text(
+                                '$count',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    } else {
+                      // MARKER ĐƠN LẺ CHIA SẺ (PURPLE PIN)
+                      final item = cluster.items.first;
+                      final isSelected = _selectedSharedLocation?.customerId == item.customerId;
+
+                      return Marker(
+                        point: cluster.center,
+                        width: isSelected ? 48 : 40,
+                        height: isSelected ? 48 : 40,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _selectedLocation = null;
+                              _selectedSharedLocation = item;
+                            });
+                            _mapController.move(cluster.center, 17.0);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF7C3AED), // Tím: ĐƯỢC CHIA SẺ
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white,
+                                width: isSelected ? 3 : 2,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: isSelected ? const Color(0x807C3AED) : Colors.black26,
+                                  blurRadius: isSelected ? 8 : 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Center(
+                              child: Icon(
+                                Icons.share_location_rounded,
+                                color: Colors.white,
+                                size: isSelected ? 24 : 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                  }).toList(),
+                ),
             ],
           ),
         ),
@@ -1300,13 +1611,9 @@ class MainMapViewState extends State<MainMapView> {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: const BorderSide(color: Color(0xFFCBD5E1)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
+                          style: AppButtons.secondary(minHeight: 48, borderRadius: 10),
                           onPressed: _cancelPinningMode,
-                          child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                          child: const Text('HỦY'),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1314,14 +1621,9 @@ class MainMapViewState extends State<MainMapView> {
                         flex: 2,
                         child: ElevatedButton(
                           key: const Key('btn_confirm_crosshair'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2563EB),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
+                          style: AppButtons.primary(minHeight: 48, borderRadius: 10),
                           onPressed: () => _showAssignPhoneDialog(_crosshairCoord),
-                          child: const Text('XÁC NHẬN VỊ TRÍ NÀY', style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: const Text('XÁC NHẬN VỊ TRÍ NÀY'),
                         ),
                       ),
                     ],
@@ -1362,6 +1664,25 @@ class MainMapViewState extends State<MainMapView> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
+                          // Nút bật/tắt Điểm được chia sẻ (TASK 023)
+                          IconButton(
+                            key: const Key('toggle_shared_locations'),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            icon: _isLoadingShared
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF7C3AED)),
+                                  )
+                                : Icon(
+                                    _showSharedLocations ? Icons.share_location_rounded : Icons.share_location_outlined,
+                                    color: _showSharedLocations ? const Color(0xFF7C3AED) : const Color(0xFF64748B),
+                                    size: 20,
+                                  ),
+                            tooltip: _showSharedLocations ? 'Tắt điểm chia sẻ' : 'Bật điểm chia sẻ',
+                            onPressed: () => _toggleSharedLocations(!_showSharedLocations),
+                          ),
                           // Nút đổi nền bản đồ
                           IconButton(
                             padding: EdgeInsets.zero,
@@ -1381,6 +1702,88 @@ class MainMapViewState extends State<MainMapView> {
                         ],
                       ),
                     ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Banner cảnh báo điểm chia sẻ ngoài khu vực (TASK 023)
+          if (!_isPinningMode && _showSharedLocations && !_isOutOfAreaBannerDismissed && _skippedOutOfAreaCount > 0)
+            Positioned(
+              key: const Key('banner_out_of_area_warning'),
+              top: 62,
+              left: 14,
+              right: 14,
+              child: SafeArea(
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(10),
+                  color: const Color(0xFFFEF3C7),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$_skippedOutOfAreaCount điểm không hiển thị vì ngoài khu vực của bạn',
+                            style: const TextStyle(color: Color(0xFF92400E), fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        IconButton(
+                          key: const Key('btn_close_out_of_area_banner'),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF92400E)),
+                          onPressed: () => setState(() => _isOutOfAreaBannerDismissed = true),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // Legend phân biệt màu sắc marker: Xanh (Của tôi) - Tím (Được chia sẻ) (TASK 023)
+          if (!_isPinningMode && _showSharedLocations)
+            Positioned(
+              top: (!_isOutOfAreaBannerDismissed && _skippedOutOfAreaCount > 0) ? 112 : 62,
+              left: 14,
+              child: SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Của tôi',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(color: Color(0xFF7C3AED), shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Được chia sẻ',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1512,10 +1915,21 @@ class MainMapViewState extends State<MainMapView> {
               ),
             ),
 
+          // 5B. THẺ CHI TIẾT ĐIỂM ĐƯỢC CHIA SẺ (READ-ONLY, KHÔNG CÓ GHIM LẠI / XÓA) (TASK 023)
+          if (!_isPinningMode && _selectedSharedLocation != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: RepaintBoundary(
+                child: _buildSharedPointBottomSheet(_selectedSharedLocation!),
+              ),
+            ),
+
           // 6. CỘT ICON DỌC Ở MÉP PHẢI PHÍA DƯỚI (VÙNG NGÓN CÁI, CÔ LẬP REPAINT BOUNDARY) (TASK 017 - MỤC A & TASK 019)
           // Từ dưới lên: Ghim vị trí mới (60px, #2563EB) | Tạo ca (52px, #0F172A) | Ca làm việc (52px, trắng viền xám)
           // Khoảng cách >= 12px, có Tooltip & Semantics label đầy đủ, ẩn khi mở tâm ngắm hoặc mở thẻ chi tiết
-          if (!_isPinningMode && _selectedLocation == null)
+          if (!_isPinningMode && _selectedLocation == null && _selectedSharedLocation == null)
             Positioned(
               right: 16,
               bottom: 20,
@@ -1552,7 +1966,7 @@ class MainMapViewState extends State<MainMapView> {
                                   child: Icon(
                                     Icons.work_history_rounded,
                                     size: 24,
-                                    color: Color(0xFF2563EB),
+                                    color: AppButtons.navy,
                                   ),
                                 ),
                               ),
@@ -1600,7 +2014,7 @@ class MainMapViewState extends State<MainMapView> {
 
                       const SizedBox(height: 12),
 
-                      // 3. Nút "Ghim vị trí mới" (dưới cùng của cột, to nhất 60px, màu xanh #2563EB)
+                      // 3. Nút "Ghim vị trí mới" (dưới cùng của cột, to nhất 60px, màu xanh đen #0F172A)
                       Semantics(
                         label: 'Ghim vị trí mới',
                         button: true,
@@ -1616,10 +2030,10 @@ class MainMapViewState extends State<MainMapView> {
                                 width: 60,
                                 height: 60,
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFF2563EB),
+                                  color: AppButtons.navy,
                                   shape: BoxShape.circle,
                                   boxShadow: [
-                                    BoxShadow(color: Color(0x662563EB), blurRadius: 10, offset: Offset(0, 4)),
+                                    BoxShadow(color: Color(0x660F172A), blurRadius: 10, offset: Offset(0, 4)),
                                   ],
                                 ),
                                 child: const Center(
@@ -1651,5 +2065,200 @@ class MainMapViewState extends State<MainMapView> {
       ),
     ),
   );
+  }
+
+  /// Thẻ chi tiết điểm được chia sẻ (Read-only, không có nút Ghim lại / Xóa) (TASK 023)
+  Widget _buildSharedPointBottomSheet(SharedLocationPointModel point) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, -2)),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Thanh gạt drag handle
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // Header: Badge tím "Chia sẻ từ [tên]" + nút đóng
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3E8FF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFDDD6FE)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.share_rounded, size: 14, color: Color(0xFF7C3AED)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Chia sẻ từ ${point.sharedByName}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF7C3AED),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF64748B)),
+                  onPressed: () => setState(() => _selectedSharedLocation = null),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Tên khách hàng + Số điện thoại
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    point.customerName,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  point.customerPhone,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+
+            // Địa chỉ khách hàng
+            if (point.customerAddress.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.place_outlined, size: 16, color: Color(0xFF64748B)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      point.customerAddress,
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            // Ghi chú định danh
+            if (point.identificationNotes.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.notes_rounded, size: 16, color: Color(0xFF64748B)),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      point.identificationNotes,
+                      style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: Color(0xFF475569)),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            // Dải ảnh (nếu có ảnh từ người chia sẻ)
+            if (point.photos.isNotEmpty || (point.imageUrl != null && point.imageUrl!.isNotEmpty)) ...[
+              const SizedBox(height: 10),
+              CustomerPhotosStripWidget(
+                customerId: point.customerId,
+                customerName: point.customerName,
+                initialPhotos: point.photos,
+                legacyImageUrl: point.imageUrl,
+                canAddPhoto: false,
+                canDeletePhoto: false,
+                height: 100,
+              ),
+            ],
+
+            const SizedBox(height: 14),
+
+            // Hàng nút hành động: GỌI | CHỈ ĐƯỜNG
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('btn_call_shared_point'),
+                    style: AppButtons.secondary(minHeight: 48, borderRadius: 10),
+                    icon: const Icon(Icons.phone_rounded, size: 18),
+                    label: const Text('GỌI'),
+                    onPressed: () => _makePhoneCall(point.customerPhone),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    key: const Key('btn_directions_shared_point'),
+                    style: AppButtons.secondary(minHeight: 48, borderRadius: 10),
+                    icon: const Icon(Icons.navigation_rounded, size: 18),
+                    label: const Text('CHỈ ĐƯỜNG'),
+                    onPressed: () {
+                      ApiService.openExternalNavigation(point.latitude, point.longitude);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            // Nút "NHẬP VÀO CỦA TÔI"
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                key: const Key('btn_import_shared_point_to_mine'),
+                style: AppButtons.primary(minHeight: 48, borderRadius: 10),
+                icon: const Icon(Icons.download_rounded, size: 20),
+                label: const Text('NHẬP VÀO CỦA TÔI', style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: () => _handleImportSingleSharedPoint(point),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

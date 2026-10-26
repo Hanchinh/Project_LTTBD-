@@ -341,12 +341,16 @@ class _CustomerPhotosStripWidgetState extends State<CustomerPhotosStripWidget> {
                     children: [
                       Icon(Icons.add_a_photo_outlined, size: 20, color: Color(0xFF64748B)),
                       SizedBox(width: 6),
-                      Text(
-                        'Chưa có ảnh - Thêm ảnh',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF475569),
+                      Flexible(
+                        child: Text(
+                          'Chưa có ảnh - Thêm ảnh',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF475569),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -407,12 +411,16 @@ class _CustomerPhotosStripWidgetState extends State<CustomerPhotosStripWidget> {
                 else ...[
                   const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 22),
                   const SizedBox(width: 6),
-                  const Text(
-                    '+ THÊM ẢNH',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                  const Flexible(
+                    child: Text(
+                      '+ THÊM ẢNH',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

@@ -320,8 +320,60 @@ class ShiftModel {
   })  : summary = summary ?? ShiftSummaryModel(),
         deliveryPoints = deliveryPoints ?? [];
 
-  /// Tên hiển thị của ca: ưu tiên shiftName nếu có, ca cũ hiển thị shiftCode
-  String get displayTitle => (shiftName != null && shiftName!.trim().isNotEmpty) ? shiftName!.trim() : shiftCode;
+  /// Định dạng ngày dd/MM (hoặc dd/MM/yyyy nếu khác năm hiện tại)
+  static String formatVnDate(DateTime dt, {DateTime? now}) {
+    final currentYear = (now ?? DateTime.now()).toUtc().add(const Duration(hours: 7)).year;
+    final vnTime = dt.toUtc().add(const Duration(hours: 7));
+    final d = vnTime.day.toString().padLeft(2, '0');
+    final m = vnTime.month.toString().padLeft(2, '0');
+    if (vnTime.year != currentYear) {
+      return '$d/$m/${vnTime.year}';
+    }
+    return '$d/$m';
+  }
+
+  /// Suy ra tên ca theo thời gian Việt Nam (GMT+7)
+  /// Sáng: < 12h, Chiều: 12h - 18h, Tối: >= 18h
+  static String inferShiftName(DateTime dt, {DateTime? now}) {
+    final vnTime = dt.toUtc().add(const Duration(hours: 7));
+    String session;
+    if (vnTime.hour < 12) {
+      session = 'Ca sáng';
+    } else if (vnTime.hour < 18) {
+      session = 'Ca chiều';
+    } else {
+      session = 'Ca tối';
+    }
+    return '$session ${formatVnDate(dt, now: now)}';
+  }
+
+  /// Gợi ý tên khi tạo ca mới: "Ca sáng/chiều/tối dd/MM", nếu trùng thì thêm " (2)", " (3)"
+  static String suggestShiftName({DateTime? dateTime, List<String> existingNames = const []}) {
+    final now = dateTime ?? DateTime.now();
+    final baseName = inferShiftName(now);
+
+    if (!existingNames.contains(baseName)) {
+      return baseName;
+    }
+
+    int suffix = 2;
+    while (existingNames.contains('$baseName ($suffix)')) {
+      suffix++;
+    }
+    return '$baseName ($suffix)';
+  }
+
+  /// Tên hiển thị của ca: ưu tiên shiftName nếu có, nếu chưa có thì suy ra "Ca sáng/chiều/tối dd/MM"
+  String get displayTitle {
+    if (shiftName != null && shiftName!.trim().isNotEmpty) {
+      return shiftName!.trim();
+    }
+    final dt = createdAt ?? startedAt ?? DateTime.tryParse(shiftDate);
+    if (dt != null) {
+      return inferShiftName(dt);
+    }
+    return 'Ca giao hàng';
+  }
 
   factory ShiftModel.fromJson(Map<String, dynamic> json) {
     List<ShiftDeliveryPointModel> points = [];

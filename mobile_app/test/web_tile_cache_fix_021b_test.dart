@@ -1,11 +1,9 @@
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:delivery_marker_mobile/services/map_tile_cache_service.dart';
-import 'package:delivery_marker_mobile/services/offline_storage_service.dart';
 import 'package:delivery_marker_mobile/views/main_map_view.dart';
 import 'package:delivery_marker_mobile/views/shift_map_view.dart';
 import 'package:delivery_marker_mobile/views/crosshair_location_picker_view.dart';
@@ -46,7 +44,7 @@ void main() {
         headers: {'User-Agent': 'TestClient'},
       );
 
-      final coordinates = const TileCoordinates(1, 2, 3);
+      const coordinates = TileCoordinates(1, 2, 3);
       final options = TileLayer(
         urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
       );

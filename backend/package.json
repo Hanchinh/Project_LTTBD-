@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "test": "jest --detectOpenHandles",
+    "test": "jest --detectOpenHandles --runInBand",
     "test:setup-db": "ts-node scripts/setup-test-db.ts",
     "test:integration": "ts-node scripts/setup-test-db.ts && jest test/database-guard.spec.ts test/location-rules-012.integration.spec.ts test/quick-add-customer-013.integration.spec.ts test/master-map-014.integration.spec.ts test/multi-photo-015.integration.spec.ts test/shift-bulk-015b.integration.spec.ts --detectOpenHandles --runInBand"
   },

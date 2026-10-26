@@ -78,8 +78,8 @@ backend/.env
 backend/uploads/
 *.apk
 *.dump
-backups/
-
-backup_*
-*.dump
 *.zip
+*.sql
+!init-db/*.sql
+backups/
+backup_*

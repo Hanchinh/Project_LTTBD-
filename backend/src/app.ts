@@ -1,7 +1,7 @@
 import express, { Express } from 'express';
 import cors from 'cors';
 import { setupSwagger } from './swagger';
-import { login } from './controllers/auth.controller';
+import { login, getMyStats, changePassword } from './controllers/auth.controller';
 import { getMyShiftOrders, createShiftOrder } from './controllers/orders.controller';
 import {
   getCustomerLocation,
@@ -44,6 +44,7 @@ import { searchAddress } from './controllers/geocoding.controller';
 import {
   listCustomers,
   createCustomer,
+  createBulkCustomers,
   getCustomerDetail,
   updateCustomer,
 } from './controllers/customers.controller';
@@ -52,6 +53,16 @@ import {
   addCustomerPhoto,
   deleteCustomerPhoto,
 } from './controllers/customer-photos.controller';
+import {
+  createShare,
+  getOutgoingShares,
+  getIncomingShares,
+  acceptShare,
+  declineShare,
+  revokeShare,
+  getSharedLocations,
+  importSharedLocations,
+} from './controllers/shares.controller';
 
 export const createApp = (): Express => {
   const app = express();
@@ -64,8 +75,10 @@ export const createApp = (): Express => {
 
   const router = express.Router();
 
-  // AUTH ROUTES
+  // AUTH ROUTES (TASK: ACCOUNT-PROFILE-AND-LOGIN-REDESIGN-022B)
   router.post('/auth/login', login);
+  router.get('/auth/me/stats', authenticateJwt, getMyStats);
+  router.post('/auth/change-password', authenticateJwt, changePassword);
 
   // SHIFT MANAGEMENT ROUTES (FEATURE-SHIFT-001)
   router.get('/shifts', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), listShifts);
@@ -86,6 +99,7 @@ export const createApp = (): Express => {
   // CUSTOMER DIRECTORY & MANAGEMENT ROUTES (MAP-FIRST-ARCHITECTURE-005)
   router.get('/customers', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), listCustomers);
   router.post('/customers', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), createCustomer);
+  router.post('/customers/bulk', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), createBulkCustomers);
   router.get('/customers/:id', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), getCustomerDetail);
   router.put('/customers/:id', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), updateCustomer);
 
@@ -149,6 +163,16 @@ export const createApp = (): Express => {
 
   // MASTER MAP & SAVED LOCATIONS (TASK: MASTER-MAP-014)
   router.get('/locations/my-saved-locations', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), getMySavedLocations);
+
+  // DATA SHARING BETWEEN SHIPPERS (TASK: DATA-SHARING-BETWEEN-SHIPPERS-023)
+  router.post('/shares', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), createShare);
+  router.get('/shares/outgoing', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), getOutgoingShares);
+  router.get('/shares/incoming', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), getIncomingShares);
+  router.post('/shares/:id/accept', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), acceptShare);
+  router.post('/shares/:id/decline', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), declineShare);
+  router.post('/shares/:id/revoke', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), revokeShare);
+  router.get('/shares/shared-locations', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), getSharedLocations);
+  router.post('/shares/:id/import', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), importSharedLocations);
 
   // ADMIN & SHARED ROUTES
   router.get('/areas/my-areas', authenticateJwt, requireRoles('SHIPPER', 'ADMIN'), getMyAreas);

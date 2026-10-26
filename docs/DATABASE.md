@@ -469,7 +469,59 @@ Bảo toàn 100% dữ liệu gốc bị lỗi từ v1 mà không xóa dữ liệ
 
 ---
 
-## 12. Trạng Thái Áp Dụng Lên CSDL Môi Trường Chính (`delivery_db`)
+## 12. Chia Sẻ Dữ Liệu Giữa Các Shipper (DATA-SHARING-BETWEEN-SHIPPERS-023)
+
+### 12.1. Bảng Dữ Liệu `data_shares`
+```sql
+CREATE TABLE IF NOT EXISTS data_shares (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    owner_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    recipient_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    scope VARCHAR(20) NOT NULL CHECK (scope IN ('ALL_POINTS', 'SHIFT')),
+    shift_id UUID NULL REFERENCES shifts(id) ON DELETE SET NULL,
+    include_photos BOOLEAN NOT NULL DEFAULT FALSE,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACTIVE', 'DECLINED', 'REVOKED')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    accepted_at TIMESTAMPTZ NULL,
+    revoked_at TIMESTAMPTZ NULL,
+    expires_at TIMESTAMPTZ NULL,
+    CONSTRAINT chk_data_shares_owner_recipient CHECK (owner_id <> recipient_id),
+    CONSTRAINT chk_data_shares_scope_shift CHECK (
+        (scope = 'SHIFT' AND shift_id IS NOT NULL) OR
+        (scope = 'ALL_POINTS' AND shift_id IS NULL)
+    )
+);
+```
+
+### 12.2. Ràng Buộc & Chỉ Mục Tối Ưu
+1. **Ràng buộc chống tự chia sẻ:** `chk_data_shares_owner_recipient CHECK (owner_id <> recipient_id)`.
+2. **Ràng buộc phạm vi ca:** `chk_data_shares_scope_shift` bắt buộc `shift_id` có giá trị khi `scope = 'SHIFT'` và phải là `NULL` khi `scope = 'ALL_POINTS'`.
+3. **Chỉ mục Partial Unique Index chống trùng lặp lời mời:**
+   ```sql
+   CREATE UNIQUE INDEX IF NOT EXISTS uq_active_pending_data_share
+   ON data_shares (
+       owner_id,
+       recipient_id,
+       scope,
+       COALESCE(shift_id, '00000000-0000-0000-0000-000000000000'::UUID)
+   )
+   WHERE status IN ('PENDING', 'ACTIVE');
+   ```
+4. **Chỉ mục hiệu năng tra cứu danh sách:**
+   - `idx_data_shares_owner ON data_shares(owner_id, status)` (cho danh sách chia sẻ đi).
+   - `idx_data_shares_recipient ON data_shares(recipient_id, status)` (cho danh sách nhận).
+   - `idx_data_shares_shift ON data_shares(shift_id) WHERE shift_id IS NOT NULL`.
+   - `idx_data_shares_expires_at ON data_shares(expires_at) WHERE expires_at IS NOT NULL`.
+
+### 12.3. Quy Tắc Toàn Vẹn & Bảo Vệ Dữ Liệu Gốc
+1. **Tuyệt đối không xóa bản ghi (No Hard Deletes):** Bảng `data_shares` không bao giờ bị xóa bản ghi (`DELETE`); thao tác hủy/dừng chia sẻ chỉ chuyển trạng thái sang `REVOKED` kèm `revoked_at`.
+2. **Không đột biến dữ liệu gốc:** Khi shipper B import điểm từ A vào danh bạ của mình (`POST /shares/:id/import`), điểm của A vẫn giữ nguyên 100%. Lịch sử thay đổi tọa độ của B được lưu giữ thông qua trigger `trg_saved_locations_history`.
+3. **Kiểm soát truy cập ảnh:** Phục vụ ảnh (`servePhoto`) kiểm tra quyền sở hữu gốc: nếu người yêu cầu không phải người tạo ảnh thì bắt buộc phải có chia sẻ `ACTIVE` còn hạn, có `include_photos = true`, và khách hàng phải nằm trong khu vực được phân công của người nhận.
+4. **Nhật ký kiểm toán (`audit_logs`):** Ghi nhận đầy đủ các hành động `SHARE_CREATED`, `SHARE_ACCEPTED`, `SHARE_DECLINED`, `SHARE_REVOKED`, `SHARE_IMPORT` mà không làm rò rỉ thông tin PII khách hàng.
+
+---
+
+## 13. Trạng Thái Áp Dụng Lên CSDL Môi Trường Chính (`delivery_db`)
 
 | Migration File | Mô Tả | Trạng Thái Áp Dụng `delivery_db` | Thời Điểm Thực Thi | Bản Sao Lưu Trước Khi Chạy |
 | :--- | :--- | :--- | :--- | :--- |
@@ -480,6 +532,8 @@ Bảo toàn 100% dữ liệu gốc bị lỗi từ v1 mà không xóa dữ liệ
 | `05-add-customers-updated-at.sql` | Cột `customers.updated_at` | **ĐÃ ÁP DỤNG** | 23/10/2026 | Docker init-db |
 | [06-create-customer-photos.sql](file:///d:/flutter create delivery_marker_app/init-db/06-create-customer-photos.sql) | Bảng `customer_photos` đa ảnh theo khách, nạp 4 ảnh cũ, 3 chỉ mục | **ĐÃ ÁP DỤNG** | **25/10/2026 15:15:00** | `D:\db_backups\delivery_db_backup_20261025_151305.sql` (172 KB) |
 | [07-add-shift-name.sql](file:///d:/flutter create delivery_marker_app/init-db/07-add-shift-name.sql) | Cột `shifts.shift_name VARCHAR(100)` và chỉ mục `idx_shifts_shift_name` | **ĐÃ ÁP DỤNG** | **25/10/2026 15:15:07** | `D:\db_backups\delivery_db_backup_20261025_151305.sql` (172 KB) |
+| [08-create-data-shares.sql](file:///d:/flutter create delivery_marker_app/init-db/08-create-data-shares.sql) | Bảng `data_shares`, partial unique index và 4 chỉ mục hiệu năng | **ĐÃ ÁP DỤNG** | **26/10/2026 13:00:16** | `D:\db_backups\delivery_db_backup_20261026_125921.sql` (115.8 KB) |
+
 
 
 

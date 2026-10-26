@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/location_model.dart';
 import '../services/api_service.dart';
+import '../theme/app_buttons.dart';
 
 class SaveLocationView extends StatefulWidget {
   final String customerId;
@@ -262,7 +263,7 @@ class _SaveLocationViewState extends State<SaveLocationView> {
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Xem lại')),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1E88E5), foregroundColor: Colors.white),
+            style: AppButtons.primary(),
             child: const Text('Xác nhận lưu'),
           ),
         ],
@@ -491,12 +492,9 @@ class _SaveLocationViewState extends State<SaveLocationView> {
                   ] else ...[
                     OutlinedButton.icon(
                       onPressed: _showImageSourceDialog,
-                      icon: const Icon(Icons.add_a_photo, color: Color(0xFF1E88E5)),
+                      icon: const Icon(Icons.add_a_photo, color: AppButtons.primaryColor),
                       label: const Text('Chụp hoặc chọn ảnh mặt tiền/cổng nhà'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
+                      style: AppButtons.secondary(minHeight: 50, borderRadius: 10),
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -531,10 +529,7 @@ class _SaveLocationViewState extends State<SaveLocationView> {
                               'KIỂM TRA & XÁC NHẬN LƯU VỊ TRÍ',
                               style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                             ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E88E5),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
+                      style: AppButtons.primary(minHeight: 50, borderRadius: 10),
                     ),
                   ),
                 ],

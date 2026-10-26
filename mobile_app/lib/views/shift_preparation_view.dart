@@ -5,6 +5,7 @@ import 'crosshair_location_picker_view.dart';
 import 'shift_map_view.dart';
 import '../widgets/quick_add_customer_sheet.dart';
 import '../widgets/bulk_paste_phone_sheet.dart';
+import '../theme/app_buttons.dart';
 
 class ShiftPreparationView extends StatefulWidget {
   final ShiftModel shift;
@@ -493,7 +494,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Ca: ${_currentShift.shiftCode}',
+              _currentShift.displayTitle,
               style: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -501,7 +502,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
               ),
             ),
             Text(
-              'Ngày ${_currentShift.shiftDate} · ${_currentShift.status.displayName}',
+              '${_currentShift.shiftCode} · ${_currentShift.status.displayName}',
               style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
             ),
           ],
@@ -537,12 +538,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
                   child: ElevatedButton.icon(
                     key: const Key('btn_bulk_paste_phones'),
                     onPressed: _openBulkPasteSheet,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
-                      foregroundColor: Colors.white,
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
+                    style: AppButtons.primaryLarge(minHeight: 56, borderRadius: 14),
                     icon: const Icon(Icons.paste_rounded, size: 22),
                     label: const Text(
                       'NHẬP HÀNG LOẠT SĐT',
@@ -790,12 +786,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
                     child: SizedBox(
                       height: 48,
                       child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
+                        style: AppButtons.primary(minHeight: 48, borderRadius: 12),
                         icon: const Icon(Icons.map_rounded, size: 20),
                         label: const Text(
                           'Xem bản đồ ca làm này',
@@ -1013,12 +1004,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
                     height: 38,
                     child: point.locationStatus == LocationStatus.noLocation
                         ? ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2563EB),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
+                            style: AppButtons.primary(minHeight: 38, borderRadius: 8),
                             icon: const Icon(Icons.add_location_alt_rounded, size: 16),
                             label: const Text(
                               'Ghim vị trí',
@@ -1027,11 +1013,7 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
                             onPressed: () => _openCrosshairPicker(point),
                           )
                         : OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF0F172A),
-                              side: const BorderSide(color: Color(0xFFCBD5E1)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
+                            style: AppButtons.secondary(minHeight: 38, borderRadius: 8),
                             icon: Icon(
                               point.locationStatus == LocationStatus.temporary
                                   ? Icons.edit_location_alt_rounded

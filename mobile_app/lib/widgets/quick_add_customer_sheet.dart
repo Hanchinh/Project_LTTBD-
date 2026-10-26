@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/customer_model.dart';
 import '../services/api_service.dart';
+import '../theme/app_buttons.dart';
 
 /// Hàm chuẩn hóa số điện thoại theo định dạng chuẩn Việt Nam (10 chữ số)
 String normalizeCustomerPhone(String raw) {
@@ -237,10 +238,7 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
               child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B))),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
-                foregroundColor: Colors.white,
-              ),
+              style: AppButtons.primary(),
               onPressed: () => Navigator.pop(dlgCtx, true),
               child: const Text('TIẾP TỤC'),
             ),
@@ -325,16 +323,19 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Handle bar
-            Center(
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Handle bar
+              Center(
               child: Container(
                 width: 36,
                 height: 4,
@@ -351,11 +352,14 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
               children: [
                 const Icon(Icons.person_add_rounded, color: Color(0xFF2563EB), size: 24),
                 const SizedBox(width: 8),
-                const Text(
-                  'Thêm nhanh khách hàng',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                const Expanded(
+                  child: Text(
+                    'Thêm nhanh khách hàng',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
                   onPressed: () => Navigator.pop(context),
@@ -461,12 +465,16 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
                       size: 20,
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      _isExpanded ? 'Ẩn thông tin tùy chọn' : 'Thêm thông tin (Tên, địa chỉ, ghi chú)',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF2563EB),
+                    Expanded(
+                      child: Text(
+                        _isExpanded ? 'Ẩn thông tin tùy chọn' : 'Thêm thông tin (Tên, địa chỉ, ghi chú)',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2563EB),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -538,12 +546,7 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF64748B),
-                      side: const BorderSide(color: Color(0xFFCBD5E1)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                    style: AppButtons.secondary(minHeight: 48, borderRadius: 10),
                     onPressed: () => Navigator.pop(context),
                     child: const Text('HỦY', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
@@ -552,13 +555,7 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
                 Expanded(
                   flex: 2,
                   child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                    style: AppButtons.primary(minHeight: 48, borderRadius: 10),
                     icon: _isSaving
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Icon(Icons.check_rounded, size: 20),
@@ -571,6 +568,7 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

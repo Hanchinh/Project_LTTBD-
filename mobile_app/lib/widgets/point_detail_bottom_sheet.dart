@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/customer_photo_model.dart';
 import '../services/api_service.dart';
 import 'customer_photos_strip_widget.dart';
+import '../theme/app_buttons.dart';
 
 /// Thẻ chi tiết điểm giao / vị trí đã lưu thiết kế cho SHIPPER ĐI XE MỘT TAY (TASK: MULTI-PHOTO-AND-THUMB-UI-015A)
 /// - Bottom sheet bám đáy màn hình (vùng ngón cái), vuốt lên để xem thêm, vuốt xuống để đóng.
@@ -440,22 +441,21 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
   Widget _buildOneHandedActionButtons() {
     return Row(
       children: [
-        // 1. NÚT GỌI (Green)
+        // 1. NÚT GỌI (Navy/đen)
         Expanded(
           child: SizedBox(
             height: 56,
             child: ElevatedButton(
               key: const ValueKey('btn_call'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF15803D), // Deep green high contrast
-                foregroundColor: Colors.white,
-                elevation: 3,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              style: AppButtons.primaryLarge(
+                minHeight: 56,
+                borderRadius: 14,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               ),
               onPressed: _makePhoneCall,
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.phone_in_talk_rounded, size: 20),
                   SizedBox(height: 2),
@@ -471,22 +471,21 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
 
         const SizedBox(width: 12),
 
-        // 2. NÚT CHỈ ĐƯỜNG (Blue)
+        // 2. NÚT CHỈ ĐƯỜNG (Navy/đen)
         Expanded(
           child: SizedBox(
             height: 56,
             child: ElevatedButton(
               key: const ValueKey('btn_directions'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1D4ED8), // Deep blue high contrast
-                foregroundColor: Colors.white,
-                elevation: 3,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              style: AppButtons.primaryLarge(
+                minHeight: 56,
+                borderRadius: 14,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               ),
               onPressed: _openNavigation,
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.directions_rounded, size: 20),
                   SizedBox(height: 2),
@@ -504,22 +503,21 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
 
         const SizedBox(width: 12),
 
-        // 3. NÚT GHIM LẠI (Orange / Amber)
+        // 3. NÚT GHIM LẠI (Navy/đen)
         Expanded(
           child: SizedBox(
             height: 56,
             child: ElevatedButton(
               key: const ValueKey('btn_repin'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFD97706), // Deep amber high contrast
-                foregroundColor: Colors.white,
-                elevation: 3,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              style: AppButtons.primaryLarge(
+                minHeight: 56,
+                borderRadius: 14,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               ),
               onPressed: widget.onRepin,
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.edit_location_alt_rounded, size: 20),
                   SizedBox(height: 2),

@@ -1013,6 +1013,356 @@
       * **[ĐÃ TEST]:** 113/113 automated Flutter tests passed, `flutter analyze` 0 issues, `flutter build web` thành công, kiểm thử runtime thực tế trên Chrome xác nhận bản đồ tải ổn định không crash.
       * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa nạp file release APK lên thiết bị di động vật lý ngoài thực địa.
 
+47. **[ĐÃ HOÀN TẤT - TASK: DIRECTORY-BULK-SHIFT-NAME-BLACK-BUTTONS-022A] Danh Bạ Thêm Số Hàng Loạt, Tên Ca Nhất Quán & Nút Hành Động Xanh Đen/Đen:**
+    - **1. Mục Tiêu & Nguyên Tắc Tuân Thủ:**
+      * Tuân thủ [AGENTS.md](file:///d:/flutter%20create%20delivery_marker_app/AGENTS.md) và QUY TẮC CHUNG.
+      * Không gửi POST/PUT/PATCH/DELETE vào API sống hay SQL ghi lên `delivery_db`. Chỉ dùng GET để kiểm tra sống (`GET http://localhost:3000/api-docs` / container health).
+      * Toàn bộ kiểm thử ghi dữ liệu tích hợp backend thực hiện độc lập trên CSDL `test_isolated_seed_db` gọi controller thật.
+      * Không có migration CSDL (sử dụng schema hiện có của bảng `customers`, `shifts`, `shift_delivery_points`, `audit_logs`).
+    - **2. Chi Tiết Kỹ Thuật Đã Triển Khai:**
+      * **A. Danh Bạ: Thêm Số Hàng Loạt ([customer_directory_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart)):**
+        - Cạnh nút "+ Thêm số", bổ sung nút "Dán nhiều số" (vùng chạm $\ge 48$px, style [AppButtons.secondary](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/theme/app_buttons.dart)) mở lại [BulkPastePhoneSheet](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/bulk_paste_phone_sheet.dart) đã có ở chế độ "thêm vào danh bạ" (`isDirectoryMode: true`), không gắn ca.
+        - Tách helper dùng chung [phone.helper.ts](file:///d:/flutter%20create%20delivery_marker_app/backend/src/utils/phone.helper.ts): `parseAndNormalizeBulkPhones` dùng chung giữa bulk ca và bulk danh bạ. Giới hạn tối đa 200 số/lần.
+        - Backend: `POST /api/v1/customers/bulk` trong [customers.controller.ts](file:///d:/flutter%20create%20delivery_marker_app/backend/src/controllers/customers.controller.ts) tiếp nhận body `{ rawText | phones[], areaId? }`, thực thi trong 1 transaction duy nhất cho cả lô:
+          * Tên mặc định: `"Khách [SĐT]"`, địa chỉ mặc định: `"Chưa cập nhật địa chỉ"`.
+          * Kiểm tra khu vực: nếu shipper phụ trách nhiều khu vực mà không truyền `areaId` -> từ chối với `requireAreaSelection: true`.
+          * Phân loại phản hồi rõ ràng 3 nhóm: `created` (mới tạo), `alreadyExists` (đã có, kèm `locationState`: `VERIFIED`, `TEMPORARY`, `NO_LOCATION`), `rejected` (bị từ chối, kèm `reason`).
+          * Ghi 1 bản ghi duy nhất vào `audit_logs` cho cả lô với `action = 'CUSTOMER_BULK_CREATE'`.
+        - Mobile App tích hợp kết quả:
+          * Hiển thị bảng tổng kết 3 nhóm sau khi dán SĐT.
+          * Tự động làm mới danh bạ (`_fetchCustomers(reset: true)`).
+          * Cung cấp nút hành động "THÊM TẤT CẢ VÀO CA": tự động chọn ca khả dụng hoặc mở dialog tạo ca mới, sau đó gọi `addBulkPointsToShift`.
+      * **B. Tên Ca Làm Việc Nhất Quán ([shift_model.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/models/shift_model.dart)):**
+        - Tất cả màn hình ([shift_preparation_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/shift_preparation_view.dart), [shift_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/shift_map_view.dart), [shift_list_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/shift_list_view.dart), dialog, bottom sheet, SnackBar) chuyển sang sử dụng `displayTitle`. Mã ca `SHF-...` chỉ hiển thị chữ nhỏ màu xám bên dưới hoặc cạnh bên. Loại bỏ hoàn toàn nhãn `"Ca: SHF-..."`.
+        - Ca chưa có tên: tự động suy diễn tên qua `ShiftModel.inferShiftName` dựa trên giờ Việt Nam (GMT+7) từ `createdAt` / `startedAt`:
+          * Sáng (< 12h): `"Ca sáng dd/MM"`.
+          * Chiều (12h - 18h): `"Ca chiều dd/MM"`.
+          * Tối ($\ge$ 18h): `"Ca tối dd/MM"`.
+          * Chỉ phục vụ hiển thị (display-only), tuyệt đối không mutate dữ liệu cũ trong CSDL.
+        - Tạo ca mới ([create_shift_dialog.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/create_shift_dialog.dart)): tự động gợi ý & điền sẵn `"Ca sáng/chiều/tối dd/MM"`. Kiểm tra danh sách ca trong ngày của shipper, nếu trùng lặp tự động thêm đuôi `" (2)"`, `" (3)"` qua `ShiftModel.suggestShiftName`. Nếu người dùng xóa trống ô tên khi tạo, tự động lưu bằng tên gợi ý.
+        - Định dạng ngày: hàm `ShiftModel.formatVnDate` trả về `dd/MM` trong năm hiện tại, và tự động thêm năm `dd/MM/yyyy` nếu khác năm hiện tại.
+      * **C. Nút Hành Động Chuyển Sang Tông Xanh Đen/Đen ([app_buttons.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/theme/app_buttons.dart)):**
+        - Toàn bộ nút hành động chính (Primary) và phụ (Secondary) chuyển về tông xanh đen/đen:
+          * Primary: Nền `#0F172A`, chữ trắng.
+          * Secondary: Nền trắng, viền `#0F172A`, chữ `#0F172A`.
+        - Tập trung tại lớp [app_buttons.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/theme/app_buttons.dart): `AppButtons.primary`, `AppButtons.primaryLarge`, `AppButtons.secondary`, `AppButtons.secondaryLarge`.
+        - Áp dụng trên toàn bộ app: Tạo ca, Mở bản đồ, Dán SĐT, GỌI, CHỈ ĐƯỜNG, GHIM LẠI, LƯU, THÊM, XÁC NHẬN, nút nổi trên bản đồ chính, nút ghim crosshair...
+        - Kích thước vùng chạm chuẩn: tối thiểu $\ge 48$px, các thao tác chính tại bottom sheet đạt $\ge 56$px.
+        - Giữ nguyên: Chấm/marker trạng thái (xanh lá/cam/xám), chip trạng thái ca, nút Xóa màu đỏ trong dialog xác nhận. GỌI, CHỈ ĐƯỜNG, GHIM LẠI phân biệt rõ bằng icon và text.
+    - **3. Kết Quả Kiểm Thử Tự Động & Nghiệm Thu:**
+      * **Backend Integration Tests ([customers-bulk-022a.integration.spec.ts](file:///d:/flutter%20create%20delivery_marker_app/backend/test/customers-bulk-022a.integration.spec.ts)):** Đạt **4/4 tests passed (100%)** trên CSDL `test_isolated_seed_db` gọi controller thật:
+        - Tạo mới hàng loạt khách hàng với định dạng hỗn hợp, chuẩn hóa và kiểm tra 1 dòng audit log duy nhất.
+        - Xử lý khách hàng đã tồn tại (phân loại đúng vào nhóm `alreadyExists` kèm `locationState`).
+        - Từ chối yêu cầu khi shipper có nhiều khu vực mà không truyền `areaId` (`requireAreaSelection: true`).
+        - Phân loại số sai định dạng vào nhóm `rejected` kèm lý do.
+      * **Backend Full Test Suite:** `npm test` đạt **14 test suites passed, 164/164 tests passed (100%)**. TypeScript `npm run build` biên dịch 0 lỗi.
+      * **Flutter Widget & Unit Tests Mới ([directory_bulk_shift_name_black_buttons_022a_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/directory_bulk_shift_name_black_buttons_022a_test.dart)):** Đạt **8/8 tests passed (100%)**:
+        - `B1`: Format ngày `dd/MM` và `dd/MM/yyyy`.
+        - `B2`: Suy diễn tên ca sáng/chiều/tối theo GMT+7.
+        - `B3`: Gợi ý tên ca và chống trùng lặp đuôi `(2)`, `(3)`.
+        - `B4`: `displayTitle` ưu tiên tên thật, rỗng thì suy diễn theo giờ tạo.
+        - `C1`: `AppButtons` chuẩn `#0F172A`, vùng chạm $\ge 48$px và $\ge 56$px.
+        - `C2`: 3 nút GỌI, CHỈ ĐƯỜNG, GHIM LẠI trong `PointDetailBottomSheet` chuẩn `#0F172A`, icon/text rõ ràng, chiều cao $\ge 56$px.
+        - `A1`: `BulkPastePhoneSheet` chế độ danh bạ có tiêu đề, nút hành động $\ge 56$px màu `#0F172A`.
+        - `A2`: `CustomerDirectoryView` có nút "Dán nhiều số" ($\ge 48$px) cạnh nút "Thêm số" ($\ge 48$px).
+      * **Flutter Full Test Suite:** `flutter test` đạt **18 test files passed, 121/121 tests passed (100%)**.
+      * **Flutter Static Analysis:** `flutter analyze` đạt **No issues found!** (0 cảnh báo, 0 lỗi trên toàn bộ dự án).
+      * **Dựng Lại Container Backend:** `docker compose up -d --build backend` hoàn thành MỘT LẦN duy nhất (`delivery_backend_api` Recreated & Started, `delivery_postgis_db` Healthy giữ nguyên không đụng chạm).
+      * **Kiểm Tra API Sống:** `GET http://localhost:3000/api-docs` phản hồi **200 OK**. Tuyệt đối không gửi request ghi nào lên API sống hay `delivery_db`.
+      * **Build Release APK:** Thực thi lệnh `flutter build apk --release` MỘT LẦN duy nhất.
+    - **4. Phân Định Thực Tế Kiểm Thử (Evidence-Based):**
+      * **[ĐÃ TEST]:** 164/164 backend tests passed trên `test_isolated_seed_db`, 121/121 Flutter tests passed, `flutter analyze` 0 issues, container backend live 200 OK, release APK build thành công.
+      * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa nạp file release APK lên thiết bị di động vật lý ngoài thực địa.
+
+---
+
+### 48. TASK: ACCOUNT-PROFILE-AND-LOGIN-REDESIGN-022B - Hồ Sơ Tài Khoản Cá Nhân, Thống Kê Riêng, Đổi Mật Khẩu An Toàn & Thiết Kế Lại Màn Hình Đăng Nhập
+- **Mã Task:** `ACCOUNT-PROFILE-AND-LOGIN-REDESIGN-022B`
+- **Mục Tiêu Nghiệp Vụ:**
+  * Bổ sung Tab thứ 4 "Tài khoản" trên thanh điều hướng dưới với đầy đủ thông tin cá nhân của shipper/quản trị viên, khu vực phụ trách, thống kê riêng (vị trí đã lưu, ca đã tạo, ảnh đã tải), màn hình đổi mật khẩu riêng với cơ chế kiểm soát rate limiting và audit log bảo mật.
+  * Thiết kế lại toàn diện màn hình Đăng nhập theo phong cách hiện đại, thanh thoát, nút hành động đen rộng $\ge 56$px đồng bộ với 022A, hiển thị lỗi tiếng Việt trực quan kèm nút "Thử lại", ghi nhớ số điện thoại phiên trước và cung cấp lối tắt cấu hình máy chủ ở chân trang.
+  * Tuyệt đối không hardcode mật khẩu, bí mật, API key; loại bỏ hoàn toàn các chip demo account hay tài khoản điền sẵn trên giao diện đăng nhập.
+- **Chi Tiết Kỹ Thuật Đã Triển Khai:**
+  * **A. Tab "Tài Khoản" ([account_profile_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/account_profile_view.dart), [home_shell_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/home_shell_view.dart)):**
+    - Mở rộng thanh `NavigationBar` tại [home_shell_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/home_shell_view.dart) từ 3 tab lên 4 tab: Tab 0: Bản đồ, Tab 1: Danh bạ, Tab 2: Ca làm việc, Tab 3: Tài khoản (icon `Icons.person_outline_rounded`, active `Icons.person_rounded`).
+    - **Đầu trang (Header):** Circle avatar chữ cái viết tắt họ tên (ví dụ: "TG" cho "Trần Văn Giao"), hiển thị họ tên đầy đủ, SĐT định dạng chuẩn `09xx xxx xxx`, badge vai trò tiếng Việt (`"Nhân viên giao hàng"` cho `SHIPPER`, `"Quản trị viên"` cho `ADMIN`).
+    - **Khu vực phụ trách:** Tích hợp API `GET /api/v1/areas/my-areas`, render dạng tag/chip xanh dương trực quan.
+    - **Thống kê của tôi:** Tích hợp API mới `GET /api/v1/auth/me/stats` tại [auth.controller.ts](file:///d:/flutter%20create%20delivery_marker_app/backend/src/controllers/auth.controller.ts), đếm chính xác dữ liệu của chính người dùng đăng nhập:
+      * Vị trí đã lưu (`saved_locations` do user tạo hoặc cập nhật).
+      * Ca đã tạo (`shifts` do user phụ trách).
+      * Ảnh đã tải (`customer_photos` do user đăng tải).
+    - **Bảo mật & Đổi mật khẩu ([change_password_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/change_password_view.dart)):** Màn hình riêng biệt với 3 trường nhập: Mật khẩu hiện tại, Mật khẩu mới ($\ge 8$ ký tự), Xác nhận mật khẩu mới; đều có nút ẩn/hiện mật khẩu.
+      * Backend `POST /api/v1/auth/change-password` xác thực mật khẩu hiện tại bằng `bcrypt.compare`, yêu cầu mật khẩu mới $\ge 8$ ký tự và khác mật khẩu cũ, băm bằng `bcrypt.hash(..., 10)`.
+      * Cơ chế Rate Limiting: giới hạn tối đa 5 lần thử sai trong vòng 15 phút (trả về HTTP 429 Too Many Requests kèm thông báo tiếng Việt).
+      * Ghi nhận kiểm toán: Ghi `audit_logs` với `action = 'PASSWORD_CHANGE'`, TUYỆT ĐỐI không ghi mật khẩu gốc hoặc chuỗi hash.
+    - **Cài đặt & Thông tin hệ thống:** Hiển thị địa chỉ API máy chủ hiện hành (mở dialog cho phép shipper hiệu chỉnh `custom_api_base_url` hoặc khôi phục mặc định qua `ApiService.resetCustomBaseUrl`), hiển thị phiên bản app `v1.0.0 (Build 1)`.
+    - **Nút Đăng xuất:** Nút viền đỏ vùng chạm $\ge 48$px, mở hộp thoại xác nhận trước khi đăng xuất (`"Xác nhận đăng xuất"`). Khi xác nhận, xóa token và phiên làm việc, chuyển hướng về `LoginView`.
+  * **B. Thiết Kế Lại Màn Hình Đăng Nhập ([login_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/login_view.dart)):**
+    - Thiết kế hiện đại, thanh lịch: biểu tượng xe giao hàng navy trên nền bo tròn, tiêu đề `"Định Vị Giao Hàng"`, phụ đề mô tả hệ thống.
+    - Nền `#F8FAFC`, thẻ đăng nhập màu trắng bo góc 16px, viền mảnh `#E2E8F0`, loại bỏ hoàn toàn đổ bóng nặng.
+    - Ô SĐT: bàn phím số `TextInputType.phone`, tự động chuẩn hóa loại bỏ khoảng trắng dư thừa, prefill số điện thoại từ phiên trước (`saved_login_phone`), TUYỆT ĐỐI không lưu hay điền sẵn mật khẩu.
+    - Ô Mật khẩu: biểu tượng khóa, nút ẩn/hiện mật khẩu (toggle visibility), hỗ trợ phím Enter để thực hiện đăng nhập ngay.
+    - Nút `ĐĂNG NHẬP`: Nền đen/navy `#0F172A` chuẩn 022A, chiều cao $\ge 56$px ([AppButtons.primaryLarge](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/theme/app_buttons.dart)), hiển thị vòng xoay `CircularProgressIndicator` và khóa vô hiệu hóa các ô nhập khi đang gửi request.
+    - Trạng thái lỗi: Hộp thông báo màu đỏ nhạt `#FEF2F2` xuất hiện ngay dưới form với thông điệp tiếng Việt thân thiện (sai thông tin, mất kết nối, quá thời gian) kèm nút hành động `"Thử lại"`.
+    - Lối tắt chân trang: Link `"Cấu hình máy chủ"` cho phép shipper đổi địa chỉ IP/máy chủ backend trực tiếp ngay tại màn đăng nhập khi gặp sự cố mạng.
+    - Khắc phục giao diện màn hình nhỏ: Bọc toàn bộ trong `SingleChildScrollView` tránh lỗi tràn viền bàn phím (`RenderFlex overflowed`).
+- **Kết Quả Kiểm Thử Tự Động & Nghiệm Thu:**
+  * **Backend Integration Tests ([auth-profile-022b.integration.spec.ts](file:///d:/flutter%20create%20delivery_marker_app/backend/test/auth-profile-022b.integration.spec.ts)):** Đạt **9/9 tests passed (100%)** trên CSDL `test_isolated_seed_db`:
+    - `1.1`: `GET /api/v1/auth/me/stats` chỉ đếm chính xác số lượng vị trí, ca và ảnh của shipper yêu cầu.
+    - `1.2`: Từ chối 401 khi không có JWT token.
+    - `2.1`: Từ chối 400 khi thiếu thông tin mật khẩu.
+    - `2.2`: Từ chối 400 khi mật khẩu mới dưới 8 ký tự.
+    - `2.3`: Từ chối 400 khi xác nhận mật khẩu không khớp.
+    - `2.4`: Từ chối 400 khi nhập sai mật khẩu cũ và đếm lùi số lần thử.
+    - `2.5`: Kích hoạt HTTP 429 Rate Limiting sau 5 lần nhập sai trong 15 phút.
+    - `2.6`: Từ chối 400 khi mật khẩu mới trùng với mật khẩu cũ.
+    - `2.7`: Đổi mật khẩu thành công: bcrypt hash cập nhật trong DB, đăng nhập được bằng mật khẩu mới, từ chối mật khẩu cũ, và xác minh `audit_logs` hoàn toàn không lộ mật khẩu.
+  * **Backend Full Test Suite:** `npm test` đạt **15/15 test suites passed, 173/173 tests passed (100%)**. TypeScript `npm run build` biên dịch 0 lỗi.
+  * **Flutter Widget Tests Mới ([account_profile_and_login_022b_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/account_profile_and_login_022b_test.dart)):** Đạt **11/11 tests passed (100%)**:
+    - `A1`: `AccountProfileView` hiển thị avatar initials, họ tên, SĐT, vai trò tiếng Việt.
+    - `A2`: Hiển thị đầy đủ các khối khu vực, thống kê, đổi mật khẩu, cài đặt máy chủ.
+    - `A3`: Hộp thoại đăng xuất có xác nhận hủy/đồng ý trước khi xóa token.
+    - `A4`: `HomeShellView` chứa tab thứ 4 "Tài khoản" với icon người.
+    - `B1`: `ChangePasswordView` kiểm tra validate mật khẩu trống, ngắn < 8 ký tự, trùng mật khẩu cũ.
+    - `B2`: Nút ẩn/hiện mật khẩu hoạt động chuẩn xác trên cả 3 trường.
+    - `C1`: `LoginView` hiện đại, nút `ĐĂNG NHẬP` rộng đầy chiều ngang có chiều cao $\ge 56$px.
+    - `C2`: Tự động nhớ SĐT lần trước nhưng KHÔNG nhớ mật khẩu.
+    - `C3`: Nút ẩn/hiện mật khẩu trên màn đăng nhập hoạt động chuẩn xác.
+    - `C4`: Hộp lỗi tiếng Việt trực quan dưới ô nhập kèm nút "Thử lại".
+    - `C5`: Link "Cấu hình máy chủ" mở dialog cấu hình base URL.
+  * **Flutter Full Test Suite:** `flutter test` đạt **19/19 test files passed, 132/132 tests passed (100%)**.
+  * **Flutter Static Analysis:** `flutter analyze` đạt **No issues found!** (0 cảnh báo, 0 lỗi).
+  * **Dựng Lại Container Backend:** `docker compose up -d --build backend` hoàn thành MỘT LẦN duy nhất (`delivery_backend_api` Recreated & Started, `delivery_postgis_db` Healthy). Kiểm tra API sống `curl.exe http://localhost:3000/api/docs/` trả về **200 OK**.
+  * **Build Release APK:** Thực thi `flutter build apk --release` MỘT LẦN duy nhất thành công: `build\app\outputs\flutter-apk\app-release.apk` (53.0MB, 55,608,756 bytes).
+- **Phân Định Thực Tế Kiểm Thử (Evidence-Based):**
+  * **[ĐÃ TEST]:** 173/173 backend tests passed trên `test_isolated_seed_db`, 132/132 Flutter widget/unit tests passed, `flutter analyze` 0 issues, container backend live 200 OK, release APK build thành công.
+  * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa nạp file release APK lên thiết bị di động vật lý ngoài thực địa.
+
+---
+
+## 49. Chia Sẻ Dữ Liệu Vị Trí Giữa Các Shipper (TASK: DATA-SHARING-BETWEEN-SHIPPERS-023)
+
+- **Mục Tiêu:**
+  - Cho phép các shipper chia sẻ an toàn dữ liệu vị trí khách hàng ngang hàng (peer-to-peer) mà không cần can thiệp của Quản trị viên (Admin).
+  - Hỗ trợ 2 phạm vi: Toàn bộ điểm đã lưu (`ALL_POINTS`) hoặc Theo một ca làm việc cụ thể (`SHIFT`).
+  - Tùy chọn cho phép hoặc không cho phép xem ảnh định vị nhà (`include_photos`).
+  - Kiểm soát khu vực nghiêm ngặt: Người nhận chỉ xem và nhập được các điểm nằm trong khu vực được phân công của mình (`assignedAreaIds`). Các điểm ngoài khu vực tự động bị lọc và đếm số lượng bỏ qua.
+  - Bảo vệ dữ liệu gốc tuyệt đối: Người nhận không thể chỉnh sửa, xóa hay ghi đè lên dữ liệu vị trí gốc của người chia sẻ. Khi nhập điểm (`import`), hệ thống ghi nhận vào `saved_locations` của người nhận và lưu vết lịch sử qua trigger `trg_saved_locations_history`.
+- **Thiết Kế Cơ Sở Dữ Liệu & Di Trú Idempotent:**
+  * **Tệp di trú [init-db/08-create-data-shares.sql](file:///d:/flutter%20create%20delivery_marker_app/init-db/08-create-data-shares.sql):**
+    - Bảng `data_shares`: `id UUID PK`, `owner_id UUID FK`, `recipient_id UUID FK`, `scope VARCHAR(20)`, `shift_id UUID FK NULL`, `include_photos BOOLEAN`, `status VARCHAR(20)`, `created_at`, `accepted_at`, `revoked_at`, `expires_at`.
+    - Ràng buộc toàn vẹn:
+      + `chk_data_shares_owner_recipient`: Cấm tự chia sẻ cho chính mình (`owner_id <> recipient_id`).
+      + `chk_data_shares_scope_shift`: Bắt buộc `shift_id` có giá trị khi `scope = 'SHIFT'` và phải là `NULL` khi `scope = 'ALL_POINTS'`.
+    - Chỉ mục Partial Unique Index:
+      + `uq_active_pending_data_share` trên `(owner_id, recipient_id, scope, COALESCE(shift_id, ...))` với điều kiện `WHERE status IN ('PENDING', 'ACTIVE')` đảm bảo không thể tạo trùng lặp 2 lời mời đang chờ hoặc đang hiệu lực giữa cùng 2 người.
+    - 4 chỉ mục hiệu năng: `idx_data_shares_owner`, `idx_data_shares_recipient`, `idx_data_shares_shift`, `idx_data_shares_expires_at`.
+    - Cập nhật kịch bản nạp kiểm thử cách ly [backend/scripts/setup-test-db.ts](file:///d:/flutter%20create%20delivery_marker_app/backend/scripts/setup-test-db.ts) nạp tệp `08-create-data-shares.sql`.
+    - **Trạng thái áp dụng lên CSDL môi trường chính (`delivery_db`): CHƯA ÁP DỤNG.**
+- **Backend API & Phân Quyền ([shares.controller.ts](file:///d:/flutter%20create%20delivery_marker_app/backend/src/controllers/shares.controller.ts)):**
+  * `POST /api/v1/shares`: Tạo lời mời chia sẻ.
+    - Validate SĐT người nhận: Nếu SĐT không tồn tại, trả về thông báo lỗi chung `"Không gửi được lời mời, kiểm tra số điện thoại"` để tránh rò rỉ thông tin người dùng (User Enumeration).
+    - Ngăn chặn chia sẻ cho chính mình (`HTTP 400`).
+    - Giới hạn tần suất (Rate Limiting): Sliding window tối đa 10 lời mời / giờ / shipper (`HTTP 429`).
+    - Ghi nhận `audit_logs` với `action = 'SHARE_CREATED'`.
+  * `GET /api/v1/shares/outgoing`: Danh sách lời mời do tôi gửi đi (kèm trạng thái, số điểm, phạm vi, thời hạn).
+  * `GET /api/v1/shares/incoming`: Danh sách lời mời gửi tới tôi.
+  * `POST /api/v1/shares/:id/accept`: Người nhận chấp nhận lời mời (`status = 'ACTIVE'`, cập nhật `accepted_at`). Ghi `audit_logs` `SHARE_ACCEPTED`.
+  * `POST /api/v1/shares/:id/decline`: Người nhận từ chối lời mời (`status = 'DECLINED'`). Ghi `audit_logs` `SHARE_DECLINED`.
+  * `POST /api/v1/shares/:id/revoke`: Người gửi dừng chia sẻ (`status = 'REVOKED'`, cập nhật `revoked_at`). Không bao giờ xóa cứng dòng trong DB. Ghi `audit_logs` `SHARE_REVOKED`.
+  * `GET /api/v1/shares/shared-locations`: Lấy tất cả các điểm được chia sẻ còn hiệu lực (`ACTIVE`, chưa hết hạn).
+    - Tự động lọc chỉ trả về các điểm nằm trong khu vực được phân công của người nhận (`assignedAreaIds`).
+    - Trả về `skippedOutOfAreaCount` thông báo số điểm bị bỏ qua do ngoài khu vực.
+    - Dữ liệu hoàn toàn read-only, không đưa vào danh sách vị trí đã lưu của người nhận.
+  * `POST /api/v1/shares/:id/import`: Nhập các điểm được chia sẻ vào danh bạ `saved_locations` của người nhận.
+    - Hỗ trợ nhập tất cả hoặc chọn theo danh sách `customerIds`.
+    - Mặc định bỏ qua khách hàng đã có vị trí trong danh bạ trừ khi chọn `replaceExisting = true`.
+    - Không copy ảnh nếu chia sẻ có `includePhotos = false`.
+    - Không bao giờ thay đổi dữ liệu của người chia sẻ gốc. Ghi nhận `audit_logs` `SHARE_IMPORT` với số lượng import/skip.
+  * **Cập nhật phục vụ ảnh ([locations.controller.ts](file:///d:/flutter%20create%20delivery_marker_app/backend/src/controllers/locations.controller.ts)):**
+    - Phương thức `servePhoto` kiểm tra quyền sở hữu ảnh gốc thông qua `customer_photos.created_by`, `shift_delivery_points`, hoặc `saved_locations.created_by`.
+    - Nếu shipper yêu cầu không phải chủ sở hữu ảnh, hệ thống bắt buộc phải tìm thấy một chia sẻ `ACTIVE` còn hạn có `include_photos = true` và khách hàng nằm trong khu vực phụ trách của shipper đó. Nếu không thỏa mãn, trả về `HTTP 403 Forbidden` (hoặc `404`).
+- **Giao Diện Ứng Dụng Di Động (Flutter Mobile App):**
+  * **Mô Hình Dữ Liệu & Dịch Vụ API:**
+    - [data_share_model.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/models/data_share_model.dart): `DataShareModel`, `SharedLocationPointModel` với JSON parsing đầy đủ.
+    - [api_service.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/services/api_service.dart): 8 phương thức tích hợp API chia sẻ dữ liệu.
+  * **Màn Hình Quản Lý Chia Sẻ Dữ Liệu ([data_sharing_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/data_sharing_view.dart)):**
+    - Đặt trong tab Tài khoản (`AccountProfileView` -> mục "Chia sẻ dữ liệu").
+    - Giao diện 2 tab: `"Tôi chia sẻ"` (danh sách chia sẻ đi kèm nút Dừng chia sẻ có xác nhận) và `"Chia sẻ cho tôi"` (danh sách nhận kèm nút Chấp nhận, Từ chối, Nhập vào danh bạ).
+    - BottomSheet `"Tạo lời mời chia sẻ dữ liệu"`: Nhập SĐT người nhận, chọn phạm vi (`Tất cả điểm đã lưu` / `Một ca làm việc`), công tắc kèm ảnh nhà, lựa chọn thời hạn (7 ngày, 30 ngày, Không thời hạn). Nút bấm màu Navy `#0F172A` chuẩn 022A, chiều cao $\ge 48$px.
+    - Hộp thoại nhập dữ liệu (`Import Dialog`): Có công tắc `Ghi đè nếu khách hàng đã có vị trí`.
+  * **Bản Đồ Chính ([main_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/main_map_view.dart)):**
+    - Nút bật/tắt `"Điểm được chia sẻ"` (`Key('toggle_shared_locations')`) trên thanh điều hướng trên cùng, mặc định **TẮT**.
+    - Khi BẬT: Hiển thị các marker màu tím `#7C3AED` có icon chia sẻ (hoặc cụm marker màu tím nếu gom cụm).
+    - Gom cụm tính riêng biệt: Cụm điểm của tôi (màu xanh lá `#10B981`) và cụm điểm được chia sẻ (màu tím `#7C3AED`) độc lập, không trộn lẫn.
+    - Legend phân biệt màu sắc: Viên thuốc nổi gọn gàng hiển thị `Xanh: Của tôi`, `Tím: Được chia sẻ`.
+    - Banner cảnh báo ngoài khu vực (`Key('banner_out_of_area_warning')`): Hiển thị khi `skippedOutOfAreaCount > 0` (`"X điểm không hiển thị vì ngoài khu vực của bạn"`) kèm nút đóng banner.
+    - Bottom sheet chi tiết điểm chia sẻ:
+      + Header: Badge tím `"Chia sẻ từ [tên shipper]"`.
+      + Thông tin: Tên khách, SĐT, Địa chỉ, Ghi chú định danh.
+      + Dải ảnh: Hiển thị ảnh nếu có quyền xem (`CustomerPhotosStripWidget` ở chế độ read-only).
+      + Các nút hành động: `"GỌI"` (`btn_call_shared_point`), `"CHỈ ĐƯỜNG"` (`btn_directions_shared_point`), `"NHẬP VÀO CỦA TÔI"` (`btn_import_shared_point_to_mine`).
+      + **TUYỆT ĐỐI KHÔNG có nút "Ghim lại" và KHÔNG có nút "Xóa".**
+      + Ẩn các nút nổi FAB khi bottom sheet đang mở.
+- **Kết Quả Kiểm Thử Tự Động & Nghiệm Thu:**
+  * **Backend Integration Tests ([data-sharing-023.integration.spec.ts](file:///d:/flutter%20create%20delivery_marker_app/backend/test/data-sharing-023.integration.spec.ts)):** Đạt **23/23 tests passed (100%)** trên CSDL cách ly `test_isolated_seed_db`:
+    - `1.1`: Bắt buộc đăng nhập (`401`).
+    - `1.2`: Chỉ chấp nhận vai trò SHIPPER hoặc ADMIN.
+    - `1.3`: Từ chối khi SĐT người nhận không tồn tại (thông báo lỗi chung bảo vệ quyền riêng tư).
+    - `1.4`: Từ chối khi tự chia sẻ cho chính mình (`400`).
+    - `1.5`: Từ chối khi scope=SHIFT nhưng thiếu shiftId (`400`).
+    - `1.6`: Giới hạn tần suất (Rate Limiting) tối đa 10 lời mời / giờ (`429`).
+    - `1.7`: Tạo thành công lời mời scope=ALL_POINTS.
+    - `1.8`: Tạo thành công lời mời scope=SHIFT.
+    - `1.9`: Chống trùng lặp lời mời ACTIVE/PENDING bằng partial unique index.
+    - `2.1`: `GET /outgoing` trả về danh sách kèm điểm đếm chính xác.
+    - `2.2`: `GET /incoming` trả về danh sách lời mời gửi tới.
+    - `3.1`: `POST /:id/accept` kích hoạt trạng thái `ACTIVE` và cập nhật `accepted_at`.
+    - `4.1`: `POST /:id/decline` chuyển trạng thái sang `DECLINED`.
+    - `5.1`: `POST /:id/revoke` dừng chia sẻ `REVOKED`, không xóa bản ghi trong DB.
+    - `6.1`: `GET /shared-locations` chỉ trả về các điểm còn hiệu lực.
+    - `6.2`: Tự động lọc điểm ngoài khu vực của người nhận và đếm `skippedOutOfAreaCount`.
+    - `6.3`: Điểm chia sẻ không xuất hiện trong `my-saved-locations`.
+    - `7.1`: Cho phép xem ảnh khi includePhotos=true và chia sẻ còn ACTIVE.
+    - `7.2`: Từ chối 403 khi lời mời đã bị REVOKED.
+    - `7.3`: Từ chối 403 khi includePhotos=false.
+    - `8.1`: `POST /:id/import` nhập thành công điểm chia sẻ vào danh bạ người nhận.
+    - `8.2`: Bỏ qua điểm đã tồn tại khi `replaceExisting=false`.
+    - `8.3`: Ghi đè và bảo toàn lịch sử thay đổi qua trigger `trg_saved_locations_history` khi `replaceExisting=true`.
+    - `8.4`: Xác minh không làm thay đổi hay đột biến điểm gốc của người chia sẻ.
+    - `9.1`: Xác minh nhật ký kiểm toán `audit_logs` đầy đủ 5 hành động không chứa PII.
+  * **Backend Full Test Suite:** `npm test` đạt **16/16 test suites passed, 196/196 tests passed (100%)**. TypeScript `npm run build` biên dịch 0 lỗi.
+  * **Flutter Widget Tests Mới ([data_sharing_023_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/data_sharing_023_test.dart)):** Đạt **11/11 tests passed (100%)**:
+    - `1.1`: `DataSharingView` hiển thị 2 tab "Tôi chia sẻ" và "Chia sẻ cho tôi" cùng nút tạo lời mời.
+    - `1.2`: Mở BottomSheet tạo lời mời với đầy đủ các trường (SĐT, scope chips, expiration chips, include photos switch, submit button).
+    - `1.3`: Validation bắt buộc SĐT người nhận.
+    - `2.1`: `AccountProfileView` có mục "Chia sẻ dữ liệu" và mở `DataSharingView`.
+    - `3.1`: `MainMapView` có nút bật/tắt "Điểm được chia sẻ", mặc định tắt.
+    - `3.2`: Bật nút chia sẻ hiển thị Legend màu sắc (Xanh: Của tôi, Tím: Được chia sẻ).
+    - `3.3`: Banner cảnh báo ngoài khu vực hiển thị khi có điểm bị lọc và đóng được.
+    - `3.4`: Bottom sheet chi tiết điểm chia sẻ hiển thị badge tím, thông tin, các nút và KHÔNG có Ghim lại/Xóa.
+    - `3.5`: Bấm "NHẬP VÀO CỦA TÔI" mở hộp thoại xác nhận kèm công tắc ghi đè.
+    - `4.1`: `DataShareModel` JSON parsing và helper getters.
+    - `4.2`: `SharedLocationPointModel` JSON parsing đầy đủ thông tin.
+  * **Flutter Full Test Suite:** `flutter test` đạt **20/20 test files passed, 143/143 tests passed (100%)**.
+  * **Flutter Static Analysis:** `flutter analyze` đạt **No issues found!** (0 cảnh báo, 0 lỗi).
+- **Phân Định Thực Tế Kiểm Thử (Evidence-Based):**
+  * **[ĐÃ TEST]:** 196/196 backend unit & integration tests passed trên `test_isolated_seed_db`, 143/143 Flutter tests passed, `flutter analyze` 0 issues.
+  * **[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:** Chưa nạp file APK lên thiết bị di động vật lý ngoài thực địa.
+  * **[ĐÃ ÁP DỤNG LÊN DB THẬT CHƯA]: ĐÃ ÁP DỤNG** (Xem chi tiết Mục 50).
+
+---
+
+## 50. Thực Thi Di Trú Lên Cơ Sở Dữ Liệu Thực Tế (TASK: LIVE-DB-MIGRATE-08-023C)
+
+- **Mục Tiêu & Quyền Hạn:**
+  - Thực thi ngoại lệ duy nhất được cấp phép: Chạy migration `08-create-data-shares.sql` lên CSDL thực tế `delivery_db`.
+  - Nghiêm ngặt tuân thủ: Chỉ thêm bảng/chỉ mục mới, không xóa hay sửa dữ liệu cũ. Tuyệt đối không gửi `POST`/`PUT`/`PATCH`/`DELETE` vào API đang chạy.
+- **Bước 1: Sao Lưu CSDL Trước Khi Chạy:**
+  - Tệp sao lưu `pg_dump`: `D:\db_backups\delivery_db_backup_20261026_125921.sql`.
+  - Dung lượng: **115,867 bytes (~115.8 KB)**.
+  - Vị trí: Đặt NGOÀI thư mục git (`D:\db_backups\`).
+  - Tệp `.gitignore` gốc đã bổ sung và chặn toàn diện: `*.sql` (ngoại trừ `!init-db/*.sql`), `*.dump`, `*.zip`, `backup_*`, `backups/`.
+- **Bước 2: Khảo Sát Hiện Trạng Bằng SELECT Trước Di Trú:**
+  - `01-init-db.sql`: ĐÃ CÓ (`roles`, `users`, `areas`, `user_areas`, `customers`, `orders`, `saved_locations`, `location_history`, `audit_logs`).
+  - `02-add-photo-and-fix-history.sql`: ĐÃ CÓ (cột `saved_locations.image_url`).
+  - `03-seed-demo-data.sql`: ĐÃ CÓ (dữ liệu mẫu Tạp hóa Hai Thu).
+  - `04-create-shifts-and-delivery-points.sql`: ĐÃ CÓ (`shifts`, `shift_delivery_points`).
+  - `05-add-customers-updated-at.sql`: ĐÃ CÓ (cột `customers.updated_at`).
+  - `06-create-customer-photos.sql`: ĐÃ CÓ (`customer_photos` áp dụng 25/10/2026).
+  - `07-add-shift-name.sql`: ĐÃ CÓ (cột `shifts.shift_name` áp dụng 25/10/2026).
+  - `08-create-data-shares.sql`: **CHƯA CÓ** (Bảng `data_shares` chưa tồn tại trong `delivery_db`).
+- **Bước 3: Thực Thi Di Trú Trong Transaction & Chứng Minh Idempotent:**
+  - **Lần 1 (Thực thi tạo mới):**
+    ```bash
+    docker exec delivery_postgis_db psql -U postgres -d delivery_db -v ON_ERROR_STOP=1 --single-transaction -f /docker-entrypoint-initdb.d/08-create-data-shares.sql
+    ```
+    - Kết quả: `CREATE TABLE`, `CREATE INDEX` (x4), exit code `0`.
+  - **Lần 2 (Chứng minh tính idempotent):**
+    ```bash
+    docker exec delivery_postgis_db psql -U postgres -d delivery_db -v ON_ERROR_STOP=1 --single-transaction -f /docker-entrypoint-initdb.d/08-create-data-shares.sql
+    ```
+    - Kết quả: `NOTICE: relation "data_shares" already exists, skipping`, `NOTICE: relation "uq_active_pending_data_share" already exists, skipping`, exit code `0` (không gây lỗi, không làm trùng lặp).
+- **Bước 4: Đối Soát Toàn Vẹn Dữ Liệu Bằng SELECT Sau Di Trú:**
+  - **Cấu trúc bảng `data_shares`:** Đầy đủ 11 cột, khóa chính UUID, các ràng buộc `chk_data_shares_owner_recipient`, `chk_data_shares_scope_shift`.
+  - **Chỉ mục:** 5 chỉ mục gồm `data_shares_pkey`, Partial Unique Index `uq_active_pending_data_share`, `idx_data_shares_owner`, `idx_data_shares_recipient`, `idx_data_shares_expires_at`.
+  - **So sánh số dòng dữ liệu (Trước vs Sau di trú):**
+    * `customers`: **32** $\rightarrow$ **32** (Không đổi).
+    * `saved_locations`: **10** $\rightarrow$ **10** (Không đổi).
+    * `location_history`: **31** $\rightarrow$ **31** (Không mất dòng nào).
+    * `audit_logs`: **229** $\rightarrow$ **229** (Không mất dòng nào).
+    * `customer_photos`: **9** $\rightarrow$ **9** (Không đổi).
+    * `shifts`: **3** $\rightarrow$ **3** (Không đổi).
+    * `shift_delivery_points`: **0** $\rightarrow$ **0** (Không đổi).
+    * `data_shares`: **0** (Bảng mới tạo sẵn sàng).
+  - **Dữ liệu khách hàng Anh Hoàng (`c0000000-0000-0000-0000-000000000001`):**
+    * Tọa độ `10.8422150, 106.8181230`, `gps_accuracy = 4.5`.
+    * Ghi chú: `"Đi vào hẻm 124 khoảng 50m, nhà cạnh tiệm tạp hóa Hai Thu, cổng màu xanh da trời, có cây mai trước sân."`.
+    * Ảnh: `"/api/v1/photos/6ffc3833-1f78-48c8-8624-3041f25449f9.jpg"`.
+    * Toàn bộ trường dữ liệu của Anh Hoàng được giữ nguyên tuyệt đối 100%.
+- **Bước 5: Đồng Bộ Trạng Thái Tài Liệu:**
+  - Cập nhật [docs/DATABASE.md](file:///d:/flutter%20create%20delivery_marker_app/docs/DATABASE.md): Đổi trạng thái của `08-create-data-shares.sql` thành **ĐÃ ÁP DỤNG** vào lúc **26/10/2026 13:00:16**.
+
+---
+
+## 14. TASK: UI-OVERFLOW-FIX-024 - Khắc Phục Lỗi Tràn Giao Diện & Co Đè Ô Nhập SĐT Khi Mở Bàn Phím
+
+> **Thời điểm cập nhật:** 26/10/2026 16:22  
+> **Phạm vi tác động:** Chỉ sửa giao diện Flutter (`mobile_app`), tuyệt đối không sửa backend, không ghi dữ liệu lên API sống hay `delivery_db`.
+
+### 14.1. Khảo Sát & Báo Cáo Hiện Trạng Trước Khi Sửa Đổi (Read-Before-Write)
+
+- **Lỗi 1 (Tràn ngang thẻ TỌA ĐỘ & GHI CHÚ VỊ TRÍ):**
+  - File: [customer_directory_view.dart:L1150-L1190](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart#L1150-L1190).
+  - Nguyên nhân: Tiêu đề `"TỌA ĐỘ & GHI CHÚ VỊ TRÍ"` và hai nút `"Xóa vị trí"`, `"Chọn trên bản đồ"` cùng nằm trong một `Row` cố định không có khả năng co giãn hay xuống dòng, dẫn đến tràn phải 109px khi hiển thị trên các màn hình có chiều rộng tiêu chuẩn hoặc chữ lớn.
+  - Ngoài ra, các thẻ trong hồ sơ và danh sách ảnh (`customer_photos_strip_widget.dart`), sheet tạo khách hàng (`quick_add_customer_sheet.dart`) và thẻ chia sẻ (`data_sharing_view.dart`) có các `Row` chứa Text không được bọc `Expanded`/`Flexible`, có nguy cơ tràn cao ở cỡ chữ lớn hoặc màn hình 320dp.
+- **Lỗi 2 (Ô nhập SĐT bị co/đè khi bàn phím mở):**
+  - File: [bulk_paste_phone_sheet.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/bulk_paste_phone_sheet.dart).
+  - Nguyên nhân: Khung nhập liệu TextField được bọc trong `Container(height: 180)` cố định, không nằm trong bộ cuộn; khi bàn phím mềm mở lên chiếm 300dp, chiều cao viewport bị thu hẹp đột ngột khiến TextField bị bóp méo, chữ tràn viền và con trỏ đè sát vào nút `"DÁN TỪ BỘ NHỚ TẠM"`.
+  - Sheet tạo ca [create_shift_dialog.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/create_shift_dialog.dart) cũng dùng chiều cao cố định tương tự cần được bổ sung cuộn an toàn.
+
+### 14.2. Các Giải Pháp Kỹ Thuật Đã Triển Khai
+
+1. **Khắc phục Lỗi 1 (Thẻ tọa độ & hồ sơ khách hàng):**
+   - **Tách hàng tiêu đề & nút bấm:** Tiêu đề `"TỌA ĐỘ & GHI CHÚ VỊ TRÍ"` được tách riêng một dòng độc lập.
+   - **Bọc nút trong `Wrap`:** Nút `"Xóa vị trí"` và `"Chọn trên bản đồ"` được đặt trong `Wrap(spacing: 8, runSpacing: 8)` để tự động xuống hàng khi màn hình hẹp mà không bao giờ bị cắt chữ hay gây lỗi RenderFlex overflow.
+   - **Kích thước vùng chạm & bảng màu 022A:** Cả 2 nút đều đạt vùng chạm `>= 48px` (`minHeight: 48`). Nút `"Xóa vị trí"` dùng kiểu viền đen trung tính `AppButtons.secondary(color: #0F172A)`, màu đỏ cảnh báo chỉ xuất hiện trong hộp thoại `AlertDialog` khi shipper thực sự xác nhận xóa.
+   - **Bảo toàn hiển thị 320dp + textScale 1.5:** Thêm `Flexible`/`Expanded` cho nhãn `"Tối đa 10 ảnh"`, `"Tọa độ: ..."` trong [customer_directory_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart).
+   - **Rà soát các màn hình liên quan:**
+     * [customer_photos_strip_widget.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/customer_photos_strip_widget.dart): Bọc `Flexible` với `TextOverflow.ellipsis` cho text trong ô trống và nút `"+ THÊM ẢNH"`.
+     * [quick_add_customer_sheet.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/quick_add_customer_sheet.dart): Bọc `Expanded` cho tiêu đề `"Thêm nhanh khách hàng"` và nút mở rộng thông tin địa chỉ/ghi chú.
+     * [data_sharing_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/data_sharing_view.dart): Bọc `Expanded` cho thông tin ca và phạm vi chia sẻ trên các thẻ đi và thẻ đến.
+
+2. **Khắc phục Lỗi 2 (Ô nhập SĐT khi bàn phím mở):**
+   - **Bỏ chiều cao cố định cho TextField:** Chuyển sang dùng `minLines: 4, maxLines: 8`, tự động co giãn theo số lượng dòng và nội dung.
+   - **Cấu hình BottomSheet chống đè bàn phím:** 
+     * `isScrollControlled: true` và bọc trong `ConstrainedBox(constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85))`.
+     * Padding dưới theo `MediaQuery.of(context).viewInsets.bottom`.
+     * Phần thân được bọc trong `Flexible(child: SingleChildScrollView(physics: BouncingScrollPhysics(), ...))`, đảm bảo bàn phím mở vẫn cuộn mượt mà.
+   - **Bố cục & Khoảng cách an toàn:** `contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14)` (dọc >= 12px), khoảng cách giữa TextField và nút dán là 12px.
+   - **Nút hành động chính ghim chắc chắn:** Nút `"THÊM VÀO CA LÀM VIỆC"` (cao 56px) luôn ghim vững ở đáy sheet phía trên bàn phím, không bao giờ bị che khuất.
+   - **Giữ nguyên chức năng & auto-focus:** `autofocus: true`, hỗ trợ tự động đếm số SĐT hợp lệ (`Regex r'0\d{9}'`).
+   - **Đồng bộ hóa sang các dialog/sheet khác:** Bọc cuộn và giới hạn chiều cao tối đa cho [create_shift_dialog.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/create_shift_dialog.dart).
+
+### 14.3. Kết Quả Kiểm Thử Thực Tế (Evidence-Based Testing)
+
+- **Widget Tests Tự Động ([ui_overflow_fix_024_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/ui_overflow_fix_024_test.dart)):**
+  * `1.1 CustomerDetailEditView (320dp, textScale 1.5, có vị trí)`: **ĐÃ TEST** $\rightarrow$ `tester.takeException() == null`, không còn sọc vàng đen hay RenderFlex overflow.
+  * `1.2 CustomerDetailEditView (320dp, textScale 1.5, chưa có vị trí)`: **ĐÃ TEST** $\rightarrow$ `tester.takeException() == null`.
+  * `2.1 BulkPastePhoneSheet (viewInsets.bottom = 300, mở bàn phím)`: **ĐÃ TEST** $\rightarrow$ Không overflow, chiều cao ô nhập 112px `>= 100px`, không đè nút `"DÁN TỪ BỘ NHỚ TẠM"`, nút chính hiển thị đầy đủ.
+  * `2.2 QuickAddCustomerSheet (viewInsets.bottom = 300)`: **ĐÃ TEST** $\rightarrow$ Không overflow, cuộn mượt mà.
+  * `2.3 CreateShiftBottomSheet (viewInsets.bottom = 300)`: **ĐÃ TEST** $\rightarrow$ Không overflow, các trường nhập liệu nguyên vẹn.
+- **Phân Tích Cú Pháp & Quy Chuẩn (Lint / Typecheck):**
+  * `flutter analyze`: **0 issues found** (hoàn toàn sạch lỗi).
+- **Hệ Thống Test Toàn Dự Án:**
+  * `flutter test`: **148/148 tests passed** (100% đạt).
+- **Trạng Thái Kiểm Thử Thiết Bị Thực Tế:**
+  * **ĐÃ TEST trên widget test tự động / CHƯA thử trên điện thoại thật.**
+
+
+
+
+
 
 
 

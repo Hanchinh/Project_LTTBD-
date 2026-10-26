@@ -255,3 +255,73 @@ class CustomerDirectoryResponse {
     this.pagination = const CustomerPagination(),
   });
 }
+
+class BulkCustomerItem {
+  final String id;
+  final String customerCode;
+  final String phoneNumber;
+  final String fullName;
+  final String addressText;
+  final String? areaId;
+  final LocationStatus locationState;
+
+  BulkCustomerItem({
+    required this.id,
+    required this.customerCode,
+    required this.phoneNumber,
+    required this.fullName,
+    required this.addressText,
+    this.areaId,
+    this.locationState = LocationStatus.noLocation,
+  });
+
+  factory BulkCustomerItem.fromJson(Map<String, dynamic> json) {
+    return BulkCustomerItem(
+      id: json['id']?.toString() ?? '',
+      customerCode: json['customerCode']?.toString() ?? '',
+      phoneNumber: json['phoneNumber']?.toString() ?? json['phone']?.toString() ?? '',
+      fullName: json['fullName']?.toString() ?? json['name']?.toString() ?? '',
+      addressText: json['addressText']?.toString() ?? json['address']?.toString() ?? '',
+      areaId: json['areaId']?.toString(),
+      locationState: LocationStatus.fromString(json['locationState']?.toString()),
+    );
+  }
+}
+
+class BulkCreateCustomersResult {
+  final List<BulkCustomerItem> created;
+  final List<BulkCustomerItem> alreadyExists;
+  final List<RejectedPhoneItem> rejected;
+  final int total;
+  final int createdCount;
+  final int alreadyExistsCount;
+  final int rejectedCount;
+
+  BulkCreateCustomersResult({
+    required this.created,
+    required this.alreadyExists,
+    required this.rejected,
+    required this.total,
+    required this.createdCount,
+    required this.alreadyExistsCount,
+    required this.rejectedCount,
+  });
+
+  factory BulkCreateCustomersResult.fromJson(Map<String, dynamic> json) {
+    final rawCreated = json['created'] as List? ?? [];
+    final rawAlready = json['alreadyExists'] as List? ?? [];
+    final rawRejected = json['rejected'] as List? ?? [];
+    final summary = json['summary'] as Map<String, dynamic>? ?? {};
+
+    return BulkCreateCustomersResult(
+      created: rawCreated.whereType<Map<String, dynamic>>().map((e) => BulkCustomerItem.fromJson(e)).toList(),
+      alreadyExists: rawAlready.whereType<Map<String, dynamic>>().map((e) => BulkCustomerItem.fromJson(e)).toList(),
+      rejected: rawRejected.whereType<Map<String, dynamic>>().map((e) => RejectedPhoneItem.fromJson(e)).toList(),
+      total: int.tryParse(summary['total']?.toString() ?? '') ?? (rawCreated.length + rawAlready.length + rawRejected.length),
+      createdCount: int.tryParse(summary['createdCount']?.toString() ?? '') ?? rawCreated.length,
+      alreadyExistsCount: int.tryParse(summary['alreadyExistsCount']?.toString() ?? '') ?? rawAlready.length,
+      rejectedCount: int.tryParse(summary['rejectedCount']?.toString() ?? '') ?? rawRejected.length,
+    );
+  }
+}
+

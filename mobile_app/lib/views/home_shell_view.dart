@@ -3,9 +3,10 @@ import '../models/shift_model.dart';
 import 'main_map_view.dart';
 import 'customer_directory_view.dart';
 import 'shift_list_view.dart';
+import 'account_profile_view.dart';
 
 /// Màn hình Khung chứa Điều hướng Chính (Home Shell View)
-/// Cung cấp 3 tab chính: [Bản đồ] (mặc định), [Danh bạ], [Ca làm việc]
+/// Cung cấp 4 tab chính: [Bản đồ] (mặc định), [Danh bạ], [Ca làm việc], [Tài khoản]
 class HomeShellView extends StatefulWidget {
   final int initialTab;
   final ShiftModel? initialShift;
@@ -99,6 +100,9 @@ class _HomeShellViewState extends State<HomeShellView> {
             onSelectShiftForMap: _handleSelectShiftFromListView,
             showAppBarLogout: true,
           ),
+
+          // Tab 3: Hồ sơ tài khoản cá nhân & Cài đặt
+          const AccountProfileView(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -131,6 +135,11 @@ class _HomeShellViewState extends State<HomeShellView> {
               icon: Icon(Icons.assignment_outlined, color: Color(0xFF64748B), size: 24),
               selectedIcon: Icon(Icons.assignment_rounded, color: Color(0xFF2563EB), size: 24),
               label: 'Ca làm việc',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline_rounded, color: Color(0xFF64748B), size: 24),
+              selectedIcon: Icon(Icons.person_rounded, color: Color(0xFF2563EB), size: 24),
+              label: 'Tài khoản',
             ),
           ],
         ),

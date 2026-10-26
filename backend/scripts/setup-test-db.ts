@@ -21,6 +21,7 @@ const SQL_FILES = [
   '05-add-customers-updated-at.sql',
   '06-create-customer-photos.sql',
   '07-add-shift-name.sql',
+  '08-create-data-shares.sql',
 ];
 
 export async function setupIsolatedTestDatabase(): Promise<void> {

@@ -471,17 +471,30 @@ export const servePhoto = async (req: AuthenticatedRequest, res: Response) => {
 
   try {
     // Check relation between photo, location, customer and area
-    // Handles both current saved_locations and location_history (even if current location was deleted)
+    // Handles current saved_locations, location_history, shift_delivery_points and customer_photos
     const accessRes = await query(
-      `SELECT DISTINCT c.area_id
+      `SELECT DISTINCT 
+         c.id as customer_id, 
+         c.area_id, 
+         photo_refs.created_by_user,
+         photo_refs.shift_id
        FROM (
-         SELECT customer_id FROM saved_locations WHERE image_url LIKE '%' || $1
+         SELECT customer_id, created_by as created_by_user, NULL::uuid as shift_id 
+         FROM customer_photos 
+         WHERE image_url LIKE '%' || $1 AND deleted_at IS NULL
          UNION
-         SELECT customer_id FROM location_history WHERE image_url LIKE '%' || $1
+         SELECT sdp.customer_id, s.shipper_id as created_by_user, sdp.shift_id 
+         FROM shift_delivery_points sdp
+         JOIN shifts s ON s.id = sdp.shift_id
+         WHERE sdp.image_url LIKE '%' || $1
          UNION
-         SELECT customer_id FROM shift_delivery_points WHERE image_url LIKE '%' || $1
+         SELECT sl.customer_id, sl.created_by as created_by_user, NULL::uuid as shift_id 
+         FROM saved_locations sl
+         WHERE sl.image_url LIKE '%' || $1
+           AND NOT EXISTS (SELECT 1 FROM customer_photos cp WHERE cp.image_url LIKE '%' || $1)
          UNION
-         SELECT customer_id FROM customer_photos WHERE image_url LIKE '%' || $1 AND deleted_at IS NULL
+         SELECT customer_id, NULL::uuid as created_by_user, NULL::uuid as shift_id 
+         FROM location_history WHERE image_url LIKE '%' || $1
        ) photo_refs
        JOIN customers c ON c.id = photo_refs.customer_id`,
       [filename]
@@ -494,19 +507,55 @@ export const servePhoto = async (req: AuthenticatedRequest, res: Response) => {
       });
     }
 
-    // Role-based area scope enforcement
+    // Role-based area scope & data-share authorization enforcement
     if (user.roleName === 'ADMIN') {
-      // Admin has permission across all areas
+      // Admin has permission across all areas and data shares
     } else if (user.roleName === 'SHIPPER') {
       const photoAreaIds = accessRes.rows.map((r: any) => r.area_id);
       const userAreas = user.assignedAreaIds || [];
-      const hasAccess = photoAreaIds.some((areaId: string) => userAreas.includes(areaId));
+      const hasAreaAccess = photoAreaIds.some((areaId: string) => userAreas.includes(areaId));
 
-      if (!hasAccess) {
+      if (!hasAreaAccess) {
         return res.status(403).json({
           success: false,
           message: 'Bạn không có quyền truy cập ảnh của khách hàng thuộc khu vực này',
         });
+      }
+
+      // Check if user owns/created the photo reference
+      const isOwner = accessRes.rows.some((r: any) => r.created_by_user === user.userId);
+
+      if (!isOwner) {
+        // Must have an ACTIVE unexpired data share with include_photos = true
+        const owners = accessRes.rows.map((r: any) => r.created_by_user).filter(Boolean);
+        const shiftIds = accessRes.rows.map((r: any) => r.shift_id).filter(Boolean);
+
+        const shareRes = await query(
+          `SELECT ds.id 
+           FROM data_shares ds
+           WHERE ds.recipient_id = $1
+             AND ds.status = 'ACTIVE'
+             AND ds.include_photos = true
+             AND (ds.expires_at IS NULL OR ds.expires_at > NOW())
+             AND (
+               (ds.scope = 'ALL_POINTS' AND ds.owner_id = ANY($2::uuid[]))
+               OR
+               (ds.scope = 'SHIFT' AND ds.shift_id = ANY($3::uuid[]))
+             )
+           LIMIT 1`,
+          [
+            user.userId,
+            owners.length > 0 ? owners : ['00000000-0000-0000-0000-000000000000'],
+            shiftIds.length > 0 ? shiftIds : ['00000000-0000-0000-0000-000000000000'],
+          ]
+        );
+
+        if (shareRes.rows.length === 0) {
+          return res.status(403).json({
+            success: false,
+            message: 'Bạn không có quyền truy cập tệp ảnh này',
+          });
+        }
       }
     } else {
       return res.status(403).json({

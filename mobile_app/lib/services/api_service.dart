@@ -11,6 +11,7 @@ import '../models/location_model.dart';
 import '../models/shift_model.dart';
 import '../models/customer_model.dart';
 import '../models/customer_photo_model.dart';
+import '../models/data_share_model.dart';
 import 'offline_storage_service.dart';
 
 class ApiService {
@@ -34,6 +35,11 @@ class ApiService {
     await prefs.setString('custom_api_base_url', url);
   }
 
+  static Future<void> resetCustomBaseUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('custom_api_base_url');
+  }
+
   static Future<String?> getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('jwt_token');
@@ -48,6 +54,16 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('jwt_token');
     await prefs.remove('user_profile');
+  }
+
+  static Future<String?> getSavedLoginPhone() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('saved_login_phone');
+  }
+
+  static Future<void> saveLoginPhone(String phone) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('saved_login_phone', phone);
   }
 
   static Future<String?> getLastActiveShiftId() async {
@@ -163,6 +179,7 @@ class ApiService {
       if (response.statusCode == 200 && body['success'] == true) {
         final token = body['data']['token'];
         await saveToken(token);
+        await saveLoginPhone(phoneNumber.trim());
 
         final user = UserModel.fromJson(body['data']['user'], token);
         final prefs = await SharedPreferences.getInstance();
@@ -172,6 +189,91 @@ class ApiService {
 
       throw Exception(body['message'] ??
           'Đăng nhập thất bại (Mã lỗi ${response.statusCode})');
+    } on http.ClientException catch (_) {
+      throw Exception(
+          'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng hoặc địa chỉ máy chủ.');
+    }
+  }
+
+  static Future<Map<String, int>> getMyStats() async {
+    final token = await getToken();
+    final baseUrl = await getBaseUrl();
+    final url = Uri.parse('$baseUrl/auth/me/stats');
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        final data = body['data'] as Map<String, dynamic>;
+        return {
+          'savedLocationsCount': (data['savedLocationsCount'] as num?)?.toInt() ?? 0,
+          'createdShiftsCount': (data['createdShiftsCount'] as num?)?.toInt() ?? 0,
+          'uploadedPhotosCount': (data['uploadedPhotosCount'] as num?)?.toInt() ?? 0,
+        };
+      }
+      return {
+        'savedLocationsCount': 0,
+        'createdShiftsCount': 0,
+        'uploadedPhotosCount': 0,
+      };
+    } catch (_) {
+      return {
+        'savedLocationsCount': 0,
+        'createdShiftsCount': 0,
+        'uploadedPhotosCount': 0,
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    String? confirmPassword,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+    final baseUrl = await getBaseUrl();
+    final url = Uri.parse('$baseUrl/auth/change-password');
+
+    try {
+      final response = await http
+          .post(
+            url,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'currentPassword': currentPassword,
+              'newPassword': newPassword,
+              'confirmPassword': confirmPassword ?? newPassword,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return {
+          'success': true,
+          'message': body['message'] ?? 'Đổi mật khẩu thành công!',
+        };
+      }
+
+      final errorMsg =
+          body['message'] ?? 'Đổi mật khẩu thất bại (Mã lỗi ${response.statusCode})';
+      return {
+        'success': false,
+        'message': errorMsg,
+        'remainingAttempts': body['remainingAttempts'],
+        'statusCode': response.statusCode,
+      };
     } on http.ClientException catch (_) {
       throw Exception(
           'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng hoặc địa chỉ máy chủ.');
@@ -586,6 +688,43 @@ class ApiService {
       }
 
       throw Exception(body['message'] ?? 'Không thể thêm danh sách SĐT vào ca');
+    } on http.ClientException catch (_) {
+      throw Exception('Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng.');
+    }
+  }
+
+  /// Thêm hàng loạt số điện thoại vào danh bạ (TASK: DIRECTORY-BULK-SHIFT-NAME-BLACK-BUTTONS-022A)
+  static Future<BulkCreateCustomersResult> createBulkCustomers({
+    String? rawText,
+    List<String>? phones,
+    String? areaId,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/customers/bulk'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          if (rawText != null) 'rawText': rawText,
+          if (phones != null) 'phones': phones,
+          if (areaId != null) 'areaId': areaId,
+        }),
+      ).timeout(const Duration(seconds: 25));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return BulkCreateCustomersResult.fromJson(body['data']);
+      }
+
+      throw Exception(body['message'] ?? 'Không thể thêm danh sách SĐT vào danh bạ');
     } on http.ClientException catch (_) {
       throw Exception('Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng.');
     }
@@ -1254,6 +1393,263 @@ class ApiService {
       throw Exception(body['message'] ?? 'Không thể xóa ảnh');
     } on http.ClientException {
       throw Exception('Mất kết nối mạng, không thể xóa ảnh');
+    }
+  }
+
+  // ==========================================
+  // CHIA SẺ DỮ LIỆU GIỮA CÁC SHIPPER (TASK 023)
+  // ==========================================
+
+  /// Tạo lời mời chia sẻ dữ liệu
+  static Future<DataShareModel> createShare({
+    required String recipientPhone,
+    required String scope,
+    String? shiftId,
+    bool includePhotos = false,
+    int? expiresInDays,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/shares'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'recipientPhone': recipientPhone,
+          'scope': scope,
+          if (shiftId != null) 'shiftId': shiftId,
+          'includePhotos': includePhotos,
+          if (expiresInDays != null) 'expiresInDays': expiresInDays,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 201 && body['success'] == true) {
+        return DataShareModel.fromJson(body['data'] as Map<String, dynamic>);
+      }
+      throw Exception(body['message'] ?? 'Không gửi được lời mời, kiểm tra số điện thoại');
+    } on http.ClientException {
+      throw Exception('Mất kết nối mạng, vui lòng thử lại');
+    }
+  }
+
+  /// Danh sách lời mời do chính mình gửi đi
+  static Future<List<DataShareModel>> getOutgoingShares() async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/shares/outgoing'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        final List list = body['data'] ?? [];
+        return list.map((item) => DataShareModel.fromJson(item as Map<String, dynamic>)).toList();
+      }
+      throw Exception(body['message'] ?? 'Không thể tải danh sách chia sẻ');
+    } on http.ClientException {
+      throw Exception('Mất kết nối mạng, vui lòng thử lại');
+    }
+  }
+
+  /// Danh sách lời mời gửi tới cho mình
+  static Future<List<DataShareModel>> getIncomingShares() async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/shares/incoming'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        final List list = body['data'] ?? [];
+        return list.map((item) => DataShareModel.fromJson(item as Map<String, dynamic>)).toList();
+      }
+      throw Exception(body['message'] ?? 'Không thể tải danh sách chia sẻ');
+    } on http.ClientException {
+      throw Exception('Mất kết nối mạng, vui lòng thử lại');
+    }
+  }
+
+  /// Chấp nhận lời mời chia sẻ
+  static Future<void> acceptShare(String shareId) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/shares/$shareId/accept'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return;
+      }
+      throw Exception(body['message'] ?? 'Không thể chấp nhận lời mời');
+    } on http.ClientException {
+      throw Exception('Mất kết nối mạng, vui lòng thử lại');
+    }
+  }
+
+  /// Từ chối lời mời chia sẻ
+  static Future<void> declineShare(String shareId) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/shares/$shareId/decline'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return;
+      }
+      throw Exception(body['message'] ?? 'Không thể từ chối lời mời');
+    } on http.ClientException {
+      throw Exception('Mất kết nối mạng, vui lòng thử lại');
+    }
+  }
+
+  /// Dừng/thu hồi chia sẻ
+  static Future<void> revokeShare(String shareId) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/shares/$shareId/revoke'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return;
+      }
+      throw Exception(body['message'] ?? 'Không thể dừng chia sẻ');
+    } on http.ClientException {
+      throw Exception('Mất kết nối mạng, vui lòng thử lại');
+    }
+  }
+
+  /// Lấy danh sách điểm được chia sẻ còn hiệu lực dành cho shipper đăng nhập
+  static Future<Map<String, dynamic>> getSharedLocations() async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/shares/shared-locations'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        final data = body['data'] as Map<String, dynamic>? ?? {};
+        final List rawLocs = data['locations'] as List? ?? [];
+        final locations = rawLocs
+            .map((e) => SharedLocationPointModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+        final totalCount = (data['totalCount'] as num?)?.toInt() ?? locations.length;
+        final skippedOutOfAreaCount = (data['skippedOutOfAreaCount'] as num?)?.toInt() ?? 0;
+
+        return {
+          'locations': locations,
+          'totalCount': totalCount,
+          'skippedOutOfAreaCount': skippedOutOfAreaCount,
+        };
+      }
+      throw Exception(body['message'] ?? 'Không thể tải điểm chia sẻ');
+    } on http.ClientException {
+      throw Exception('Mất kết nối mạng, vui lòng thử lại');
+    }
+  }
+
+  /// Nhập điểm chia sẻ thành vị trí của tôi
+  static Future<Map<String, dynamic>> importSharedLocations(
+    String shareId, {
+    List<String>? customerIds,
+    bool all = true,
+    bool replaceExisting = false,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    final baseUrl = await getBaseUrl();
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/shares/$shareId/import'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          if (customerIds != null) 'customerIds': customerIds,
+          'all': all,
+          'replaceExisting': replaceExisting,
+        }),
+      ).timeout(const Duration(seconds: 20));
+
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['success'] == true) {
+        return body['data'] as Map<String, dynamic>? ?? {};
+      }
+      throw Exception(body['message'] ?? 'Không thể nhập điểm chia sẻ');
+    } on http.ClientException {
+      throw Exception('Mất kết nối mạng, vui lòng thử lại');
     }
   }
 }

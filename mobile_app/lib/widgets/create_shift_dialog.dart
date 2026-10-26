@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/shift_model.dart';
 import '../services/api_service.dart';
+import '../theme/app_buttons.dart';
 
 /// Hộp thoại tạo ca làm việc nhanh từ bản đồ chính (TASK: SHIFT-FROM-MAP-AND-BULK-PASTE-015B)
 /// - Thiết kế tối ưu cho shipper thao tác một tay ở vùng ngón cái
@@ -26,15 +27,31 @@ class _CreateShiftBottomSheetState extends State<CreateShiftBottomSheet> {
   final TextEditingController _nameController = TextEditingController();
   bool _isCreating = false;
   String? _errorMessage;
+  String _suggestedName = '';
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    final hour = now.hour;
-    final period = hour < 12 ? 'Ca sáng' : (hour < 18 ? 'Ca chiều' : 'Ca tối');
-    final dateStr = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}';
-    _nameController.text = '$period $dateStr';
+    _suggestedName = ShiftModel.suggestShiftName();
+    _nameController.text = _suggestedName;
+    _checkExistingShiftsForDeduplication();
+  }
+
+  Future<void> _checkExistingShiftsForDeduplication() async {
+    try {
+      final shifts = await ApiService.getShifts();
+      if (!mounted) return;
+      final existingNames = shifts
+          .map((s) => s.shiftName?.trim() ?? s.displayTitle.trim())
+          .toList();
+      final resolved = ShiftModel.suggestShiftName(existingNames: existingNames);
+      if (mounted && (_nameController.text.trim() == _suggestedName || _nameController.text.trim().isEmpty)) {
+        setState(() {
+          _suggestedName = resolved;
+          _nameController.text = resolved;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -50,9 +67,12 @@ class _CreateShiftBottomSheetState extends State<CreateShiftBottomSheet> {
     });
 
     try {
-      final nameText = _nameController.text.trim();
+      var nameText = _nameController.text.trim();
+      if (nameText.isEmpty) {
+        nameText = _suggestedName.isNotEmpty ? _suggestedName : ShiftModel.suggestShiftName();
+      }
       final newShift = await ApiService.createShift(
-        shiftName: nameText.isNotEmpty ? nameText : null,
+        shiftName: nameText,
       );
       if (!mounted) return;
       Navigator.of(context).pop(newShift);
@@ -68,22 +88,27 @@ class _CreateShiftBottomSheetState extends State<CreateShiftBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, -4)),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, -4)),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
             // Thanh gạt vuốt đóng
             Center(
               child: Container(
@@ -176,14 +201,7 @@ class _CreateShiftBottomSheetState extends State<CreateShiftBottomSheet> {
               height: 56,
               child: ElevatedButton.icon(
                 onPressed: _isCreating ? null : _handleCreate,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
+                style: AppButtons.primaryLarge(minHeight: 56, borderRadius: 16),
                 icon: _isCreating
                     ? const SizedBox(
                         width: 20,
@@ -204,6 +222,8 @@ class _CreateShiftBottomSheetState extends State<CreateShiftBottomSheet> {
           ],
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }

@@ -7,6 +7,8 @@ import '../widgets/quick_add_customer_sheet.dart';
 import '../widgets/authenticated_image.dart';
 import '../widgets/customer_photos_strip_widget.dart';
 import '../widgets/create_shift_dialog.dart';
+import '../widgets/bulk_paste_phone_sheet.dart';
+import '../theme/app_buttons.dart';
 import 'crosshair_location_picker_view.dart';
 
 class CustomerDirectoryView extends StatefulWidget {
@@ -347,6 +349,16 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
     _openCustomerDetailEdit(customer);
   }
 
+  void _openBulkPasteDirectorySheet() {
+    BulkPastePhoneSheet.show(
+      context: context,
+      isDirectoryMode: true,
+      onCustomersAdded: (result) {
+        _fetchCustomers(reset: true);
+      },
+    );
+  }
+
   void _openCustomerDetailEdit(CustomerDirectoryModel customer) {
     Navigator.push(
       context,
@@ -560,48 +572,68 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
             // Header: "Danh bạ" kèm huy hiệu tổng + nút "+ Thêm số"
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-              child: Row(
-                children: [
-                  const Text(
-                    'Danh bạ',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                    ),
-                    child: Text(
-                      '${_tabCounts.total}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF475569),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    const Text(
+                      'Danh bạ',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF2563EB),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      minimumSize: const Size(48, 48),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: Text(
+                        '${_tabCounts.total}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF475569),
+                        ),
+                      ),
                     ),
-                    icon: const Icon(Icons.add, size: 20),
-                    label: const Text(
-                      'Thêm số',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      key: const ValueKey('btn_bulk_paste_directory'),
+                      style: AppButtons.secondary(
+                        minHeight: 48,
+                        borderRadius: 10,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                      icon: const Icon(Icons.playlist_add_rounded, size: 18),
+                      label: const Text(
+                        'Dán nhiều số',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      onPressed: _openBulkPasteDirectorySheet,
                     ),
-                    onPressed: _openCreateCustomerSheet,
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      key: const ValueKey('btn_add_single_customer'),
+                      style: AppButtons.primary(
+                        minHeight: 48,
+                        borderRadius: 10,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text(
+                        'Thêm số',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      ),
+                      onPressed: _openCreateCustomerSheet,
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -694,11 +726,7 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
                                 ),
                                 const SizedBox(height: 16),
                                 OutlinedButton.icon(
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: const Color(0xFF2563EB),
-                                    side: const BorderSide(color: Color(0xFF2563EB)),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
+                                  style: AppButtons.secondary(minHeight: 48, borderRadius: 10),
                                   icon: const Icon(Icons.refresh_rounded, size: 18),
                                   onPressed: () => _fetchCustomers(reset: true),
                                   label: const Text('Thử lại'),
@@ -1013,14 +1041,22 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
                     children: [
                       const Icon(Icons.photo_camera_rounded, size: 20, color: Color(0xFF2563EB)),
                       const SizedBox(width: 8),
-                      const Text(
-                        'Ảnh mặt tiền / cổng nhà',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                      const Expanded(
+                        child: Text(
+                          'Ảnh mặt tiền / cổng nhà',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      const Spacer(),
-                      Text(
-                        'Tối đa 10 ảnh',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Tối đa 10 ảnh',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
@@ -1121,30 +1157,31 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  const Text(
+                    'TỌA ĐỘ & GHI CHÚ VỊ TRÍ',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.start,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      const Text('TỌA ĐỘ & GHI CHÚ VỊ TRÍ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                      const Spacer(),
-                      if (_currentLat != null && _currentLng != null) ...[
-                        TextButton.icon(
-                          style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFFEF4444),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      if (_currentLat != null && _currentLng != null)
+                        OutlinedButton.icon(
+                          key: const Key('btn_delete_customer_location'),
+                          style: AppButtons.secondary(minHeight: 48, borderRadius: 8),
+                          icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFF0F172A)),
+                          label: const Text(
+                            'Xóa vị trí',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                           ),
-                          icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                          label: const Text('Xóa vị trí', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                           onPressed: _isSaving ? null : _confirmAndDeleteLocation,
                         ),
-                        const SizedBox(width: 4),
-                      ],
                       ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2563EB),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
+                        key: const Key('btn_pick_location_map'),
+                        style: AppButtons.primary(minHeight: 48, borderRadius: 8),
                         icon: const Icon(Icons.add_location_alt_rounded, size: 16),
                         label: const Text('Chọn trên bản đồ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                         onPressed: _openCrosshairPicker,
@@ -1163,9 +1200,13 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
                         children: [
                           const Icon(Icons.gps_fixed_rounded, size: 16, color: Color(0xFF2563EB)),
                           const SizedBox(width: 8),
-                          Text(
-                            'Tọa độ: ${_currentLat!.toStringAsFixed(6)}, ${_currentLng!.toStringAsFixed(6)}',
-                            style: const TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                          Expanded(
+                            child: Text(
+                              'Tọa độ: ${_currentLat!.toStringAsFixed(6)}, ${_currentLng!.toStringAsFixed(6)}',
+                              style: const TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),

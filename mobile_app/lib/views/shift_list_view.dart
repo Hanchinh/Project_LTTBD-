@@ -6,6 +6,7 @@ import '../widgets/bulk_paste_phone_sheet.dart';
 import 'shift_preparation_view.dart';
 import 'shift_map_view.dart';
 import 'login_view.dart';
+import '../theme/app_buttons.dart';
 
 class ShiftListView extends StatefulWidget {
   final Function(ShiftModel)? onSelectShiftForMap;
@@ -341,13 +342,11 @@ class _ShiftListViewState extends State<ShiftListView> {
                           color: Color(0xFF0F172A),
                         ),
                       ),
-                      if (shift.shiftName != null && shift.shiftName!.trim().isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          shift.shiftCode,
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                        ),
-                      ],
+                      const SizedBox(height: 2),
+                      Text(
+                        shift.shiftCode,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
                     ],
                   ),
                 ),
@@ -355,7 +354,7 @@ class _ShiftListViewState extends State<ShiftListView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '${shift.shiftDate} · $total điểm',
+                      '${ShiftModel.formatVnDate(DateTime.tryParse(shift.shiftDate) ?? shift.createdAt ?? DateTime.now())} · $total điểm',
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                     ),
                     PopupMenuButton<String>(
@@ -424,11 +423,7 @@ class _ShiftListViewState extends State<ShiftListView> {
                   child: SizedBox(
                     height: 48,
                     child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF0F172A),
-                        side: const BorderSide(color: Color(0xFFCBD5E1)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
+                      style: AppButtons.secondary(minHeight: 48, borderRadius: 10),
                       icon: const Icon(Icons.paste_rounded, size: 18),
                       label: const Text('Dán SĐT', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                       onPressed: () => _openBulkPasteSheet(shift),
@@ -440,12 +435,7 @@ class _ShiftListViewState extends State<ShiftListView> {
                   child: SizedBox(
                     height: 48,
                     child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F172A),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
+                      style: AppButtons.primary(minHeight: 48, borderRadius: 10),
                       icon: const Icon(Icons.map_rounded, size: 18),
                       label: const Text('Mở bản đồ', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                       onPressed: () => _openShiftMap(shift),
@@ -485,9 +475,10 @@ class _ShiftListViewState extends State<ShiftListView> {
     }
 
     final summary = shift.summary;
+    final dateStr = ShiftModel.formatVnDate(DateTime.tryParse(shift.shiftDate) ?? shift.createdAt ?? DateTime.now());
     final String subText = shift.status == ShiftStatus.completed
-        ? '${summary.totalPoints} điểm hoàn tất'
-        : '${summary.totalPoints} điểm (${summary.verifiedCount} xác minh, ${summary.temporaryCount} tạm)';
+        ? '$dateStr · ${summary.totalPoints} điểm hoàn tất'
+        : '$dateStr · ${summary.totalPoints} điểm (${summary.verifiedCount} xác minh, ${summary.temporaryCount} tạm)';
 
     return Container(
       decoration: BoxDecoration(
@@ -521,6 +512,11 @@ class _ShiftListViewState extends State<ShiftListView> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            shift.shiftCode,
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                           ),
                           const SizedBox(width: 8),
                           Container(
@@ -594,14 +590,7 @@ class _ShiftListViewState extends State<ShiftListView> {
                   Row(
                     children: [
                       ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F172A),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          minimumSize: const Size(0, 48),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
+                        style: AppButtons.primary(minHeight: 48, borderRadius: 10),
                         icon: const Icon(Icons.add_rounded, size: 20),
                         label: const Text(
                           'Tạo ca mới',
@@ -684,12 +673,7 @@ class _ShiftListViewState extends State<ShiftListView> {
                                     ),
                                     const SizedBox(height: 16),
                                     ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF0F172A),
-                                        foregroundColor: Colors.white,
-                                        minimumSize: const Size(140, 48),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                      ),
+                                      style: AppButtons.primary(minHeight: 48, borderRadius: 10),
                                       icon: const Icon(Icons.add, size: 18),
                                       label: const Text('Tạo ca'),
                                       onPressed: _openCreateShiftDialog,

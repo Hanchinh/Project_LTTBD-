@@ -3,6 +3,7 @@ import '../models/shift_model.dart';
 import '../services/api_service.dart';
 import '../views/shift_map_view.dart';
 import 'create_shift_dialog.dart';
+import '../theme/app_buttons.dart';
 
 /// Bottom sheet chọn ca làm việc từ bản đồ chính (TASK: PHOTO-SYNC-SHIFT-PICKER-BULK-016 - Mục B)
 /// - Liệt kê các ca của shipper: shiftName (nếu trống thì shift_code), ngày, trạng thái, số điểm
@@ -140,11 +141,7 @@ class _ShiftPickerBottomSheetState extends State<ShiftPickerBottomSheet> {
             child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
+            style: AppButtons.primary(),
             onPressed: () {
               if (formKey.currentState?.validate() ?? false) {
                 Navigator.pop(dlgCtx, controller.text.trim());
@@ -514,17 +511,15 @@ class _ShiftPickerBottomSheetState extends State<ShiftPickerBottomSheet> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (shift.shiftName != null && shift.shiftName!.trim().isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              shift.shiftCode,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF64748B),
-                              ),
+                          const SizedBox(height: 2),
+                          Text(
+                            shift.shiftCode,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64748B),
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ),
@@ -591,7 +586,7 @@ class _ShiftPickerBottomSheetState extends State<ShiftPickerBottomSheet> {
                     const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF64748B)),
                     const SizedBox(width: 4),
                     Text(
-                      shift.shiftDate,
+                      ShiftModel.formatVnDate(DateTime.tryParse(shift.shiftDate) ?? shift.createdAt ?? DateTime.now()),
                       style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
                     const Spacer(),
@@ -686,12 +681,7 @@ class _ShiftPickerBottomSheetState extends State<ShiftPickerBottomSheet> {
               child: ElevatedButton.icon(
                 key: const Key('btn_empty_create_shift'),
                 onPressed: _handleCreateNewShift,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2563EB),
-                  foregroundColor: Colors.white,
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
+                style: AppButtons.primaryLarge(minHeight: 56, borderRadius: 16),
                 icon: const Icon(Icons.add_rounded, size: 22),
                 label: const Text(
                   '+ TẠO CA MỚI',

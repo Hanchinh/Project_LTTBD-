@@ -43,7 +43,12 @@ export const pool = new Pool({
   connectionTimeoutMillis: 5000,
 });
 
-// Guard: Bất kỳ lệnh connect hoặc query nào khi chạy test với delivery_db đều bị từ chối
+pool.on('error', (err: any) => {
+  if (process.env.NODE_ENV === 'test' || err?.code === '57P01') {
+    return;
+  }
+  console.error('[Database Pool Error]:', err?.message || err);
+});
 const originalPoolConnect = pool.connect.bind(pool);
 pool.connect = ((callback?: any) => {
   assertSafeDatabaseForTests(process.env.DB_NAME || (pool.options as any)?.database || PRODUCTION_DB_NAME);
