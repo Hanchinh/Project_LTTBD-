@@ -2,17 +2,8 @@ import 'package:flutter/material.dart';
 import '../models/customer_model.dart';
 import '../repositories/repository_provider.dart';
 import '../theme/app_buttons.dart';
-
-/// Hàm chuẩn hóa số điện thoại theo định dạng chuẩn Việt Nam (10 chữ số)
-String normalizeCustomerPhone(String raw) {
-  String clean = raw.replaceAll(RegExp(r'\D'), '');
-  if (clean.startsWith('84') && clean.length == 11) {
-    clean = '0${clean.substring(2)}';
-  } else if (clean.length == 9 && !clean.startsWith('0')) {
-    clean = '0$clean';
-  }
-  return clean;
-}
+import '../utils/phone_utils.dart';
+export '../utils/phone_utils.dart' show normalizeCustomerPhone;
 
 /// Mở bottom sheet Thêm nhanh khách hàng (TASK: QUICK-ADD-CUSTOMER-013)
 Future<CustomerDirectoryModel?> showQuickAddCustomerBottomSheet(

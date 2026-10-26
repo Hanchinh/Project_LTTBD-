@@ -580,6 +580,35 @@ Tất cả các lệnh dưới đây đã được thực thi trực tiếp trê
 - **6. Trạng thái kiểm thử:**
   - **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
 
+### 3.14. Đợt Kiểm Thử Lược Đồ CSDL SQLite Cục Bộ (LOCAL-FIRST-02-SQLITE-SCHEMA) - 26/10/2026
+
+- **Mục tiêu:** Kiểm tra toàn diện lược đồ cơ sở dữ liệu SQLite mới `local_data_v1.db` ([app_database.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/local/app_database.dart)), tính toàn vẹn ràng buộc khóa ngoại `PRAGMA foreign_keys = ON;`, trigger ghi lịch sử tự động, bảo toàn bản ghi lịch sử khi xóa vị trí, bảo toàn khách hàng khi xóa ca, chặn trùng lặp ca, chặn giá trị sai bằng `CHECK`, tìm kiếm không dấu unaccent hai chiều và chuẩn hóa SĐT.
+- **1. Phân tích tĩnh & Cú pháp:**
+  - Lệnh: `flutter analyze`
+  - Kết quả: **No issues found! (ran in 1.4s)** (0 errors, 0 warnings, 0 lints).
+- **2. Bộ kiểm thử mới ([local_first_sqlite_schema_02_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_sqlite_schema_02_test.dart)):**
+  - `1. Tạo DB sạch đủ tất cả các bảng và trigger trg_saved_locations_history`: **PASSED**.
+  - `2. Migration chạy lại (re-run) không bị lỗi`: **PASSED**.
+  - `3. Trigger lịch sử sinh dòng khi đổi tọa độ hoặc ghi chú (UPDATE)`: **PASSED**.
+  - `4. Xóa vị trí giữ lịch sử (saved_location_id đặt NULL, không xóa dòng lịch sử)`: **PASSED**.
+  - `5. Xóa ca KHÔNG xóa khách hàng hay vị trí`: **PASSED**.
+  - `6. UNIQUE(shift_id, customer_id) chặn thêm khách trùng vào một ca`: **PASSED**.
+  - `7. CHECK ràng buộc trạng thái chặn giá trị sai`: **PASSED**.
+  - `8. Tìm kiếm không dấu: "Nguyen Xien" khớp "Nguyễn Xiển"`: **PASSED**.
+  - `9. Chuẩn hóa SĐT và chặn trùng lặp khách hàng`: **PASSED**.
+  - `10. App Profile, App Meta và Activity Log hoạt động chính xác`: **PASSED**.
+- **3. Toàn bộ kiểm thử Mobile App:**
+  - Lệnh: `flutter test`
+  - Kết quả: **162/162 tests passed (100%)** (148 tests gốc + 4 tests repository layer + 10 tests sqlite schema).
+- **4. Đóng gói & Build:**
+  - Lệnh: `flutter build apk --debug`
+  - Kết quả: **Thành công (Built build\app\outputs\flutter-apk\app-debug.apk in 15.0s)**.
+- **5. Môi trường Backend & Database:**
+  - Không thay đổi bất kỳ file nào trong `backend/` hay `admin_web/`.
+  - 0 request ghi dữ liệu vào CSDL sống `delivery_db`.
+- **6. Trạng thái kiểm thử:**
+  - **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
 ---
 
 ## 4. Quy Chuẩn Cách Ly Kiểm Thử (Strict Testing Isolation Policy)

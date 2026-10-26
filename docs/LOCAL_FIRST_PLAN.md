@@ -183,3 +183,141 @@ Các lời gọi sau đây không thuộc 6 nhóm nghiệp vụ quản lý dữ 
    - `ApiService.searchAddress(query)` tại [crosshair_location_picker_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/crosshair_location_picker_view.dart) và [main_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/main_map_view.dart).
 4. **Tiện ích mở ứng dụng dẫn đường ngoài (Google Maps):**
    - `ApiService.openExternalNavigation(lat, lng)` tại [point_detail_bottom_sheet.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/point_detail_bottom_sheet.dart), [shift_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/shift_map_view.dart), [main_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/main_map_view.dart), [delivery_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/delivery_map_view.dart), [order_detail_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/order_detail_view.dart).
+
+---
+
+## 5. Sơ Đồ Cơ Sở Dữ Liệu SQLite Cục Bộ (Local SQLite Schema - `local_data_v1.db`)
+
+> **Quyết định kiến trúc (TASK: LOCAL-FIRST-02-SQLITE-SCHEMA):**
+> - **Tách biệt hoàn toàn:** Tạo tệp cơ sở dữ liệu mới `local_data_v1.db` do [app_database.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/local/app_database.dart) quản lý.
+> - **Bảo toàn:** Giữ nguyên tệp `delivery_offline_v2.db` cùng [offline_storage_service.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/services/offline_storage_service.dart) để tránh làm ảnh hưởng đến hàng đợi đồng bộ cũ và các bài test đã có.
+> - **Cấu hình động cơ SQLite:**
+>   - Bắt buộc bật `PRAGMA foreign_keys = ON;` qua hook `onConfigure`.
+>   - Kích hoạt chế độ `PRAGMA journal_mode = WAL;` (Write-Ahead Logging) cho hiệu năng đọc/ghi đồng thời tối ưu.
+>   - Cơ chế migration theo phiên bản (`user_version`, `onCreate`, `onUpgrade` chạy tuần tự trong transaction).
+>   - Định danh `id` dạng TEXT UUID v4 sinh trực tiếp tại app qua [uuid_utils.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/utils/uuid_utils.dart).
+>   - Thời gian lưu trữ theo định dạng chuẩn ISO-8601 UTC (`YYYY-MM-DDTHH:mm:ss.sssZ`).
+
+```mermaid
+erDiagram
+    customers ||--o| saved_locations : "has verified gate"
+    customers ||--o{ location_history : "tracks changes"
+    saved_locations ||--o{ location_history : "on delete set null"
+    customers ||--o{ customer_photos : "owns photos"
+    shifts ||--o{ shift_delivery_points : "contains delivery points (cascade)"
+    customers ||--o{ shift_delivery_points : "delivered to"
+
+    customers {
+        TEXT id PK "UUID"
+        TEXT customer_code "Mã khách"
+        TEXT full_name "Họ và tên"
+        TEXT phone_number UK "Đã chuẩn hóa 10 số"
+        TEXT address_text "Địa chỉ văn bản"
+        TEXT notes "Ghi chú"
+        TEXT search_text "Cột phụ không dấu unaccent"
+        TEXT created_at "ISO-8601 UTC"
+        TEXT updated_at "ISO-8601 UTC"
+        TEXT deleted_at "Xóa mềm (NULL nếu active)"
+    }
+
+    saved_locations {
+        TEXT id PK "UUID"
+        TEXT customer_id UK, FK "Chỉ 1 vị trí chuẩn / khách"
+        REAL latitude "Vĩ độ WGS84"
+        REAL longitude "Kinh độ WGS84"
+        REAL gps_accuracy "Độ chính xác GPS (mét)"
+        TEXT identification_notes "Mô tả đặc điểm cổng/nhà"
+        TEXT created_at "ISO-8601 UTC"
+        TEXT updated_at "ISO-8601 UTC"
+    }
+
+    location_history {
+        TEXT id PK "UUID"
+        TEXT saved_location_id FK "NULL khi vị trí gốc bị xóa"
+        TEXT customer_id FK "Liên kết khách hàng"
+        REAL latitude "Vĩ độ cũ"
+        REAL longitude "Kinh độ cũ"
+        REAL gps_accuracy "Độ chính xác cũ"
+        TEXT identification_notes "Mô tả cũ"
+        TEXT change_reason "Lý do thay đổi"
+        TEXT created_at "Thời điểm thay đổi"
+    }
+
+    customer_photos {
+        TEXT id PK "UUID"
+        TEXT customer_id FK "Khách hàng sở hữu"
+        TEXT file_name "Tên tệp ảnh trong app storage"
+        TEXT thumb_file_name "Tên tệp ảnh thu nhỏ"
+        TEXT created_at "ISO-8601 UTC"
+        TEXT deleted_at "Xóa mềm"
+    }
+
+    shifts {
+        TEXT id PK "UUID"
+        TEXT shift_code "Mã ca SHF-YYYYMMDD-XXX"
+        TEXT shift_name "Tên ca (gợi ý tự động)"
+        TEXT work_date "Ngày làm việc YYYY-MM-DD"
+        TEXT status "CHECK: PREPARING/IN_PROGRESS/COMPLETED"
+        TEXT started_at "Bắt đầu ca"
+        TEXT completed_at "Hoàn thành ca"
+        TEXT created_at "ISO-8601 UTC"
+        TEXT updated_at "ISO-8601 UTC"
+    }
+
+    shift_delivery_points {
+        TEXT id PK "UUID"
+        TEXT shift_id FK "Ca làm việc (ON DELETE CASCADE)"
+        TEXT customer_id FK "Khách hàng"
+        INTEGER delivery_order_index "Thứ tự giao trong ca"
+        TEXT location_status "CHECK: NO_LOCATION/TEMPORARY/VERIFIED"
+        REAL latitude "Tọa độ ghim tạm riêng trong ca"
+        REAL longitude "Tọa độ ghim tạm riêng trong ca"
+        REAL gps_accuracy "Độ chính xác GPS"
+        TEXT identification_notes "Ghi chú giao điểm này"
+        TEXT created_at "ISO-8601 UTC"
+        TEXT updated_at "ISO-8601 UTC"
+    }
+
+    app_profile {
+        INTEGER id PK "CHECK: id = 1"
+        TEXT display_name "Tên hiển thị người dùng"
+        TEXT pin_hash "Mã PIN bảo mật cục bộ"
+        TEXT created_at "ISO-8601 UTC"
+        TEXT updated_at "ISO-8601 UTC"
+    }
+
+    app_meta {
+        TEXT key PK "Khóa cấu hình"
+        TEXT value "Giá trị cài đặt"
+    }
+
+    activity_log {
+        TEXT id PK "UUID"
+        TEXT action "Hành động thực hiện"
+        TEXT entity "Đối tượng tác động"
+        TEXT entity_id "ID đối tượng"
+        TEXT details_json "Chi tiết (lọc bỏ dữ liệu nhạy cảm)"
+        TEXT created_at "ISO-8601 UTC"
+    }
+```
+
+### 5.1. Quy Tắc Nghiệp Vụ Cốt Lõi Được Đảm Bảo Bằng Ràng Buộc CSDL
+
+1. **Vị Trí Đã Xác Minh vs. Vị Trí Ghim Tạm:**
+   - `saved_locations` chỉ chứa vị trí cổng nhà đã được xác minh (`VERIFIED`) chính thức của khách hàng.
+   - Vị trí ghim tạm (`TEMPORARY`) trước khi đi giao chỉ tồn tại cục bộ trong ca làm việc tại bảng `shift_delivery_points` (`location_status = 'TEMPORARY'`), không ghi đè vào `saved_locations`.
+2. **Bảo Toàn Khách Hàng Khi Xóa Ca:**
+   - `shift_delivery_points` có khóa ngoại `FOREIGN KEY (shift_id) REFERENCES shifts(id) ON DELETE CASCADE`.
+   - Bảng `customers` và `saved_locations` **không** bị phụ thuộc khóa ngoại cascade từ `shifts`. Khi xóa ca làm việc, toàn bộ khách hàng và vị trí đã lưu hoàn toàn nguyên vẹn.
+3. **Bảo Toàn Lịch Sử Đối Soát Khi Xóa Vị Trí:**
+   - `location_history` có khóa ngoại `FOREIGN KEY (saved_location_id) REFERENCES saved_locations(id) ON DELETE SET NULL`.
+   - Trigger SQLite `trg_saved_locations_history` tự động sinh bản ghi lưu lại tọa độ và ghi chú cũ mỗi khi có thao tác `UPDATE` thay đổi tọa độ/ghi chú.
+   - Khi xóa dòng trong `saved_locations`, các bản ghi lịch sử tương ứng vẫn tồn tại nguyên vẹn, chỉ có trường `saved_location_id` tự động chuyển về `NULL`.
+4. **Ngăn Ngừa Trùng Lặp Trong Ca:**
+   - Khóa duy nhất tổ hợp `UNIQUE(shift_id, customer_id)` chặn tuyệt đối hành vi thêm một khách hàng nhiều lần vào cùng một ca.
+5. **Tìm Kiếm Thông Minh Không Dấu (Vietnamese Unaccent):**
+   - Cột phụ `search_text` trong bảng `customers` được tự động sinh đồng bộ qua [vietnamese_utils.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/utils/vietnamese_utils.dart).
+   - Cho phép người dùng tìm kiếm theo `"Nguyen Xien"` khớp chính xác `"Nguyễn Xiển"`, tìm theo SĐT có khoảng cách/dấu chấm (`"0909 112 233"`) khớp `"0909112233"`.
+6. **Chuẩn Hóa Số Điện Thoại Dùng Chung:**
+   - Hàm `normalizeCustomerPhone` được tách ra [phone_utils.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/utils/phone_utils.dart) đảm bảo mọi số điện thoại nhập từ giao diện (Thêm nhanh khách, dán SĐT, tra cứu) đều được chuẩn hóa về 10 chữ số bắt đầu bằng `0` trước khi lưu.
+
