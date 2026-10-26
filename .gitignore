@@ -79,3 +79,7 @@ backend/uploads/
 *.apk
 *.dump
 backups/
+
+backup_*
+*.dump
+*.zip
