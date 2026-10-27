@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/shift_model.dart';
-import 'main_map_view.dart';
-import 'customer_directory_view.dart';
-import 'shift_list_view.dart';
+import '../repositories/repository_provider.dart';
 import 'account_profile_view.dart';
+import 'customer_directory_view.dart';
+import 'main_map_view.dart';
+import 'pin_lock_screen.dart';
+import 'shift_list_view.dart';
 
 /// Màn hình Khung chứa Điều hướng Chính (Home Shell View)
-/// Cung cấp 4 tab chính: [Bản đồ] (mặc định), [Danh bạ], [Ca làm việc], [Tài khoản]
+/// Cung cấp 4 tab chính: [Bản đồ] (mặc định), [Danh bạ], [Ca làm việc], [Cá nhân] / [Tài khoản]
 class HomeShellView extends StatefulWidget {
   final int initialTab;
   final ShiftModel? initialShift;
@@ -21,9 +23,10 @@ class HomeShellView extends StatefulWidget {
   State<HomeShellView> createState() => _HomeShellViewState();
 }
 
-class _HomeShellViewState extends State<HomeShellView> {
+class _HomeShellViewState extends State<HomeShellView> with WidgetsBindingObserver {
   late int _currentIndex;
   ShiftModel? _activeShift;
+  bool _isLockShowing = false;
 
   // Key để tương tác với MainMapView khi chuyển tab hoặc cập nhật ca
   final GlobalKey<MainMapViewState> _mainMapKey = GlobalKey<MainMapViewState>();
@@ -31,8 +34,44 @@ class _HomeShellViewState extends State<HomeShellView> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentIndex = widget.initialTab;
     _activeShift = widget.initialShift;
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!RepositoryProvider.useLocalData) return;
+
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      RepositoryProvider.localProfile.recordActiveNow();
+    } else if (state == AppLifecycleState.resumed) {
+      _checkLockOnResume();
+    }
+  }
+
+  Future<void> _checkLockOnResume() async {
+    if (_isLockShowing) return;
+    final needLock = await RepositoryProvider.localProfile.shouldLockApp();
+    if (needLock && mounted) {
+      _isLockShowing = true;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) => PinLockScreen(
+            onSuccess: () => Navigator.of(context).pop(),
+          ),
+        ),
+      );
+      _isLockShowing = false;
+      await RepositoryProvider.localProfile.recordActiveNow();
+    }
   }
 
   void _onTabSelected(int index) {
@@ -120,26 +159,26 @@ class _HomeShellViewState extends State<HomeShellView> {
           elevation: 0,
           height: 72,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: const [
-            NavigationDestination(
+          destinations: [
+            const NavigationDestination(
               icon: Icon(Icons.map_outlined, color: Color(0xFF64748B), size: 24),
               selectedIcon: Icon(Icons.map_rounded, color: Color(0xFF2563EB), size: 24),
               label: 'Bản đồ',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.contacts_outlined, color: Color(0xFF64748B), size: 24),
               selectedIcon: Icon(Icons.contacts_rounded, color: Color(0xFF2563EB), size: 24),
               label: 'Danh bạ',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(Icons.assignment_outlined, color: Color(0xFF64748B), size: 24),
               selectedIcon: Icon(Icons.assignment_rounded, color: Color(0xFF2563EB), size: 24),
               label: 'Ca làm việc',
             ),
             NavigationDestination(
-              icon: Icon(Icons.person_outline_rounded, color: Color(0xFF64748B), size: 24),
-              selectedIcon: Icon(Icons.person_rounded, color: Color(0xFF2563EB), size: 24),
-              label: 'Tài khoản',
+              icon: const Icon(Icons.person_outline_rounded, color: Color(0xFF64748B), size: 24),
+              selectedIcon: const Icon(Icons.person_rounded, color: Color(0xFF2563EB), size: 24),
+              label: RepositoryProvider.useLocalData ? 'Cá nhân' : 'Tài khoản',
             ),
           ],
         ),

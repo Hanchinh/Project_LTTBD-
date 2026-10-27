@@ -13,21 +13,19 @@ import 'remote/remote_shift_repository.dart';
 import 'local/local_customer_repository.dart';
 import 'local/local_location_repository.dart';
 import 'local/local_photo_repository.dart';
+import 'local/local_profile_repository.dart';
 import 'local/local_shift_repository.dart';
 
 /// Service locator & provider cho toàn bộ các Repository trong ứng dụng.
-/// Mặc định: Trỏ về RemoteRepository (bọc ApiService kết nối backend hiện tại).
-/// Kiến trúc Local-First: Cho phép kích hoạt `useLocalData = true` để dùng LocalCustomerRepository, LocalLocationRepository, LocalShiftRepository & LocalPhotoRepository (SQLite + bộ nhớ riêng).
+/// Mặc định nhánh local-first: useLocalData = true (Customer, Location, Shift, Photo & Profile đều Local SQLite).
+/// Cho phép chuyển đổi `useLocalData = false` để chạy Remote như cũ khi có kết nối backend.
 /// Hỗ trợ ghi đè (override) trong kiểm thử widget test mà không làm xáo trộn UI.
 class RepositoryProvider {
-  static const bool _compileTimeLocalData = bool.fromEnvironment('LOCAL_DATA', defaultValue: false);
+  static const bool _compileTimeLocalData = bool.fromEnvironment('LOCAL_DATA', defaultValue: true);
   static bool? _useLocalDataOverride;
 
-  /// Cờ xác định có đang sử dụng Local Repositories cho Customer, Location, Shift & Photo hay không
-  /// Mặc định: false (chạy Remote như cũ).
-  /// Có thể bật qua:
-  /// 1. RepositoryProvider.useLocalData = true
-  /// 2. Cờ biên dịch: --dart-define=LOCAL_DATA=true
+  /// Cờ xác định có đang sử dụng Local Repositories cho Customer, Location, Shift, Photo & Profile hay không
+  /// Mặc định nhánh local-first: true.
   static bool get useLocalData => _useLocalDataOverride ?? _compileTimeLocalData;
 
   static set useLocalData(bool value) {
@@ -37,6 +35,7 @@ class RepositoryProvider {
     _locationRepository = null;
     _photoRepository = null;
     _shiftRepository = null;
+    _profileRepository = null;
   }
 
   static CustomerRepository? _customerRepository;
@@ -62,7 +61,13 @@ class RepositoryProvider {
       _sharingRepository ??= RemoteSharingRepository();
 
   static ProfileRepository get profile =>
-      _profileRepository ??= RemoteProfileRepository();
+      _profileRepository ??= (useLocalData ? LocalProfileRepository() : RemoteProfileRepository());
+
+  static LocalProfileRepository get localProfile {
+    final p = profile;
+    if (p is LocalProfileRepository) return p;
+    return LocalProfileRepository();
+  }
 
   /// Ghi đè (override) các repository khi chạy test hoặc khi chuyển chế độ hoạt động
   static void overrideRepositories({

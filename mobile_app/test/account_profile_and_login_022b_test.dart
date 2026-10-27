@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delivery_marker_mobile/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/views/account_profile_view.dart';
 import 'package:delivery_marker_mobile/views/change_password_view.dart';
 import 'package:delivery_marker_mobile/views/login_view.dart';
@@ -13,6 +14,7 @@ void main() {
 
   group('TASK: ACCOUNT-PROFILE-AND-LOGIN-REDESIGN-022B Widget & UI Tests', () {
     setUp(() {
+      RepositoryProvider.useLocalData = false; // Chạy ở chế độ có máy chủ (Remote) cho suite test này
       SharedPreferences.setMockInitialValues({
         'jwt_token': 'mock-valid-jwt-token-022b',
         'user_profile': jsonEncode({
@@ -25,6 +27,10 @@ void main() {
         'saved_login_phone': '0901111111',
         'custom_api_base_url': 'http://127.0.0.1:3000/api/v1',
       });
+    });
+
+    tearDown(() {
+      RepositoryProvider.reset();
     });
 
     // -------------------------------------------------------------------------

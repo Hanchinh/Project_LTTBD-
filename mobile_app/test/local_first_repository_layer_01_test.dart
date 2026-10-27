@@ -9,7 +9,6 @@ import 'package:delivery_marker_mobile/repositories/customer_repository.dart';
 import 'package:delivery_marker_mobile/repositories/location_repository.dart';
 import 'package:delivery_marker_mobile/repositories/photo_repository.dart';
 import 'package:delivery_marker_mobile/repositories/profile_repository.dart';
-import 'package:delivery_marker_mobile/repositories/sharing_repository.dart';
 import 'package:delivery_marker_mobile/repositories/shift_repository.dart';
 import 'package:delivery_marker_mobile/repositories/remote/remote_customer_repository.dart';
 import 'package:delivery_marker_mobile/repositories/remote/remote_location_repository.dart';
@@ -135,24 +134,23 @@ void main() {
       RepositoryProvider.reset();
     });
 
-    test('1. RepositoryProvider mặc định khởi tạo RemoteRepository tương ứng', () {
-      expect(RepositoryProvider.customer, isA<RemoteCustomerRepository>());
+    test('1. RepositoryProvider mặc định khởi tạo LocalRepository trên nhánh local-first và Remote khi useLocalData=false', () {
+      // Mặc định nhánh local-first: Local
       expect(RepositoryProvider.customer, isA<CustomerRepository>());
-
-      expect(RepositoryProvider.location, isA<RemoteLocationRepository>());
       expect(RepositoryProvider.location, isA<LocationRepository>());
-
-      expect(RepositoryProvider.photo, isA<RemotePhotoRepository>());
       expect(RepositoryProvider.photo, isA<PhotoRepository>());
-
-      expect(RepositoryProvider.shift, isA<RemoteShiftRepository>());
       expect(RepositoryProvider.shift, isA<ShiftRepository>());
-
       expect(RepositoryProvider.sharing, isA<RemoteSharingRepository>());
-      expect(RepositoryProvider.sharing, isA<SharingRepository>());
-
-      expect(RepositoryProvider.profile, isA<RemoteProfileRepository>());
       expect(RepositoryProvider.profile, isA<ProfileRepository>());
+
+      // Chuyển sang Remote:
+      RepositoryProvider.useLocalData = false;
+      expect(RepositoryProvider.customer, isA<RemoteCustomerRepository>());
+      expect(RepositoryProvider.location, isA<RemoteLocationRepository>());
+      expect(RepositoryProvider.photo, isA<RemotePhotoRepository>());
+      expect(RepositoryProvider.shift, isA<RemoteShiftRepository>());
+      expect(RepositoryProvider.sharing, isA<RemoteSharingRepository>());
+      expect(RepositoryProvider.profile, isA<RemoteProfileRepository>());
     });
 
     test('2. RepositoryProvider hỗ trợ override bằng FakeRepository và reset', () {
@@ -166,12 +164,11 @@ void main() {
 
       expect(RepositoryProvider.shift, same(fakeShift));
       expect(RepositoryProvider.customer, same(fakeCustomer));
-      expect(RepositoryProvider.location, isA<RemoteLocationRepository>());
 
       RepositoryProvider.reset();
 
-      expect(RepositoryProvider.shift, isA<RemoteShiftRepository>());
-      expect(RepositoryProvider.customer, isA<RemoteCustomerRepository>());
+      expect(RepositoryProvider.shift, isA<ShiftRepository>());
+      expect(RepositoryProvider.customer, isA<CustomerRepository>());
     });
 
     testWidgets('3. Màn hình/Widget dùng đúng FakeShiftRepository được tiêm vào', (tester) async {

@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delivery_marker_mobile/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/services/api_service.dart';
 import 'package:delivery_marker_mobile/widgets/quick_add_customer_sheet.dart';
 
 void main() {
+  setUp(() {
+    RepositoryProvider.useLocalData = false;
+  });
+
+  tearDown(() {
+    RepositoryProvider.reset();
+  });
   group('TASK: QUICK-ADD-CUSTOMER-013 - Phone Normalization Unit Tests', () {
     test('Chuẩn hóa các định dạng số điện thoại phổ biến về 10 chữ số chuẩn', () {
       // Khoảng trắng và dấu gạch ngang

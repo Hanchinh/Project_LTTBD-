@@ -479,5 +479,73 @@ Khi kích hoạt `RepositoryProvider.useLocalData = true`:
    - Hỗ trợ chế độ xem đơn lẻ và xem Gallery nhiều ảnh qua `PageView.builder` và `InteractiveViewer`.
    - Render ảnh cục bộ bằng `Image.file` với độ phân giải đầy đủ, hỗ trợ thu phóng cảm ứng mượt mà (zoom từ 0.8x đến 5.0x).
 
+---
+
+## 9. Triển Khai Local Profile, Mã PIN Bảo Mật & Sao Lưu / Phục Hồi Dữ Liệu (TASK: LOCAL-FIRST-06-PROFILE-PIN-BACKUP)
+
+### 9.1. Hồ Sơ Cục Bộ & Cơ Chế Khởi Động Không Cần Đăng Nhập
+1. **LocalProfileRepository ([local_profile_repository.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_profile_repository.dart)):**
+   - Hồ sơ người dùng lưu trữ trong bảng SQLite `app_profile` (`id = 1`): `display_name` (mặc định "Người giao hàng"), `pin_hash` (chuỗi PBKDF2).
+   - Thống kê người dùng `getMyStats()` tính toán trực tiếp từ dữ liệu thực tế trong SQLite: số vị trí đã lưu (`saved_locations`), số ca đã tạo (`shifts`), số ảnh đã tải (`customer_photos WHERE deleted_at IS NULL`), số khách hàng (`customers WHERE deleted_at IS NULL`).
+   - Mọi hoạt động cập nhật tên, đặt/đổi/tắt PIN, xóa trắng khôi phục được ghi vào `activity_log` (TUYỆT ĐỐI không ghi mã PIN hay dữ liệu khách hàng).
+2. **Khởi Động Không Cần Đăng Nhập (No Login / First-Run Onboarding):**
+   - **Mặc định nhánh `local-first`:** Bỏ cờ bắt buộc `--dart-define=LOCAL_DATA=true`. Biến cờ `RepositoryProvider.useLocalData` mặc định `true` cho toàn bộ nhánh này. Toàn bộ các kho `Customer`, `Location`, `Shift`, `Photo`, `Profile` đều khởi tạo chế độ `Local`.
+   - Lần đầu mở ứng dụng: Màn hình chào mừng [WelcomeOnboardingView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/welcome_onboarding_view.dart) xuất hiện ngắn gọn với tiêu đề "CHÀO MỪNG BẠN!", cho phép nhập tên hiển thị (hoặc bỏ qua) rồi bấm "BẮT ĐẦU SỬ DỤNG" vào thẳng ứng dụng chính [HomeShellView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/home_shell_view.dart). Cờ `onboarding_completed` lưu vào `app_meta` để không hiện lại.
+3. **Chuyển Đổi Tab "Tài Khoản" Thành Tab "Cá Nhân":**
+   - Giao diện [AccountProfileView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/account_profile_view.dart) thích ứng động theo `RepositoryProvider.useLocalData`:
+     - Tiêu đề AppBar hiển thị "Cá nhân", nhãn chế độ "Chế độ Local-First (Dữ liệu trên máy)".
+     - Có nút bút chì cạnh tên để mở hộp thoại đổi tên hiển thị bất kỳ lúc nào.
+     - Khối "Thống kê của tôi": hiển thị 3 chỉ số từ SQLite (Vị trí đã lưu, Ca đã tạo, Ảnh đã tải).
+     - Khối "Bảo mật & Mã PIN khóa app" mở [PinSettingsBottomSheet](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/pin_settings_bottom_sheet.dart).
+     - Khối "Sao lưu & Khôi phục dữ liệu" mở [BackupRestoreBottomSheet](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/backup_restore_bottom_sheet.dart).
+     - Khối "Phiên bản ứng dụng": hiển thị `v1.0.0 (Local-First)`.
+     - **Ẩn hoàn toàn trong chế độ Local:** Khối "Khu vực phụ trách", mục "Đổi mật khẩu", mục "Địa chỉ máy chủ", nút "ĐĂNG XUẤT", và mục "Chia sẻ dữ liệu" (tạm ẩn cho đến Bước 8).
+4. **Bảo Tồn Các Tệp Giao Diện Máy Chủ:**
+   - Các tệp [login_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/login_view.dart), [change_password_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/change_password_view.dart), [data_sharing_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/data_sharing_view.dart) **KHÔNG BỊ XÓA**, được giữ nguyên 100% trong mã nguồn để phục vụ việc chuyển đổi lại khi người dùng kết nối máy chủ tập trung (`useLocalData = false`).
+
+---
+
+### 9.2. Mã PIN Khóa Ứng Dụng Tùy Chọn (PIN Security & Lock Screen)
+1. **Thuật Toán Băm Mật Mã PBKDF2/SHA-256 ([PinCryptoUtils](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/utils/pin_crypto_utils.dart)):**
+   - Mã PIN gồm 4 đến 6 chữ số (`^\d{4,6}$`).
+   - Sử dụng chuẩn HMAC-SHA256 kết hợp 10,000 vòng lặp PBKDF2 (RFC 8018) và Salt ngẫu nhiên 16 bytes tạo từ `Random.secure()`.
+   - Định dạng lưu trữ: `pbkdf2:sha256:10000:<saltHex>:<hashHex>`.
+   - Xác thực so sánh chuỗi bằng thời gian hằng số (`_constantTimeEquals`) để triệt tiêu hoàn toàn nguy cơ tấn công kênh kề phân tích thời gian (timing attacks).
+   - **Bảo mật tuyệt đối:** TUYỆT ĐỐI không lưu trữ PIN thô ở bất kỳ đâu; không in hay ghi PIN vào log hệ thống.
+2. **Cơ Chế Khóa Tự Động & Chống Brute-Force Tăng Dần:**
+   - **Tự động khóa theo thời gian chờ nền:** Lắng nghe vòng đời ứng dụng `AppLifecycleState` trong [HomeShellView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/home_shell_view.dart). Khi app tạm dừng (paused/inactive), ghi nhận thời điểm. Khi quay lại (resumed), kiểm tra chênh lệch thời gian với cấu hình tự động khóa trong `app_meta` (hỗ trợ 3 mức: Ngay lập tức / 1 phút / 5 phút). Nếu quá hạn, tự động kích hoạt màn hình khóa.
+   - **Khóa lũy tiến khi nhập sai:**
+     - 1 đến 4 lần sai: Báo lỗi và đếm ngược số lần thử còn lại.
+     - Lần thứ 5 sai: Khóa tạm thời 30 giây, hiển thị bộ đếm ngược thời gian thực trên màn hình khóa.
+     - Mỗi lần sai tiếp theo cộng thêm 15 giây.
+3. **Màn Hình Khóa PIN ([PinLockScreen](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/pin_lock_screen.dart)):**
+   - Giao diện tối hiện đại, bàn phím số tròn lớn (chiều cao 72px) dễ thao tác bằng một tay.
+   - Dãy 6 chấm tròn biểu thị số chữ số trực quan.
+   - Nút "Quên mã PIN?": Cảnh báo nghiêm ngặt và minh bạch *"Quên mã PIN sẽ phải xóa toàn bộ dữ liệu ứng dụng để bảo vệ quyền riêng tư. Bạn có thể khôi phục lại dữ liệu sau đó nếu đã tạo file sao lưu."* Nút "XÁC NHẬN ĐẶT LẠI" yêu cầu gõ chữ `XOA HET` để tránh bấm nhầm. Triệt để không có cửa sau (no backdoor).
+
+---
+
+### 9.3. Sao Lưu & Phục Hồi Dữ Liệu Ngoại Tuyến (Backup & Restore Service)
+1. **Dịch Vụ [BackupService](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/services/backup_service.dart):**
+   - **Tạo bản sao lưu nhất quán:**
+     - Thực hiện `PRAGMA wal_checkpoint(TRUNCATE);` để đảm bảo toàn bộ nhật ký WAL được commit trọn vẹn vào file CSDL chính `local_data_v1.db`.
+     - Đóng gói thành **MỘT** file `.zip` duy nhất đặt tên `delivery-backup-YYYYMMDD-HHmm.zip` (theo giờ địa phương).
+     - Cấu trúc file zip gồm: `database.db`, thư mục `photos/`, và `manifest.json`.
+     - Tùy chọn sao lưu linh hoạt: "Có kèm toàn bộ ảnh" hoặc "Chỉ sao lưu dữ liệu văn bản".
+     - Trong `manifest.json`: Lưu thông tin `formatVersion: 1`, `schemaVersion`, `appVersion`, `createdAt`, thống kê số lượng (`customersCount`, `savedLocationsCount`, `shiftsCount`, `photosCount`), và mã băm SHA-256 đối soát cho từng file bên trong.
+   - **Chia sẻ hệ thống:** Sử dụng thư viện `share_plus` để mở Share Sheet của hệ điều hành (cho phép lưu vào máy, gửi qua Zalo, Telegram, Google Drive,...).
+2. **Khôi Phục Toàn Vẹn & An Toàn Tuyệt Đối (Restore Service):**
+   - Chọn file `.zip` qua `file_picker`.
+   - Kiểm tra tính toàn vẹn: Giải nén kiểm tra cấu trúc, đối soát SHA-256 từng file (từ chối ngay lập tức nếu file bị hỏng hoặc có dấu hiệu giả mạo/chỉnh sửa trái phép), kiểm tra phiên bản schema (từ chối file có phiên bản mới hơn phiên bản app hỗ trợ).
+   - **Chống tấn công Path Traversal:** Kiểm duyệt tên file trong zip, từ chối mọi file chứa `../` hoặc ghi đè ra ngoài thư mục ứng dụng.
+   - Hiển thị màn hình xem trước (Preview) chi tiết số lượng khách hàng, vị trí, ca, ảnh trước khi tiến hành.
+   - **2 chế độ khôi phục:**
+     - **"Gộp vào dữ liệu hiện có" (Merge):** Dữ liệu khách hàng trùng SĐT được giữ nguyên phiên bản hiện tại, chỉ bổ sung khách mới, vị trí và ảnh tương ứng. Báo cáo minh bạch số lượng khách đã thêm và số lượng bỏ qua.
+     - **"Thay toàn bộ dữ liệu" (Full Replace):** Tự động tạo bản sao lưu an toàn (`pre_restore_backup_*.zip`) trước khi ghi đè để có thể hoàn nguyên nếu cần; yêu cầu shipper xác nhận rõ ràng; thực thi toàn bộ trong một Transaction an toàn.
+3. **Nhắc Nhở Sao Lưu Định Kỳ (Backup Reminder):**
+   - Lưu thời điểm sao lưu thành công gần nhất vào `app_meta` (`last_backup_at`).
+   - Nếu đã quá 14 ngày kể từ lần sao lưu gần nhất (và trong SQLite đã có dữ liệu khách hoặc vị trí), hiển thị thẻ nhắc nhở màu vàng nhẹ nhàng ở đầu tab "Cá nhân" kèm nút "Sao lưu ngay", hoàn toàn không làm phiền ở các màn hình tác nghiệp khác.
+
+
 
 

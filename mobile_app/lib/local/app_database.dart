@@ -22,6 +22,9 @@ class AppDatabase {
       : _customPath = customPath,
         _factory = factory;
 
+  /// Getter factory CSDL (nếu được truyền khi khởi tạo)
+  DatabaseFactory? get factory => _factory;
+
   /// Lấy instance kết nối SQLite
   Future<Database> get database async {
     if (_db != null && _db!.isOpen) {
@@ -687,6 +690,90 @@ class AppDatabase {
     final db = await database;
     final rows = await db.query('app_profile', where: 'id = 1', limit: 1);
     return rows.isNotEmpty ? rows.first : null;
+  }
+
+  /// Lấy đường dẫn file CSDL thực tế trên đĩa
+  Future<String> getDatabasePath() async {
+    if (_customPath != null) return _customPath!;
+    final effectiveFactory = _factory ?? databaseFactory;
+    final dbFolder = await effectiveFactory.getDatabasesPath();
+    return p.join(dbFolder, databaseFileName);
+  }
+
+  /// Cập nhật riêng tên hiển thị mà không ảnh hưởng mã PIN
+  Future<void> updateDisplayName(String displayName) async {
+    final db = await database;
+    final now = currentIsoUtc();
+    final current = await getAppProfile();
+    if (current == null) {
+      await db.insert('app_profile', {
+        'id': 1,
+        'display_name': displayName.trim(),
+        'pin_hash': null,
+        'created_at': now,
+        'updated_at': now,
+      });
+    } else {
+      await db.update(
+        'app_profile',
+        {'display_name': displayName.trim(), 'updated_at': now},
+        where: 'id = 1',
+      );
+    }
+  }
+
+  /// Cập nhật mã PIN băm (truyền null để tắt PIN)
+  Future<void> updatePinHash(String? pinHash) async {
+    final db = await database;
+    final now = currentIsoUtc();
+    final current = await getAppProfile();
+    if (current == null) {
+      await db.insert('app_profile', {
+        'id': 1,
+        'display_name': 'Người giao hàng',
+        'pin_hash': pinHash,
+        'created_at': now,
+        'updated_at': now,
+      });
+    } else {
+      await db.update(
+        'app_profile',
+        {'pin_hash': pinHash, 'updated_at': now},
+        where: 'id = 1',
+      );
+    }
+  }
+
+  /// Lấy thống kê tổng quan (số vị trí, số ca, số ảnh, số khách)
+  Future<Map<String, int>> getStats() async {
+    final db = await database;
+    final savedLocationsResult = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM saved_locations'),
+    ) ?? 0;
+    final shiftsResult = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM shifts'),
+    ) ?? 0;
+    final photosResult = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM customer_photos WHERE deleted_at IS NULL'),
+    ) ?? 0;
+    final customersResult = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM customers WHERE deleted_at IS NULL'),
+    ) ?? 0;
+
+    return {
+      'savedLocationsCount': savedLocationsResult,
+      'createdShiftsCount': shiftsResult,
+      'uploadedPhotosCount': photosResult,
+      'customersCount': customersResult,
+    };
+  }
+
+  /// Thực hiện WAL checkpoint để đồng bộ dữ liệu vào file CSDL chính trước khi sao lưu
+  Future<void> checkpoint() async {
+    final db = await database;
+    try {
+      await db.rawQuery('PRAGMA wal_checkpoint(TRUNCATE);');
+    } catch (_) {}
   }
 
   /// Ghi cài đặt meta

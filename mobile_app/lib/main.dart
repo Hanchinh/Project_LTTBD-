@@ -4,6 +4,8 @@ import 'repositories/repository_provider.dart';
 import 'services/api_service.dart';
 import 'views/home_shell_view.dart';
 import 'views/login_view.dart';
+import 'views/pin_lock_screen.dart';
+import 'views/welcome_onboarding_view.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,11 +60,49 @@ class _AuthSplashScreenState extends State<AuthSplashScreen> {
       if (photoRepo is LocalPhotoRepository) {
         photoRepo.purgeDeletedPhotosOlderThan().catchError((_) => 0);
       }
+
+      // 1. Kiểm tra lần đầu mở app -> Màn chào WelcomeOnboardingView
+      final isFirst = await RepositoryProvider.localProfile.isFirstOpen();
+      if (!mounted) return;
+      if (isFirst) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const WelcomeOnboardingView()),
+        );
+        return;
+      }
+
+      // 2. Kiểm tra mã PIN khóa app
+      final needPin = await RepositoryProvider.localProfile.shouldLockApp();
+      if (!mounted) return;
+      if (needPin) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PinLockScreen(
+              onSuccess: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HomeShellView()),
+                );
+              },
+            ),
+          ),
+        );
+        return;
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomeShellView()),
+      );
+      return;
     }
+
     final token = await ApiService.getToken();
     if (!mounted) return;
 
-    if (isLocalMode || (token != null && token.isNotEmpty)) {
+    if (token != null && token.isNotEmpty) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomeShellView()),

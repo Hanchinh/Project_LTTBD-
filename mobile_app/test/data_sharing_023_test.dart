@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:delivery_marker_mobile/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/views/data_sharing_view.dart';
 import 'package:delivery_marker_mobile/views/account_profile_view.dart';
 import 'package:delivery_marker_mobile/views/main_map_view.dart';
@@ -12,6 +13,7 @@ void main() {
 
   group('TASK: DATA-SHARING-BETWEEN-SHIPPERS-023 Widget & UI Tests', () {
     setUp(() {
+      RepositoryProvider.useLocalData = false;
       SharedPreferences.setMockInitialValues({
         'jwt_token': 'mock-valid-jwt-token-023',
         'user_profile': jsonEncode({
@@ -23,6 +25,10 @@ void main() {
         }),
         'custom_api_base_url': 'http://127.0.0.1:3000/api/v1',
       });
+    });
+
+    tearDown(() {
+      RepositoryProvider.reset();
     });
 
     // -------------------------------------------------------------------------

@@ -36,16 +36,16 @@ void main() {
 
   group('TASK: LOCAL-FIRST-04-LOCAL-SHIFTS-AND-BULK Tests', () {
     test('1. RepositoryProvider toggle useLocalData chuyển đổi chính xác ShiftRepository sang LocalShiftRepository', () {
-      expect(RepositoryProvider.useLocalData, isFalse);
-      expect(RepositoryProvider.shift, isA<RemoteShiftRepository>());
-
-      RepositoryProvider.useLocalData = true;
       expect(RepositoryProvider.useLocalData, isTrue);
       expect(RepositoryProvider.shift, isA<LocalShiftRepository>());
 
-      RepositoryProvider.reset();
+      RepositoryProvider.useLocalData = false;
       expect(RepositoryProvider.useLocalData, isFalse);
       expect(RepositoryProvider.shift, isA<RemoteShiftRepository>());
+
+      RepositoryProvider.reset();
+      expect(RepositoryProvider.useLocalData, isTrue);
+      expect(RepositoryProvider.shift, isA<LocalShiftRepository>());
     });
 
     test('2. Tạo ca có tên (trim, max 100 ký tự) và tạo ca không tên tự gợi ý "Ca sáng/chiều/tối dd/MM"', () async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:delivery_marker_mobile/main.dart';
 import 'package:delivery_marker_mobile/views/login_view.dart';
 import 'package:delivery_marker_mobile/views/delivery_map_view.dart';
@@ -10,6 +11,11 @@ import 'package:delivery_marker_mobile/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUpAll(() {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  });
+
   group('Delivery Location Marker App Unit & Widget Tests', () {
     testWidgets('App root initializes with AuthSplashScreen', (WidgetTester tester) async {
       await tester.pumpWidget(const DeliveryLocationMarkerApp());
