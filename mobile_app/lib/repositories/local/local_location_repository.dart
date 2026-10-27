@@ -244,18 +244,65 @@ class LocalLocationRepository implements LocationRepository {
     final now = AppDatabase.currentIsoUtc();
     final effectiveNotes = identificationNotes ?? locationNotes;
 
-    await db.update(
+    // Lấy customer_id của điểm giao cần ghim tạm
+    final targetPointRows = await db.query(
       'shift_delivery_points',
-      {
-        'location_status': 'TEMPORARY',
-        'latitude': latitude,
-        'longitude': longitude,
-        'identification_notes': effectiveNotes,
-        'updated_at': now,
-      },
+      columns: ['customer_id'],
       where: 'shift_id = ? AND id = ?',
       whereArgs: [shiftId, pointId],
+      limit: 1,
     );
+
+    if (targetPointRows.isEmpty) {
+      throw Exception('Không tìm thấy điểm giao hàng trong ca');
+    }
+
+    final customerId = targetPointRows.first['customer_id'] as String;
+
+    await db.transaction((txn) async {
+      // 1. Cập nhật điểm giao trong ca hiện tại thành TEMPORARY (KHÔNG ghi vào saved_locations)
+      await txn.update(
+        'shift_delivery_points',
+        {
+          'location_status': 'TEMPORARY',
+          'latitude': latitude,
+          'longitude': longitude,
+          'identification_notes': effectiveNotes,
+          'updated_at': now,
+        },
+        where: 'shift_id = ? AND id = ?',
+        whereArgs: [shiftId, pointId],
+      );
+
+      // 2. Đồng bộ tọa độ tạm thời này sang các ca PREPARING hoặc IN_PROGRESS khác có chứa cùng khách hàng
+      await txn.rawUpdate('''
+        UPDATE shift_delivery_points
+        SET location_status = 'TEMPORARY',
+            latitude = ?,
+            longitude = ?,
+            identification_notes = COALESCE(?, identification_notes),
+            updated_at = ?
+        WHERE customer_id = ?
+          AND id != ?
+          AND shift_id IN (
+            SELECT id FROM shifts WHERE status IN ('PREPARING', 'IN_PROGRESS')
+          )
+      ''', [latitude, longitude, effectiveNotes, now, customerId, pointId]);
+
+      // 3. Ghi activity_log
+      await _appDb.logActivity(
+        action: 'PIN_TEMPORARY_LOCATION',
+        entity: 'shift_delivery_points',
+        entityId: pointId,
+        details: {
+          'shiftId': shiftId,
+          'customerId': customerId,
+          'latitude': latitude,
+          'longitude': longitude,
+        },
+        executor: txn,
+      );
+    });
 
     final rows = await db.rawQuery('''
       SELECT sdp.*, c.customer_code, c.full_name, c.phone_number, c.address_text

@@ -83,6 +83,9 @@ class FakeShiftRepository implements ShiftRepository {
 
   @override
   Future<Map<String, dynamic>> addOrderToShift({required String customerId, bool allowMultiple = false, String? idempotencyKey}) async => throw UnimplementedError();
+
+  @override
+  Future<void> verifyPointLocation(String shiftId, String pointId) async => throw UnsupportedError('verifyPointLocation is deprecated');
 }
 
 /// Fake CustomerRepository để kiểm thử

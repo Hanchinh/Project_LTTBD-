@@ -28,6 +28,9 @@ class ParsedPhoneItem {
     required this.isValid,
     this.reason,
   });
+
+  String get rawInput => original;
+  String get normalizedPhone => cleanPhone;
 }
 
 /// Kết quả tách và chuẩn hóa danh sách số điện thoại hàng loạt
@@ -41,7 +44,11 @@ class ParseBulkPhonesResult {
     required this.uniquePhones,
     required this.totalRawCount,
   });
+
+  int get totalCount => totalRawCount;
+  bool get isExceededLimit => totalRawCount > 200 || items.length > 200 || uniquePhones.length > 200;
 }
+
 
 /// Tách và chuẩn hóa danh sách số điện thoại hàng loạt từ chuỗi văn bản hoặc mảng
 /// - Tách theo: xuống dòng (\r, \n), dấu phẩy (,), dấu chấm phẩy (;)

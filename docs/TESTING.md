@@ -639,6 +639,40 @@ Tất cả các lệnh dưới đây đã được thực thi trực tiếp trê
 - **6. Trạng thái kiểm thử:**
   - **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
 
+### 3.16. Đợt Kiểm Thử Tầng Repository Cục Bộ Ca Làm Việc & Dán Hàng Loạt (LOCAL-FIRST-04-LOCAL-SHIFTS-AND-BULK) - 27/10/2026
+
+- **Mục tiêu:** Kiểm tra toàn diện 100% các phương thức trong [LocalShiftRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_shift_repository.dart) chạy trên SQLite FFI in-memory, đảm bảo đáp ứng đầy đủ các quy tắc nghiệp vụ: tạo ca có tên/không tên, sinh mã ca chuẩn `SHF-YYYYMMDD-XXX` tăng dần và reset theo ngày (UTC+7), chống trùng tên ca trong ngày thêm `(2)`, `(3)`, danh sách ca kèm summary mới nhất trước, chi tiết ca kèm các điểm giao, đổi tên ca, chuyển trạng thái đúng tuần tự `PREPARING -> IN_PROGRESS -> COMPLETED` (gán started_at, completed_at) và chặn sai thứ tự, xóa ca cascade xóa điểm giao mà TUYỆT ĐỐI KHÔNG xóa khách hàng hay vị trí (ca `IN_PROGRESS` vẫn xóa được), thêm điểm đủ 3 trường hợp (đã có vị trí -> `VERIFIED`, chưa có vị trí -> `NO_LOCATION`, SĐT mới -> tự tạo khách nhanh), chống trùng lặp `isExisting: true`, ghim tạm `TEMPORARY` chỉ ghi vào `shift_delivery_points` mà KHÔNG ghi đè vào `saved_locations` (điểm đã `VERIFIED` ghim tạm lại thì trạng thái trong ca đổi `TEMPORARY` còn `saved_locations` giữ nguyên), dán hàng loạt tách số đa định dạng (xuống dòng, phẩy, chấm phẩy, khoảng trắng/chấm trong số), chặn > 200 số, chạy trong đúng 1 transaction khép kín (lỗi rollback 100%), trả đủ 4 nhóm và ghi 1 `activity_log`, hoàn tác xóa đúng điểm vừa thêm và cập nhật summary, hàm `verifyPointLocation` ném lỗi `UnsupportedError` thông báo chuyển hướng sang Danh bạ, và tương thích ngược các hàm đơn hàng `getMyShiftOrders`, `addOrderToShift`.
+- **1. Phân tích tĩnh & Cú pháp:**
+  - Lệnh: `flutter analyze`
+  - Kết quả: **No issues found! (ran in 1.5s)** (0 errors, 0 warnings, 0 lints).
+- **2. Bộ kiểm thử mới ([local_first_shift_bulk_04_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_shift_bulk_04_test.dart)):**
+  - `1. RepositoryProvider toggle useLocalData chuyển đổi chính xác ShiftRepository sang LocalShiftRepository`: **PASSED**.
+  - `2. Tạo ca có tên (trim, max 100 ký tự) và tạo ca không tên tự gợi ý "Ca sáng/chiều/tối dd/MM"`: **PASSED**.
+  - `3. Mã ca tăng đúng (SHF-YYYYMMDD-001, 002), reset khi sang ngày khác; trùng tên trong ngày thêm (2), (3)`: **PASSED**.
+  - `4. getShifts & getShiftDetail: danh sách ca kèm summary, mới nhất trước; chi tiết ca đầy đủ điểm giao`: **PASSED**.
+  - `5. updateShiftName: Đổi tên ca thành công, từ chối tên rỗng, cập nhật CSDL và ghi activity_log`: **PASSED**.
+  - `6. updateShiftStatus: chuyển trạng thái đúng thứ tự PREPARING -> IN_PROGRESS -> COMPLETED, chặn sai thứ tự`: **PASSED**.
+  - `7. deleteShift: xóa ca cascade xóa điểm giao; TUYỆT ĐỐI KHÔNG xóa khách hay vị trí; ca IN_PROGRESS vẫn xóa được`: **PASSED**.
+  - `8. addPointToShift: 3 trường hợp (khách có vị trí -> VERIFIED, chưa có vị trí -> NO_LOCATION, SĐT mới -> tự tạo khách)`: **PASSED**.
+  - `9. addPointToShift: chống trùng lặp trả isExisting=true và không tạo dòng mới`: **PASSED**.
+  - `10. updateTemporaryLocation: ghim tạm chỉ ghi vào shift_delivery_points, KHÔNG ghi saved_locations`: **PASSED**.
+  - `11. addBulkPointsToShift: tách số đa định dạng, lọc trùng, chặn > 200 số, trả đủ 4 nhóm, ghi 1 activity_log`: **PASSED**.
+  - `12. addBulkPointsToShift: tính toàn vẹn transaction (lỗi giữa lô rollback 100%, không để lại dữ liệu nửa vời)`: **PASSED**.
+  - `13. removePointFromShift (Hoàn tác): xóa đúng điểm vừa thêm và cập nhật summary chính xác`: **PASSED**.
+  - `14. verifyPointLocation: ném UnsupportedError thông báo chuyển hướng sang Danh bạ`: **PASSED**.
+  - `15. Compatibility: getMyShiftOrders và addOrderToShift ánh xạ mượt mà từ SQLite sang OrderModel`: **PASSED**.
+- **3. Toàn bộ kiểm thử Mobile App:**
+  - Lệnh: `flutter test`
+  - Kết quả: **188/188 tests passed (100%)** (0 failures, 0 errors, 0 regressions).
+- **4. Đóng gói & Build:**
+  - Lệnh: `flutter build apk --debug`
+  - Kết quả: **Thành công (Built build\app\outputs\flutter-apk\app-debug.apk in 36.7s)**.
+- **5. Môi trường Backend & Database:**
+  - Không thay đổi bất kỳ file nào trong `backend/` hay `admin_web/`.
+  - 0 request ghi dữ liệu vào CSDL sống `delivery_db`.
+- **6. Trạng thái kiểm thử:**
+  - **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
 ---
 
 ## 4. Quy Chuẩn Cách Ly Kiểm Thử (Strict Testing Isolation Policy)

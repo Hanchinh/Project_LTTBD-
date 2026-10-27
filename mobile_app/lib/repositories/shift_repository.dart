@@ -47,4 +47,12 @@ abstract class ShiftRepository {
     bool allowMultiple = false,
     String? idempotencyKey,
   });
+
+  /// Xác minh vị trí trong ca (Đã ngừng hoạt động theo LOCATION-RULES-012, chỉ dùng luồng Danh bạ)
+  Future<void> verifyPointLocation(String shiftId, String pointId) async {
+    throw UnsupportedError(
+      'Endpoint xác minh vị trí trong ca đã ngừng hoạt động (410 Gone). Theo quy chuẩn LOCATION-RULES-012, vị trí chuẩn chỉ được xác nhận qua luồng Danh bạ -> Hồ sơ khách -> Xác nhận vị trí.',
+    );
+  }
 }
+

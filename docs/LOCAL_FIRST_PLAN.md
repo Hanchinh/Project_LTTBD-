@@ -380,4 +380,49 @@ erDiagram
 3. **Bỏ Qua Màn Hình Đăng Nhập:**
    Khi `RepositoryProvider.useLocalData = true`, [main.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/main.dart) tự động chuyển hướng thẳng vào [HomeShellView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/home_shell_view.dart) mà không cần kiểm tra JWT token hay bắt shipper đăng nhập.
 
+---
+
+## 7. Triển Khai Local Repositories: Shifts & Bulk Operations (TASK: LOCAL-FIRST-04)
+
+### 7.1. Bảng Đối Chiếu Phương Thức: Interface -> SQLite -> Khác Biệt So Với Remote
+
+#### ShiftRepository ([shift_repository.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/shift_repository.dart))
+
+| Phương Thức Interface | Triển Khai SQLite Cục Bộ ([LocalShiftRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_shift_repository.dart)) | Khác Biệt So Với Remote ([RemoteShiftRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_shift_repository.dart)) |
+| :--- | :--- | :--- |
+| `getShifts()` | Truy vấn `shifts` sắp xếp `work_date DESC, created_at DESC`, tính `summary` (`totalPoints`, `verifiedCount`, `temporaryCount`, `noLocationCount`) qua `GROUP BY shift_id` từ `shift_delivery_points`. | Đọc trực tiếp từ SQLite thiết bị, tốc độ tức thì, không phụ thuộc kết nối mạng. |
+| `createShift(...)` | Sinh `shift_code` dạng `SHF-YYYYMMDD-XXX` theo giờ VN (UTC+7), `XXX` tăng dần và tự động reset về `001` khi sang ngày mới; `shift_name` cắt khoảng trắng, tối đa 100 ký tự; nếu không đặt tên thì tự động gợi ý `"Ca sáng/chiều/tối dd/MM"` và thêm `" (2)"`, `" (3)"` khi trùng tên trong ngày; trạng thái ban đầu `PREPARING`. | Mã ca và tên ca được tính toán trực tiếp trên SQLite cục bộ. |
+| `getShiftDetail(id)` | Truy vấn `shifts` theo ID, JOIN `shift_delivery_points` với `customers` và `saved_locations`, tính `summary` thực tế. | Trả về `ShiftModel` kèm danh sách `deliveryPoints` hoàn chỉnh cho UI bản đồ ca và danh sách điểm. |
+| `updateShiftName(id, name)` | Cắt khoảng trắng, từ chối tên rỗng, giới hạn 100 ký tự, cập nhật `shift_name` và ghi `activity_log`. | Cập nhật tức thì. |
+| `updateShiftStatus(id, status)` | Chuyển đổi trạng thái tuần tự `PREPARING -> IN_PROGRESS -> COMPLETED`: gán `started_at = now` khi bắt đầu, gán `completed_at = now` khi hoàn thành. Chặn tuyệt đối chuyển sai thứ tự hoặc đổi trạng thái khi ca đã hoàn thành. | Ràng buộc logic chặt chẽ ngay tại client. |
+| `deleteShift(id)` | Xóa ca trong transaction: Cascade xóa các điểm giao của ca trong `shift_delivery_points`. TUYỆT ĐỐI KHÔNG xóa khách hàng, vị trí đã lưu hay lịch sử vị trí. Ca đang `IN_PROGRESS` vẫn xóa được bình thường. Ghi `activity_log`. | Đảm bảo tính toàn vẹn kiểm toán và an toàn dữ liệu khách hàng. |
+| `addPointToShift(...)` | Thêm điểm bằng `customerId` hoặc `phoneNumber` (chuẩn hóa). Nếu SĐT chưa có thì tạo khách nhanh (`"Khách [SĐT]"`, `"Chưa cập nhật địa chỉ"`). Kiểm tra vị trí đã lưu (`VERIFIED` kèm tọa độ nếu có, `NO_LOCATION` nếu chưa có). Chống trùng lặp trả `isExisting: true`. Tự động tăng `delivery_order_index`. | Hoạt động khép kín trong 1 transaction an toàn. |
+| `addBulkPointsToShift(...)` | Dùng hàm tách số chung `parseAndNormalizeBulkPhones` (xuống dòng, phẩy, chấm phẩy, khoảng trắng/chấm trong số), chặn > 200 số. Chạy trong ĐÚNG 1 transaction cho cả lô. Trả 4 nhóm: `added`, `alreadyInShift`, `rejected`, và `summary`. Ghi ĐÚNG 1 dòng `activity_log` cho cả lô. | Không tạo khách mồ côi hay dữ liệu nửa vời nếu phát sinh lỗi giữa lô. |
+| `removePointFromShift(sId, pId)` | Xóa điểm khỏi `shift_delivery_points`. Phục vụ tính năng HOÀN TÁC khi thêm điểm từ Danh bạ. | Xóa chính xác điểm vừa thêm và cập nhật lại summary. |
+| `verifyPointLocation(...)` | Ném `UnsupportedError`: Giữ nguyên trạng thái ngừng hoạt động theo chuẩn `LOCATION-RULES-012`, vị trí chuẩn chỉ xác nhận qua luồng Danh bạ. | Khớp 100% với mã phản hồi 410 Gone của Remote. |
+| `getMyShiftOrders()` & `addOrderToShift(...)` | Ánh xạ mượt mà từ các điểm giao trong ca đang mở (`IN_PROGRESS` / `PREPARING`) sang danh sách `OrderModel` phục vụ tương thích ngược các màn hình cũ. | Đảm bảo các widget cũ không bị crash. |
+
+---
+
+### 7.2. Báo Cáo Khảo Sát Các Màn Hình Nghiệp Vụ Sử Dụng Ca
+Rà soát toàn bộ các màn hình và widget liên quan đến ca làm việc:
+- [shift_list_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/shift_list_view.dart): Sử dụng `RepositoryProvider.shift.getShifts()`, `createShift`, `deleteShift`. **100% không còn gọi ApiService trực tiếp**.
+- [shift_preparation_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/shift_preparation_view.dart): Sử dụng `RepositoryProvider.shift.addPointToShift`, `RepositoryProvider.customer.lookupCustomerLocationByPhone`. **100% không còn gọi ApiService trực tiếp**.
+- [shift_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/shift_map_view.dart): Sử dụng `RepositoryProvider.shift.getShiftDetail`, `updateShiftStatus`. (Chỉ còn tiện ích `ApiService.openExternalNavigation` để mở ứng dụng Google Maps ngoài thiết bị).
+- [create_shift_dialog.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/create_shift_dialog.dart): Sử dụng `RepositoryProvider.shift.createShift`. **100% không gọi ApiService**.
+- [bulk_paste_phone_sheet.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/bulk_paste_phone_sheet.dart): Sử dụng `RepositoryProvider.shift.addBulkPointsToShift`. **100% không gọi ApiService**.
+- [shift_picker_bottom_sheet.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/shift_picker_bottom_sheet.dart): Sử dụng `RepositoryProvider.shift.getShifts`. **100% không gọi ApiService**.
+- [customer_directory_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart): Nút `+` thêm khách vào ca dùng `RepositoryProvider.shift.addPointToShift` và nút `HOÀN TÁC` dùng `RepositoryProvider.shift.removePointFromShift`. **100% không gọi ApiService**.
+
+---
+
+### 7.3. Mở Rộng Công Tắc `RepositoryProvider.useLocalData`
+
+Khi kích hoạt `RepositoryProvider.useLocalData = true`:
+- `customer`: Trỏ về [LocalCustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_customer_repository.dart).
+- `location`: Trỏ về [LocalLocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_location_repository.dart).
+- `shift`: Trỏ về [LocalShiftRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_shift_repository.dart).
+- `photo`, `sharing`, `profile`: Vẫn trỏ về Remote tương ứng (chờ các bước tiếp theo).
+- **Mặc định:** `useLocalData = false` (ứng dụng chạy hoàn toàn như cũ trừ khi được bật rõ ràng).
+
 
