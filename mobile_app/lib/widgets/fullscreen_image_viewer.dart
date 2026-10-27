@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../repositories/repository_provider.dart';
 
@@ -126,7 +127,34 @@ class _FullscreenImageViewerState extends State<FullscreenImageViewer> {
                       }
 
                       final photoInfo = snapshot.data!;
-                      final url = photoInfo['url']!;
+                      final url = photoInfo['url'] ?? '';
+                      final isLocal = photoInfo['isLocal'] == 'true' ||
+                          photoInfo['filePath'] != null ||
+                          url.startsWith('file://');
+
+                      if (isLocal) {
+                        final filePath = photoInfo['filePath'] ?? url.replaceFirst('file://', '');
+                        return InteractiveViewer(
+                          minScale: 0.8,
+                          maxScale: 5.0,
+                          child: Image.file(
+                            File(filePath),
+                            fit: BoxFit.contain,
+                            errorBuilder: (ctx, err, stack) => const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.broken_image_rounded, color: Colors.white60, size: 48),
+                                SizedBox(height: 12),
+                                Text(
+                                  'Lỗi hiển thị tệp ảnh cục bộ',
+                                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
                       final token = photoInfo['token'];
 
                       return InteractiveViewer(

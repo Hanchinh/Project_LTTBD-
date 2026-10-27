@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../local/app_database.dart';
+import '../../models/customer_photo_model.dart';
 import '../../models/location_model.dart';
 import '../../models/order_model.dart';
 import '../../models/shift_model.dart';
@@ -9,14 +10,17 @@ import '../../utils/uuid_utils.dart';
 import '../../utils/vietnamese_utils.dart';
 import '../shift_repository.dart';
 import 'local_customer_repository.dart';
+import 'local_photo_repository.dart';
 
 /// Triển khai ShiftRepository cục bộ bằng SQLite (Local-First)
 /// Toàn bộ dữ liệu ca làm việc, điểm giao và dán hàng loạt được lưu trữ trên thiết bị
 class LocalShiftRepository implements ShiftRepository {
   final AppDatabase _appDb;
+  final LocalPhotoRepository _photoRepo;
 
-  LocalShiftRepository({AppDatabase? appDb})
-      : _appDb = appDb ?? AppDatabase.instance;
+  LocalShiftRepository({AppDatabase? appDb, LocalPhotoRepository? photoRepo})
+      : _appDb = appDb ?? AppDatabase.instance,
+        _photoRepo = photoRepo ?? LocalPhotoRepository(appDb: appDb ?? AppDatabase.instance);
 
   static const String defaultAreaId = LocalCustomerRepository.defaultAreaId;
   static const String defaultAreaName = LocalCustomerRepository.defaultAreaName;
@@ -212,7 +216,24 @@ class LocalShiftRepository implements ShiftRepository {
       ORDER BY sdp.delivery_order_index ASC, sdp.created_at ASC
     ''', [shiftId]);
 
-    final points = pointRows.map(_mapToPointModel).toList();
+    final initialPoints = pointRows.map(_mapToPointModel).toList();
+    final customerIds = initialPoints.map((p) => p.customerId).toSet().toList();
+    final photoSummaries = await _photoRepo.getBatchPhotoSummaries(customerIds);
+
+    final points = initialPoints.map((p) {
+      final summary = photoSummaries[p.customerId];
+      if (summary != null) {
+        final count = summary['photoCount'] as int;
+        final photos = summary['photos'] as List<CustomerPhotoModel>;
+        final firstThumb = summary['firstThumbnailUrl'] as String?;
+        return p.copyWith(
+          photoCount: count,
+          photos: photos,
+          photoUrl: firstThumb,
+        );
+      }
+      return p;
+    }).toList();
 
     int verifiedCount = 0;
     int temporaryCount = 0;

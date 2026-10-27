@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../repositories/repository_provider.dart';
 
@@ -61,7 +62,32 @@ class AuthenticatedImage extends StatelessWidget {
         }
 
         final photoInfo = snapshot.data!;
-        final url = photoInfo['url']!;
+        final url = photoInfo['url'] ?? '';
+        final isLocal = photoInfo['isLocal'] == 'true' ||
+            photoInfo['filePath'] != null ||
+            url.startsWith('file://');
+
+        if (isLocal) {
+          final filePath = photoInfo['filePath'] ?? url.replaceFirst('file://', '');
+          return Image.file(
+            File(filePath),
+            width: width,
+            height: height,
+            fit: fit,
+            cacheWidth: width != null && width! > 0 ? (width! * 2).toInt() : null,
+            cacheHeight: height != null && height! > 0 ? (height! * 2).toInt() : null,
+            errorBuilder: (context, error, stackTrace) {
+              return errorWidget ??
+                  Container(
+                    width: width,
+                    height: height,
+                    color: Colors.grey.shade300,
+                    child: const Icon(Icons.broken_image, color: Colors.grey),
+                  );
+            },
+          );
+        }
+
         final token = photoInfo['token'];
 
         return Image.network(

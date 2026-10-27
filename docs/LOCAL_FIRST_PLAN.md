@@ -422,7 +422,62 @@ Khi kích hoạt `RepositoryProvider.useLocalData = true`:
 - `customer`: Trỏ về [LocalCustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_customer_repository.dart).
 - `location`: Trỏ về [LocalLocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_location_repository.dart).
 - `shift`: Trỏ về [LocalShiftRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_shift_repository.dart).
-- `photo`, `sharing`, `profile`: Vẫn trỏ về Remote tương ứng (chờ các bước tiếp theo).
+- `photo`: Trỏ về [LocalPhotoRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_photo_repository.dart) (từ TASK: LOCAL-FIRST-05).
+- `sharing`, `profile`: Vẫn trỏ về Remote tương ứng (chờ các bước tiếp theo).
 - **Mặc định:** `useLocalData = false` (ứng dụng chạy hoàn toàn như cũ trừ khi được bật rõ ràng).
+
+---
+
+## 8. Triển Khai Local Repositories: Photos & Quản Lý Tệp Ảnh Cục Bộ (TASK: LOCAL-FIRST-05)
+
+### 8.1. Bảng Đối Chiếu Phương Thức: Interface -> Local Storage -> Khác Biệt So Với Remote
+
+#### PhotoRepository ([photo_repository.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/photo_repository.dart))
+
+| Phương Thức Interface | Triển Khai Cục Bộ ([LocalPhotoRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_photo_repository.dart)) | Khác Biệt So Với Remote ([RemotePhotoRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_photo_repository.dart)) |
+| :--- | :--- | :--- |
+| `addCustomerPhoto(customerId, imageBase64)` | 1. Nhận chuỗi base64 / Data URI, kiểm tra Magic Bytes (JPEG: `FF D8 FF`, PNG: `89 50 4E 47...`, WebP: `RIFF...WEBP`). Từ chối các tệp sai định dạng.<br>2. Chặn file vượt quá 5MB.<br>3. Kiểm tra số lượng ảnh hiện có của khách (tối đa 10 ảnh mặt tiền chưa xóa mềm, thêm ảnh thứ 11 ném `StateError`).<br>4. Sinh tên file ngẫu nhiên UUID (`<uuid>.jpg` và `<uuid>_thumb.jpg`) không chứa SĐT hay tên khách.<br>5. Nén ảnh cạnh dài <= 1600px quality ~80 và tạo thumbnail ~300px.<br>6. Ghi file vào thư mục riêng của app (`<docDir>/photos` và `<docDir>/photos/thumbs`).<br>7. Lưu vào bảng SQLite `customer_photos` và ghi `activity_log` (`ADD_CUSTOMER_PHOTO`). Nếu DB lỗi, tự động xóa ngay file vừa tạo để chống file mồ côi. | Xử lý nén và lưu hoàn toàn trên thiết bị, không cần mạng, tốc độ tức thì. Đảm bảo tính toàn vẹn tuyệt đối (atomic rollback không để lại file rác). |
+| `getCustomerPhotos(customerId)` | Truy vấn `customer_photos` WHERE `customer_id = ? AND deleted_at IS NULL` sắp xếp `created_at DESC`. Ghép đường dẫn cục bộ tuyệt đối vào `imageUrl` của `CustomerPhotoModel`. | Trả về danh sách ảnh với đường dẫn file cục bộ sẵn sàng hiển thị, không cần chờ tải mạng. |
+| `deleteCustomerPhoto(customerId, photoId)` | Xóa mềm: Gán `deleted_at = now` trong bảng `customer_photos`, ghi `activity_log` (`DELETE_CUSTOMER_PHOTO`). File trên đĩa được giữ nguyên tạm thời để phục vụ hoàn tác hoặc đối soát. | Xóa mềm an toàn, không xóa file vật lý ngay lập tức. |
+| `getPhotoAuthInfo(photoUrl, ...)` | Kiểm tra nếu URL là đường dẫn file cục bộ hoặc bắt đầu bằng `file://`: Trả về `{'url': photoUrl, 'filePath': path, 'isLocal': 'true', 'token': ''}` mà không yêu cầu JWT token. | Trả thẳng đường dẫn tệp thiết bị để widget sử dụng `Image.file` trực tiếp, không phụ thuộc phiên đăng nhập. |
+| `purgeDeletedPhotosOlderThan(...)` *(Mở rộng)* | Quét các ảnh có `deleted_at` cũ hơn 30 ngày: Xóa file ảnh gốc và thumbnail trên đĩa, xóa dòng bản ghi trong `customer_photos`, ghi `activity_log` (`PURGE_EXPIRED_PHOTOS`). Tự động kích hoạt khi mở ứng dụng. | Cơ chế dọn dẹp bộ nhớ tự động, ngăn tràn dung lượng máy của shipper. |
+| `getCustomerPhotoSummary(id)` & `getBatchPhotoSummaries(ids)` *(Mở rộng)* | Truy vấn nhóm ảnh theo danh sách `customerId`, trả về `photoCount`, danh sách tối đa 3 ảnh thumbnail đầu tiên và `firstThumbnailUrl`. | Dùng để enrich đồng loạt cho `CustomerDirectoryModel`, `MasterSavedLocationModel` và `ShiftDeliveryPointModel`. |
+
+---
+
+### 8.2. Quy Chuẩn Lưu Trữ File & Bảo Mật Quyền Riêng Tư (Privacy & Storage)
+1. **Thư Mục Lưu Trữ Riêng:**
+   - Ảnh gốc: `getApplicationDocumentsDirectory() / photos / <uuid>.jpg`.
+   - Thumbnail: `getApplicationDocumentsDirectory() / photos / thumbs / <uuid>_thumb.jpg`.
+   - **Tuyệt đối KHÔNG** lưu vào thư mục công khai (`DCIM`, `Pictures`, `Downloads`) hoặc thư viện ảnh chung của hệ điều hành.
+2. **Quy Tắc Đặt Tên File:**
+   - Tên file sử dụng UUID v4 ngẫu nhiên (`UuidUtils.generate()`), ví dụ: `d9e03d42-2b63-4a0b-93df-f1261a8ef1c2.jpg`.
+   - **Nghiêm cấm** đưa số điện thoại, họ tên, hoặc địa chỉ của khách hàng vào tên file hoặc tên thư mục nhằm triệt để bảo vệ quyền riêng tư theo tiêu chuẩn bảo mật dữ liệu.
+3. **Lưu Đường Dẫn Tương Đối Trong SQLite:**
+   - Cột `file_name` và `thumb_file_name` trong bảng `customer_photos` chỉ lưu tên file tương đối (`<uuid>.jpg`).
+   - Đường dẫn tuyệt đối được ghép động qua `p.join(photosDir.path, fileName)` khi truy vấn. Điều này giúp tránh hỏng đường dẫn khi hệ điều hành Android/iOS thay đổi đường dẫn sandbox nội bộ sau các bản cập nhật ứng dụng.
+
+> [!WARNING]
+> **THÔNG BÁO QUYỀN RIÊNG TƯ & AN TOÀN DỮ LIỆU (PRIVACY NOTICE):**
+> Toàn bộ ảnh chụp mặt tiền nhà khách hàng được lưu trữ trong không gian riêng biệt (internal sandbox storage) của ứng dụng `Delivery Marker`. 
+> Do đó, **nếu người dùng gỡ cài đặt (uninstall) ứng dụng, toàn bộ ảnh chụp này sẽ bị hệ điều hành xóa sạch cùng ứng dụng** trừ khi đã thực hiện tính năng sao lưu (Backup / Export).
+> Cơ chế sao lưu và phục hồi dữ liệu hoàn chỉnh sẽ được triển khai tại **Bước 7: Local Backup & Export**.
+
+---
+
+### 8.3. Thích Ứng Các Widget Hiển Thị & Chụp Ảnh
+1. **[CustomerPhotosStripWidget](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/customer_photos_strip_widget.dart):**
+   - **Thao tác 1 chạm (1-touch camera):** Bấm trực tiếp vào nút `+ THÊM ẢNH` (kích thước chuẩn `>= 56px`) sẽ mở ngay Camera để chụp ảnh mặt tiền nhanh chóng cho shipper.
+   - **Thao tác nâng cao:** Nhấn giữ nút `+ THÊM ẢNH` sẽ mở Action Sheet để cho phép chọn ảnh từ Thư viện (Gallery) khi cần.
+   - **Xem ảnh phóng to:** Bấm vào bất kỳ ảnh nào trong dải ảnh sẽ mở [FullscreenImageViewer](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/fullscreen_image_viewer.dart) ở chế độ Gallery vuốt qua lại giữa các ảnh.
+   - **Xóa ảnh:** Nhấn giữ vào ảnh hiện hộp thoại xác nhận xóa ảnh an toàn.
+2. **[AuthenticatedImage](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/authenticated_image.dart):**
+   - Tự động nhận diện `photoInfo['isLocal'] == 'true'` hoặc URL file cục bộ (`file://` hoặc đường dẫn tệp trên đĩa).
+   - Render bằng `Image.file(File(filePath))` kèm cấu hình bộ nhớ đệm `cacheWidth` và `cacheHeight` tương ứng với kích thước hiển thị để tối ưu hóa RAM, ngăn giật lag cuộn danh sách.
+   - Giữ nguyên `Image.network` khi chạy ở chế độ Remote.
+3. **[FullscreenImageViewer](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/fullscreen_image_viewer.dart):**
+   - Hỗ trợ chế độ xem đơn lẻ và xem Gallery nhiều ảnh qua `PageView.builder` và `InteractiveViewer`.
+   - Render ảnh cục bộ bằng `Image.file` với độ phân giải đầy đủ, hỗ trợ thu phóng cảm ứng mượt mà (zoom từ 0.8x đến 5.0x).
+
 
 

@@ -1,18 +1,22 @@
 import '../../local/app_database.dart';
 import '../../models/customer_model.dart';
+import '../../models/customer_photo_model.dart';
 import '../../models/shift_model.dart';
 import '../../utils/phone_utils.dart';
 import '../../utils/uuid_utils.dart';
 import '../../utils/vietnamese_utils.dart';
 import '../customer_repository.dart';
+import 'local_photo_repository.dart';
 
 /// Triển khai CustomerRepository cục bộ bằng SQLite (Local-First)
 /// Toàn bộ dữ liệu khách hàng được lưu trữ và truy vấn trực tiếp trên thiết bị
 class LocalCustomerRepository implements CustomerRepository {
   final AppDatabase _appDb;
+  final LocalPhotoRepository _photoRepo;
 
-  LocalCustomerRepository({AppDatabase? appDb})
-      : _appDb = appDb ?? AppDatabase.instance;
+  LocalCustomerRepository({AppDatabase? appDb, LocalPhotoRepository? photoRepo})
+      : _appDb = appDb ?? AppDatabase.instance,
+        _photoRepo = photoRepo ?? LocalPhotoRepository(appDb: appDb ?? AppDatabase.instance);
 
   static const String defaultAreaId = 'local-area-default';
   static const String defaultAreaName = 'Của tôi';
@@ -149,8 +153,28 @@ class LocalCustomerRepository implements CustomerRepository {
 
     final pagedItems = filtered.skip(effOffset).take(effLimit).toList();
 
+    // 5. Nạp photoCount và tối đa 3 ảnh thumbnail cho danh sách khách hàng hiển thị
+    final customerIds = pagedItems.map((c) => c.id).toList();
+    final photoSummaries = await _photoRepo.getBatchPhotoSummaries(customerIds);
+
+    final enrichedItems = pagedItems.map((c) {
+      final summary = photoSummaries[c.id];
+      if (summary != null) {
+        final count = summary['photoCount'] as int;
+        final photos = summary['photos'] as List<CustomerPhotoModel>;
+        final firstThumb = summary['firstThumbnailUrl'] as String?;
+        return c.copyWith(
+          photoCount: count,
+          photos: photos,
+          firstThumbnailUrl: firstThumb,
+          imageUrl: firstThumb ?? c.imageUrl,
+        );
+      }
+      return c;
+    }).toList();
+
     return CustomerDirectoryResponse(
-      items: pagedItems,
+      items: enrichedItems,
       counts: CustomerTabCounts(
         total: allModels.length,
         verified: verifiedCount,
@@ -206,6 +230,11 @@ class LocalCustomerRepository implements CustomerRepository {
       }
     }
 
+    final photoSummary = await _photoRepo.getCustomerPhotoSummary(customerId);
+    final count = photoSummary['photoCount'] as int;
+    final photos = photoSummary['photos'] as List<CustomerPhotoModel>;
+    final firstThumb = photoSummary['firstThumbnailUrl'] as String?;
+
     return CustomerDirectoryModel(
       id: customerId,
       customerCode: (customer['customer_code'] as String?) ?? 'CUST',
@@ -220,6 +249,10 @@ class LocalCustomerRepository implements CustomerRepository {
       latitude: lat,
       longitude: lng,
       identificationNotes: notes,
+      imageUrl: firstThumb,
+      firstThumbnailUrl: firstThumb,
+      photoCount: count,
+      photos: photos,
       savedLocationId: savedLocId,
       createdAt: DateTime.tryParse(customer['created_at']?.toString() ?? ''),
       updatedAt: DateTime.tryParse(customer['updated_at']?.toString() ?? ''),

@@ -395,7 +395,8 @@ class _CustomerPhotosStripWidgetState extends State<CustomerPhotosStripWidget> {
         elevation: 2,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: _isUploading ? null : _showPhotoSourceSheet,
+          onTap: _isUploading ? null : () => _pickAndUploadPhoto(ImageSource.camera),
+          onLongPress: _isUploading ? null : _showPhotoSourceSheet,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
@@ -450,9 +451,10 @@ class _CustomerPhotosStripWidgetState extends State<CustomerPhotosStripWidget> {
           children: [
             GestureDetector(
               onTap: () {
-                FullscreenImageViewer.show(
+                FullscreenImageViewer.showGallery(
                   context,
-                  photoUrl: photo.imageUrl,
+                  photoUrls: _photos.map((p) => p.imageUrl).toList(),
+                  initialIndex: index,
                   title: '${widget.customerName} (Ảnh ${index + 1}/${_photos.length})',
                 );
               },

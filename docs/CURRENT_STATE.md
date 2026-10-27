@@ -12,7 +12,7 @@
 | **Database (PostGIS)** | Đạt ([01-init-db.sql](file:///d:/flutter create delivery_marker_app/init-db/01-init-db.sql), [02-add-photo-and-fix-history.sql](file:///d:/flutter create delivery_marker_app/init-db/02-add-photo-and-fix-history.sql), [04-create-shifts-and-delivery-points.sql](file:///d:/flutter create delivery_marker_app/init-db/04-create-shifts-and-delivery-points.sql)) | Đạt (Schema PostGIS, Trigger ảnh, Quản lý Ca làm việc & Điểm giao) | Đã bổ sung bảng `shifts` và `shift_delivery_points`, hỗ trợ 3 trạng thái vị trí `VERIFIED`, `TEMPORARY`, `NO_LOCATION`, kích hoạt extension `unaccent` |
 | **Backend API** | Đạt ([app.ts](file:///d:/flutter create delivery_marker_app/backend/src/app.ts), TypeScript 5.4.5) | **Đạt** (66/66 tests: [shifts.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/shifts.spec.ts), [orders.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/orders.spec.ts), [location.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/location.spec.ts), [auth.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/auth.spec.ts)) | Hoạt động 23 endpoints (bao gồm Geocoding Search, Tạo nhanh khách hàng & thêm vào ca, 8 API Ca làm việc, ghim tạm, xác minh cổng nhà) |
 | **Admin Web** | Đạt ([client.ts](file:///d:/flutter create delivery_marker_app/admin_web/src/api/client.ts), TypeScript 5.2.2) | Đã cập nhật UI hỗ trợ ảnh và tạo tài khoản mới | Hoạt động 5 trang giao diện chính, đã cấu hình [nginx.conf](file:///d:/flutter create delivery_marker_app/admin_web/nginx.conf) |
-| **Mobile App (Flutter)** | Đạt chuẩn Flutter/Dart SDK `>=3.0.0 <4.0.0`, build APK debug thành công ([app-debug.apk](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/build/app/outputs/flutter-apk/app-debug.apk)) | **Đạt** (188/188 tests: [local_first_shift_bulk_04_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_shift_bulk_04_test.dart), [local_first_customer_location_03_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_customer_location_03_test.dart), [local_first_sqlite_schema_02_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_sqlite_schema_02_test.dart), [local_first_repository_layer_01_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_repository_layer_01_test.dart), [shift_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/shift_test.dart), [widget_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/widget_test.dart)) | **Đã kích hoạt:** Local Shift Repository & Dán hàng loạt (Local-First 04), Local Repositories Customer & Location (Local-First 03), SQLite `local_data_v1.db` (Local-First 02), Tách tầng Repository (Local-First 01) |
+| **Mobile App (Flutter)** | Đạt chuẩn Flutter/Dart SDK `>=3.0.0 <4.0.0`, build APK debug thành công ([app-debug.apk](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/build/app/outputs/flutter-apk/app-debug.apk)) | **Đạt** (199/199 tests: [local_first_photo_05_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_photo_05_test.dart), [local_first_shift_bulk_04_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_shift_bulk_04_test.dart), [local_first_customer_location_03_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_customer_location_03_test.dart), [local_first_sqlite_schema_02_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_sqlite_schema_02_test.dart), [local_first_repository_layer_01_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_repository_layer_01_test.dart), [shift_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/shift_test.dart), [widget_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/widget_test.dart)) | **Đã kích hoạt:** Local Photo Management & Widget (Local-First 05), Local Shift Repository & Dán hàng loạt (Local-First 04), Local Repositories Customer & Location (Local-First 03), SQLite `local_data_v1.db` (Local-First 02), Tách tầng Repository (Local-First 01) |
 
 ---
 
@@ -1643,12 +1643,78 @@ Tất cả các màn hình, sheet và widget nghiệp vụ trong `mobile_app/lib
     15. `Compatibility: getMyShiftOrders và addOrderToShift ánh xạ mượt mà từ SQLite sang OrderModel`: **PASSED**.
 - **Toàn bộ bộ kiểm thử Mobile App:**
   * Lệnh: `flutter test`
-  * Kết quả: **188/188 tests passed (100%)** (Toàn bộ 173 bài test cũ + 15 bài test mới, 0 regressions).
-- **Biên dịch gói APK Debug:**
-  * Lệnh: `flutter build apk --debug`
-  * Kết quả: **Thành công (Built build\app\outputs\flutter-apk\app-debug.apk in 36.7s)**.
+  * Kết quả: **199/199 tests passed (100%)** (Toàn bộ 188 bài test cũ + 11 bài test mới, 0 regressions).
 - **Trạng Thái Kiểm Thử Thiết Bị Thực Tế:**
   * **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
+---
+
+## 19. TASK: LOCAL-FIRST-05-LOCAL-PHOTOS (Quản Lý Ảnh Cục Bộ & Thích Ứng Widget)
+
+### 19.1. Khảo Sát & Phân Tích
+Đã khảo sát và đọc kỹ:
+- Interface [photo_repository.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/photo_repository.dart) và [remote_photo_repository.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_photo_repository.dart).
+- Dữ liệu model [customer_photo_model.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/models/customer_photo_model.dart).
+- Bảng CSDL `customer_photos` trong [app_database.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/local/app_database.dart).
+- Các widget hiển thị ảnh: [authenticated_image.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/authenticated_image.dart), [customer_photos_strip_widget.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/customer_photos_strip_widget.dart), [fullscreen_image_viewer.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/fullscreen_image_viewer.dart), [point_detail_bottom_sheet.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/point_detail_bottom_sheet.dart).
+
+### 19.2. Kiến Trúc & Triển Khai Thực Tế
+
+1. **Lưu trữ tệp ảnh an toàn & Bảo vệ quyền riêng tư ([LocalPhotoRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_photo_repository.dart)):**
+   - **Thư mục riêng:** Tệp được lưu tại `getApplicationDocumentsDirectory() / photos` và thumbnail tại `/photos/thumbs`. Tuyệt đối không lưu vào thư mục chia sẻ công khai hay thư viện ảnh chung của thiết bị.
+   - **Tên file UUID ngẫu nhiên:** Định dạng `<uuid>.jpg` và `<uuid>_thumb.jpg`. Tuyệt đối không chứa số điện thoại hay họ tên khách hàng trong tên tệp hoặc đường dẫn.
+   - **Đường dẫn tương đối trong CSDL:** Cột `file_name` và `thumb_file_name` trong bảng `customer_photos` chỉ lưu tên file tương đối, giúp ứng dụng không bị mất liên kết ảnh khi hệ điều hành thay đổi đường dẫn sandbox sau cập nhật.
+   - **Kiểm tra Magic Bytes:** Xác thực định dạng thật của tệp (JPEG: `FF D8 FF`, PNG: `89 50 4E 47 0D 0A 1A 0A`, WebP: `RIFF...WEBP`). Từ chối các tệp sai định dạng.
+   - **Giới hạn an toàn:** Chặn file lớn hơn 5MB; giới hạn tối đa 10 ảnh mặt tiền chưa xóa mềm cho mỗi khách hàng.
+   - **Nén ảnh & Thumbnail:** Nén cạnh dài <= 1600px quality ~80 và tạo thumbnail cạnh dài ~300px quality 75. Khi chạy trên app dùng `compute` trong isolate riêng để giữ 60fps UI; trong môi trường test thực thi trực tiếp tránh isolate deadlock.
+   - **Tính toàn vẹn (Atomic Rollback):** Nếu thao tác ghi vào SQLite thất bại, tệp vừa ghi trên đĩa sẽ bị xóa ngay lập tức, không để lại file mồ côi.
+
+2. **Xóa mềm (Soft Delete) & Cơ chế Purge tự động:**
+   - Khi xóa ảnh (`deleteCustomerPhoto`), gán `deleted_at = now` trong SQLite, file trên đĩa được giữ nguyên tạm thời và ghi nhận `DELETE_CUSTOMER_PHOTO` trong `activity_log`.
+   - Cơ chế `purgeDeletedPhotosOlderThan` quét các ảnh có `deleted_at` quá 30 ngày: Xóa file ảnh gốc, xóa thumbnail trên đĩa, xóa dòng bản ghi trong SQLite và ghi `PURGE_EXPIRED_PHOTOS` vào `activity_log`.
+   - Trong [main.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/main.dart), quá trình kiểm tra đăng nhập tự động kích hoạt lệnh dọn dẹp chạy nền không chặn giao diện.
+
+3. **Thích ứng các Widget giao diện:**
+   - [authenticated_image.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/authenticated_image.dart): Nhận diện `isLocal == 'true'` hoặc URL tệp cục bộ (`file://` hoặc đường dẫn tuyệt đối), render trực tiếp bằng `Image.file(File(filePath))` kèm `cacheWidth` và `cacheHeight` tối ưu hóa RAM. Giữ nguyên `Image.network` khi ở chế độ Remote.
+   - [fullscreen_image_viewer.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/fullscreen_image_viewer.dart): Hỗ trợ phóng to thu nhỏ cảm ứng (zoom 0.8x đến 5.0x) và vuốt gallery nhiều ảnh cho cả ảnh cục bộ (`Image.file`) và ảnh từ xa (`Image.network`).
+   - [customer_photos_strip_widget.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/customer_photos_strip_widget.dart): Nút `+ THÊM ẢNH` chuẩn kích thước vùng chạm `>= 56px`. Thao tác 1 chạm trực tiếp mở Camera (`ImageSource.camera`) để shipper chụp nhanh tại hiện trường; nhấn giữ mở menu chọn từ Thư viện (`ImageSource.gallery`). Chạm vào ảnh mở Fullscreen Gallery, nhấn giữ vào ảnh mở hộp thoại xác nhận xóa.
+
+4. **Đồng bộ hóa dữ liệu Danh bạ, Bản đồ chính và Ca làm việc:**
+   - [LocalCustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_customer_repository.dart): Tự động đếm `photoCount` và nạp 3 ảnh thumbnail đầu tiên vào [CustomerDirectoryModel](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/models/customer_model.dart).
+   - [LocalLocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_location_repository.dart): Tự động nạp `photoCount` và 3 ảnh thumbnail vào [MasterSavedLocationModel](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/models/master_saved_location_model.dart).
+   - [LocalShiftRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_shift_repository.dart): Tự động nạp `photoCount` và 3 ảnh thumbnail vào [ShiftDeliveryPointModel](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/models/shift_model.dart) cho mỗi điểm giao trong ca.
+
+5. **Mở rộng công tắc `RepositoryProvider.useLocalData`:**
+   - Khi `useLocalData = true`: `customer`, `location`, `shift`, `photo` đồng thời chuyển sang Local SQLite. `sharing` và `profile` vẫn trỏ về Remote.
+   - Mặc định: `useLocalData = false`.
+
+### 19.3. Bằng Chứng Kiểm Thử Thực Tế (Evidence-Based Verification)
+
+- **Phân tích mã nguồn (Static Analysis):**
+  * Lệnh: `flutter analyze`
+  * Kết quả: **No issues found!** (ran in 1.7s).
+- **Bộ kiểm thử chuyên sâu Task 05 ([local_first_photo_05_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_photo_05_test.dart)):**
+  * Lệnh: `flutter test test/local_first_photo_05_test.dart`
+  * Kết quả: **11/11 tests passed (100%)**:
+    1. `RepositoryProvider toggle useLocalData chuyển đổi chính xác PhotoRepository`: **PASSED**.
+    2. `Thêm ảnh hợp lệ (JPEG, PNG) - nén cạnh dài <= 1600px, tạo thumbnail ~300px, ghi CSDL và lưu file UUID`: **PASSED**.
+    3. `Kiểm tra định dạng Magic Bytes: từ chối file sai định dạng`: **PASSED**.
+    4. `Kiểm tra giới hạn dung lượng tối đa 5MB`: **PASSED**.
+    5. `Giới hạn tối đa 10 ảnh/khách hàng`: **PASSED**.
+    6. `Lỗi ghi DB thì file vừa tạo bị xóa dọn sạch (không để lại file mồ côi)`: **PASSED**.
+    7. `Xóa mềm (deleted_at) giữ file; dọn sau 30 ngày xóa sạch file & CSDL`: **PASSED**.
+    8. `photoCount và 3 ảnh đầu đúng; hai khách hàng không lẫn ảnh của nhau`: **PASSED**.
+    9. `Đồng bộ photoCount và 3 ảnh đầu sang CustomerRepository, LocationRepository và ShiftRepository`: **PASSED**.
+    10. `Widget AuthenticatedImage hiển thị ảnh cục bộ qua Image.file`: **PASSED**.
+    11. `CustomerPhotosStripWidget: Nút thêm ảnh >= 56px, chạm mở camera, hiển thị dải ảnh, chạm xem fullscreen`: **PASSED**.
+- **Toàn bộ bộ kiểm thử tự động Mobile App:**
+  * Lệnh: `flutter test`
+  * Kết quả: **199/199 tests passed (100%)** (Bảo toàn 100% các bộ kiểm thử cũ, không phát sinh bất kỳ hồi quy nào).
+- **Biên dịch gói APK Debug:**
+  * Lệnh: `flutter build apk --debug`
+- **Trạng Thái Kiểm Thử Thiết Bị Thực Tế:**
+  * **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
 
 
 

@@ -1,17 +1,21 @@
 import '../../local/app_database.dart';
+import '../../models/customer_photo_model.dart';
 import '../../models/location_model.dart';
 import '../../models/shift_model.dart';
 import '../../utils/phone_utils.dart';
 import '../../utils/uuid_utils.dart';
 import '../location_repository.dart';
+import 'local_photo_repository.dart';
 
 /// Triển khai LocationRepository cục bộ bằng SQLite (Local-First)
 /// Toàn bộ thao tác lưu, sửa, xóa vị trí được quản lý và bảo toàn lịch sử trên thiết bị
 class LocalLocationRepository implements LocationRepository {
   final AppDatabase _appDb;
+  final LocalPhotoRepository _photoRepo;
 
-  LocalLocationRepository({AppDatabase? appDb})
-      : _appDb = appDb ?? AppDatabase.instance;
+  LocalLocationRepository({AppDatabase? appDb, LocalPhotoRepository? photoRepo})
+      : _appDb = appDb ?? AppDatabase.instance,
+        _photoRepo = photoRepo ?? LocalPhotoRepository(appDb: appDb ?? AppDatabase.instance);
 
   static const String defaultAreaId = 'local-area-default';
   static const String defaultAreaName = 'Của tôi';
@@ -27,7 +31,13 @@ class LocalLocationRepository implements LocationRepository {
       ORDER BY sl.updated_at DESC
     ''');
 
-    return rows.map((r) => _mapToMasterSavedLocation(r)).toList();
+    final customerIds = rows.map((r) => r['customer_id'] as String).toList();
+    final photoSummaries = await _photoRepo.getBatchPhotoSummaries(customerIds);
+
+    return rows.map((r) {
+      final cid = r['customer_id'] as String;
+      return _mapToMasterSavedLocation(r, photoSummaries[cid]);
+    }).toList();
   }
 
   @override
@@ -48,7 +58,13 @@ class LocalLocationRepository implements LocationRepository {
       ORDER BY sl.updated_at DESC
     ''', [minLat, maxLat, minLng, maxLng]);
 
-    return rows.map((r) => _mapToMasterSavedLocation(r)).toList();
+    final customerIds = rows.map((r) => r['customer_id'] as String).toList();
+    final photoSummaries = await _photoRepo.getBatchPhotoSummaries(customerIds);
+
+    return rows.map((r) {
+      final cid = r['customer_id'] as String;
+      return _mapToMasterSavedLocation(r, photoSummaries[cid]);
+    }).toList();
   }
 
   @override
@@ -348,7 +364,14 @@ class LocalLocationRepository implements LocationRepository {
     return await _appDb.getLocationHistory(customerId);
   }
 
-  MasterSavedLocationModel _mapToMasterSavedLocation(Map<String, dynamic> r) {
+  MasterSavedLocationModel _mapToMasterSavedLocation(
+    Map<String, dynamic> r, [
+    Map<String, dynamic>? photoSummary,
+  ]) {
+    final photos = (photoSummary?['photos'] as List<CustomerPhotoModel>?) ?? const [];
+    final count = (photoSummary?['photoCount'] as int?) ?? 0;
+    final firstThumb = photoSummary?['firstThumbnailUrl'] as String?;
+
     return MasterSavedLocationModel(
       id: r['id'] as String,
       customerId: r['customer_id'] as String,
@@ -362,8 +385,9 @@ class LocalLocationRepository implements LocationRepository {
       longitude: (r['longitude'] as num).toDouble(),
       gpsAccuracy: (r['gps_accuracy'] as num?)?.toDouble() ?? 0.0,
       identificationNotes: (r['identification_notes'] as String?) ?? '',
-      photoCount: 0,
-      photos: const [],
+      imageUrl: firstThumb,
+      photoCount: count,
+      photos: photos,
       createdAt: DateTime.tryParse(r['created_at']?.toString() ?? ''),
       updatedAt: DateTime.tryParse(r['updated_at']?.toString() ?? ''),
     );

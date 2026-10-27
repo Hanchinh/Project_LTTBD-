@@ -673,6 +673,36 @@ Tất cả các lệnh dưới đây đã được thực thi trực tiếp trê
 - **6. Trạng thái kiểm thử:**
   - **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
 
+### 3.17. Đợt Kiểm Thử Quản Lý Ảnh Cục Bộ & Thích Ứng Widget (LOCAL-FIRST-05-LOCAL-PHOTOS) - 27/10/2026
+
+- **Mục tiêu:** Kiểm tra toàn diện quản lý ảnh mặt tiền nhà cục bộ qua [LocalPhotoRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_photo_repository.dart), xác thực định dạng file bằng Magic Bytes, giới hạn tối đa 5MB, giới hạn tối đa 10 ảnh/khách, nén ảnh cạnh dài <= 1600px quality ~80 và thumbnail ~300px, lưu file thư mục riêng biệt của app với tên UUID ngẫu nhiên không lộ SĐT, dọn sạch file mồ côi khi lỗi ghi DB (Atomic Rollback), xóa mềm (`deleted_at`), tự động dọn ảnh sau 30 ngày (`purgeDeletedPhotosOlderThan`), đồng bộ `photoCount` và top 3 ảnh sang Danh bạ, Bản đồ chính, Bản đồ ca, và thích ứng widget [AuthenticatedImage](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/authenticated_image.dart) (`Image.file`), [FullscreenImageViewer](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/fullscreen_image_viewer.dart), [CustomerPhotosStripWidget](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/customer_photos_strip_widget.dart).
+- **1. Phân tích tĩnh & Cú pháp:**
+  - Lệnh: `flutter analyze`
+  - Kết quả: **No issues found! (ran in 1.7s)** (0 errors, 0 warnings, 0 lints).
+- **2. Bộ kiểm thử mới ([local_first_photo_05_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_photo_05_test.dart)):**
+  - `1. RepositoryProvider toggle useLocalData chuyển đổi chính xác PhotoRepository sang LocalPhotoRepository`: **PASSED**.
+  - `2. Thêm ảnh hợp lệ (JPEG, PNG) - nén cạnh dài <= 1600px, tạo thumbnail ~300px, ghi CSDL và lưu file UUID`: **PASSED**.
+  - `3. Kiểm tra định dạng Magic Bytes: từ chối file sai định dạng`: **PASSED**.
+  - `4. Kiểm tra giới hạn dung lượng tối đa 5MB`: **PASSED**.
+  - `5. Giới hạn tối đa 10 ảnh/khách hàng (thêm ảnh thứ 11 ném StateError)`: **PASSED**.
+  - `6. Lỗi ghi DB thì file vừa tạo bị xóa dọn sạch (Atomic Rollback, không để lại file mồ côi)`: **PASSED**.
+  - `7. Xóa mềm (deleted_at) giữ file; dọn sau 30 ngày xóa sạch file & CSDL, ghi activity_log`: **PASSED**.
+  - `8. photoCount và 3 ảnh đầu đúng; hai khách hàng không lẫn ảnh của nhau`: **PASSED**.
+  - `9. Đồng bộ photoCount và 3 ảnh đầu sang CustomerRepository, LocationRepository và ShiftRepository`: **PASSED**.
+  - `10. Widget AuthenticatedImage hiển thị ảnh cục bộ qua Image.file (hỗ trợ cacheWidth/cacheHeight)`: **PASSED**.
+  - `11. CustomerPhotosStripWidget: Nút thêm ảnh >= 56px, chạm mở camera, hiển thị dải ảnh, chạm xem fullscreen`: **PASSED**.
+- **3. Toàn bộ kiểm thử Mobile App:**
+  - Lệnh: `flutter test`
+  - Kết quả: **199/199 tests passed (100%)** (188 bài test cũ + 11 bài test mới, 0 regressions).
+- **4. Đóng gói & Build:**
+  - Lệnh: `flutter build apk --debug`
+  - Kết quả: Sẽ được chạy nghiệm thu cuối cùng theo quy tắc.
+- **5. Môi trường Backend & Database:**
+  - Không thay đổi bất kỳ file nào trong `backend/` hay `admin_web/`.
+  - 0 request ghi dữ liệu vào CSDL sống `delivery_db`.
+- **6. Trạng thái kiểm thử:**
+  - **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
 ---
 
 ## 4. Quy Chuẩn Cách Ly Kiểm Thử (Strict Testing Isolation Policy)

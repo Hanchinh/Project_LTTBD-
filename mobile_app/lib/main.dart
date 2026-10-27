@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'repositories/local/local_photo_repository.dart';
 import 'repositories/repository_provider.dart';
 import 'services/api_service.dart';
 import 'views/home_shell_view.dart';
@@ -52,6 +53,12 @@ class _AuthSplashScreenState extends State<AuthSplashScreen> {
 
   Future<void> _checkAuthState() async {
     final isLocalMode = RepositoryProvider.useLocalData;
+    if (isLocalMode) {
+      final photoRepo = RepositoryProvider.photo;
+      if (photoRepo is LocalPhotoRepository) {
+        photoRepo.purgeDeletedPhotosOlderThan().catchError((_) => 0);
+      }
+    }
     final token = await ApiService.getToken();
     if (!mounted) return;
 
