@@ -74,4 +74,21 @@ class RemoteLocationRepository implements LocationRepository {
   Future<void> syncOfflineQueue() {
     return ApiService.syncOfflineQueue();
   }
+
+  @override
+  Future<List<MasterSavedLocationModel>> getSavedLocationsInBounds({
+    required double minLat,
+    required double maxLat,
+    required double minLng,
+    required double maxLng,
+  }) async {
+    final all = await getMySavedLocations();
+    return all.where((loc) =>
+      loc.latitude >= minLat && loc.latitude <= maxLat &&
+      loc.longitude >= minLng && loc.longitude <= maxLng
+    ).toList();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getLocationHistory(String customerId) async => [];
 }

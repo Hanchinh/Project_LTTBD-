@@ -609,6 +609,36 @@ Tất cả các lệnh dưới đây đã được thực thi trực tiếp trê
 - **6. Trạng thái kiểm thử:**
   - **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
 
+### 3.15. Đợt Kiểm Thử Tầng Repository Cục Bộ Khách Hàng & Vị Trí (LOCAL-FIRST-03-LOCAL-REPOSITORY-CUSTOMER-LOCATION) - 26/10/2026
+
+- **Mục tiêu:** Kiểm tra toàn diện 100% các phương thức trong [LocalCustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_customer_repository.dart) và [LocalLocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_location_repository.dart) chạy trên SQLite FFI in-memory mà không cần backend hay mạng, đảm bảo tuân thủ đầy đủ các quy tắc nghiệp vụ: tạo khách chỉ cần SĐT, chống trùng lặp, xóa mềm an toàn (chặn khi có ca active), phân trang danh bạ, tìm kiếm không dấu qua `search_text`, 3 trạng thái vị trí `locationState` (VERIFIED / TEMPORARY / NO_LOCATION), dán hàng loạt SĐT đa định dạng trong 1 transaction (giới hạn 200 số), lưu/cập nhật vị trí đã xác nhận, ghim SĐT mới trong cùng 1 transaction (không để lại khách mồ côi nếu lỗi), xóa vị trí bảo toàn lịch sử và hạ điểm trong ca, xác nhận vị trí từ danh bạ nâng cấp điểm trong ca theo LOCATION-RULES-012, truy vấn dữ liệu bản đồ chính và lọc theo khung nhìn bbox, kiểm tra tính tương thích mô hình dữ liệu giữa Fake và Local.
+- **1. Phân tích tĩnh & Cú pháp:**
+  - Lệnh: `flutter analyze`
+  - Kết quả: **No issues found! (ran in 2.6s)** (0 errors, 0 warnings, 0 lints).
+- **2. Bộ kiểm thử mới ([local_first_customer_location_03_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_customer_location_03_test.dart)):**
+  - `1. Customer: Tạo khách chỉ cần SĐT (tên mặc định 'Khách [SĐT]', địa chỉ mặc định), chống trùng lặp (isExisting=true)`: **PASSED**.
+  - `2. Customer: Sửa tên/địa chỉ/ghi chú; xóa mềm khách (từ chối xóa nếu nằm trong ca PREPARING/IN_PROGRESS)`: **PASSED**.
+  - `3. Customer: Danh bạ phân trang (limit/offset), tìm không dấu qua search_text, đếm counts chính xác`: **PASSED**.
+  - `4. Customer: locationState đủ 3 trường hợp (VERIFIED, TEMPORARY, NO_LOCATION)`: **PASSED**.
+  - `5. Customer: Bulk tách số các dạng (dấu phẩy, xuống dòng, chấm phẩy, khoảng trắng/chấm trong số), trùng lặp, chặn >200 số trong 1 transaction`: **PASSED**.
+  - `6. Location: Lưu & cập nhật vị trí đã xác nhận trong transaction, validate tọa độ [-90..90, -180..180], trigger sinh lịch sử`: **PASSED**.
+  - `7. Location: Ghim vị trí mới gán cho SĐT chưa có trong 1 transaction khép kín (lỗi không để lại khách mồ côi)`: **PASSED**.
+  - `8. Location: Xóa vị trí giữ lịch sử (saved_location_id=NULL), điểm VERIFIED trong ca chuyển NO_LOCATION, điểm TEMPORARY giữ nguyên, ghi log`: **PASSED**.
+  - `9. Location: Xác nhận vị trí qua luồng Danh bạ nâng cấp điểm trong ca sang VERIFIED và ghi updatedShiftPointsCount`: **PASSED**.
+  - `10. Location: Dữ liệu bản đồ chính MasterSavedLocationModel và lọc theo khung nhìn bbox (minLat..maxLat, minLng..maxLng)`: **PASSED**.
+  - `11. Compatibility: Kiểm thử tính tương thích hợp đồng giữa Fake và Local trả về cùng cấu trúc dữ liệu cho UI`: **PASSED**.
+- **3. Toàn bộ kiểm thử Mobile App:**
+  - Lệnh: `flutter test`
+  - Kết quả: **173/173 tests passed (100%)** (0 failures, 0 errors, 0 regressions).
+- **4. Đóng gói & Build:**
+  - Lệnh: `flutter build apk --debug`
+  - Kết quả: **Thành công (Built build\app\outputs\flutter-apk\app-debug.apk in 154.3s)**.
+- **5. Môi trường Backend & Database:**
+  - Không thay đổi bất kỳ file nào trong `backend/` hay `admin_web/`.
+  - 0 request ghi dữ liệu vào CSDL sống `delivery_db`.
+- **6. Trạng thái kiểm thử:**
+  - **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
 ---
 
 ## 4. Quy Chuẩn Cách Ly Kiểm Thử (Strict Testing Isolation Policy)

@@ -10,12 +10,31 @@ import 'remote/remote_photo_repository.dart';
 import 'remote/remote_profile_repository.dart';
 import 'remote/remote_sharing_repository.dart';
 import 'remote/remote_shift_repository.dart';
+import 'local/local_customer_repository.dart';
+import 'local/local_location_repository.dart';
 
 /// Service locator & provider cho toàn bộ các Repository trong ứng dụng.
 /// Mặc định: Trỏ về RemoteRepository (bọc ApiService kết nối backend hiện tại).
-/// Kiến trúc Local-First: Cho phép thay thế bằng LocalRepository (SQLite OfflineStorageService)
-/// hoặc ghi đè (override) trong kiểm thử widget test mà không làm xáo trộn UI.
+/// Kiến trúc Local-First: Cho phép kích hoạt `useLocalData = true` để dùng LocalCustomerRepository & LocalLocationRepository (SQLite).
+/// Hỗ trợ ghi đè (override) trong kiểm thử widget test mà không làm xáo trộn UI.
 class RepositoryProvider {
+  static const bool _compileTimeLocalData = bool.fromEnvironment('LOCAL_DATA', defaultValue: false);
+  static bool? _useLocalDataOverride;
+
+  /// Cờ xác định có đang sử dụng Local Repositories cho Customer & Location hay không
+  /// Mặc định: false (chạy Remote như cũ).
+  /// Có thể bật qua:
+  /// 1. RepositoryProvider.useLocalData = true
+  /// 2. Cờ biên dịch: --dart-define=LOCAL_DATA=true
+  static bool get useLocalData => _useLocalDataOverride ?? _compileTimeLocalData;
+
+  static set useLocalData(bool value) {
+    _useLocalDataOverride = value;
+    // Reset instance để tạo lại với loại repository tương ứng
+    _customerRepository = null;
+    _locationRepository = null;
+  }
+
   static CustomerRepository? _customerRepository;
   static LocationRepository? _locationRepository;
   static PhotoRepository? _photoRepository;
@@ -24,10 +43,10 @@ class RepositoryProvider {
   static ProfileRepository? _profileRepository;
 
   static CustomerRepository get customer =>
-      _customerRepository ??= RemoteCustomerRepository();
+      _customerRepository ??= (useLocalData ? LocalCustomerRepository() : RemoteCustomerRepository());
 
   static LocationRepository get location =>
-      _locationRepository ??= RemoteLocationRepository();
+      _locationRepository ??= (useLocalData ? LocalLocationRepository() : RemoteLocationRepository());
 
   static PhotoRepository get photo =>
       _photoRepository ??= RemotePhotoRepository();
@@ -60,6 +79,7 @@ class RepositoryProvider {
 
   /// Khôi phục trạng thái mặc định
   static void reset() {
+    _useLocalDataOverride = null;
     _customerRepository = null;
     _locationRepository = null;
     _photoRepository = null;

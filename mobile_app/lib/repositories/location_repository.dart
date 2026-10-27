@@ -33,4 +33,15 @@ abstract class LocationRepository {
   Future<int> getPendingSyncCount();
 
   Future<void> syncOfflineQueue();
+
+  /// Lấy danh sách vị trí đã lưu trong khung nhìn bản đồ (bbox)
+  Future<List<MasterSavedLocationModel>> getSavedLocationsInBounds({
+    required double minLat,
+    required double maxLat,
+    required double minLng,
+    required double maxLng,
+  }) async => [];
+
+  /// Lấy lịch sử thay đổi vị trí của khách hàng
+  Future<List<Map<String, dynamic>>> getLocationHistory(String customerId) async => [];
 }

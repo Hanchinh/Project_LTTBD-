@@ -45,4 +45,7 @@ abstract class CustomerRepository {
   });
 
   Future<Map<String, dynamic>?> lookupCustomerLocationByPhone(String phoneNumber);
+
+  /// Xóa mềm khách hàng (kiểm tra không nằm trong ca PREPARING/IN_PROGRESS)
+  Future<bool> deleteCustomer(String customerId) async => false;
 }

@@ -99,4 +99,9 @@ class RemoteCustomerRepository implements CustomerRepository {
   Future<Map<String, dynamic>?> lookupCustomerLocationByPhone(String phoneNumber) {
     return ApiService.lookupCustomerLocationByPhone(phoneNumber);
   }
+
+  @override
+  Future<bool> deleteCustomer(String customerId) async {
+    return false;
+  }
 }

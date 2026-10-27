@@ -321,3 +321,63 @@ erDiagram
 6. **Chuẩn Hóa Số Điện Thoại Dùng Chung:**
    - Hàm `normalizeCustomerPhone` được tách ra [phone_utils.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/utils/phone_utils.dart) đảm bảo mọi số điện thoại nhập từ giao diện (Thêm nhanh khách, dán SĐT, tra cứu) đều được chuẩn hóa về 10 chữ số bắt đầu bằng `0` trước khi lưu.
 
+---
+
+## 6. Triển Khai Local Repositories: Customer & Location (TASK: LOCAL-FIRST-03)
+
+### 6.1. Bảng Đối Chiếu Phương Thức: Interface -> SQLite -> Khác Biệt So Với Remote
+
+#### A. CustomerRepository ([customer_repository.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/customer_repository.dart))
+
+| Phương Thức Interface | Triển Khai SQLite Cục Bộ ([LocalCustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_customer_repository.dart)) | Khác Biệt So Với Remote ([RemoteCustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_customer_repository.dart)) |
+| :--- | :--- | :--- |
+| `getCustomers(...)` | Gọi `getCustomersResponse` và trích xuất danh sách `items`. | Truy vấn trực tiếp từ bảng `customers`, không có độ trễ mạng. |
+| `getCustomersResponse(...)` | Lọc `deleted_at IS NULL`, tìm kiếm không dấu qua `search_text LIKE ?`, xác định `locationState` (VERIFIED / TEMPORARY / NO_LOCATION), tính `counts` và phân trang (`limit`, `offset`). | Xử lý ngay trong thiết bị. Không phân biệt quyền hạn/khu vực khác nhau giữa các shipper. |
+| `getCustomerDetail(id)` | Truy vấn `customers` theo ID, LEFT JOIN `saved_locations` và điểm ghim tạm ca đang mở. | Trả về `CustomerDirectoryModel` nguyên vẹn cho UI. |
+| `createCustomer(...)` | Chuẩn hóa SĐT, kiểm tra tồn tại trong transaction. Nếu đã có trả về với `isExisting = true`. Nếu chưa có tự gán `"Khách [SĐT]"`, `"Chưa cập nhật địa chỉ"`. Nếu có tọa độ, lưu đồng thời vào `saved_locations`. | Thực thi trong 1 transaction khép kín, tuyệt đối không để lại khách mồ côi nếu tọa độ lỗi. |
+| `createBulkCustomers(...)` | Sử dụng `parseAndNormalizeBulkPhones` tách dấu xuống dòng/phẩy/chấm phẩy, giữ khoảng trắng/chấm trong số, lọc trùng, giới hạn 200 số. Chạy 1 transaction phân 3 nhóm `created`, `alreadyExists`, `rejected`. | Ghi nhận nhật ký vào `activity_log` thay vì `audit_logs` trên máy chủ. |
+| `updateCustomer(...)` | Chuẩn hóa SĐT, kiểm tra trùng lặp với khách khác, cập nhật họ tên/địa chỉ/SĐT và tái sinh `search_text`. | Kiểm tra trùng lặp cục bộ tức thì. |
+| `lookupCustomerLocationByPhone(...)` | Tìm khách theo SĐT đã chuẩn hóa, lấy vị trí VERIFIED hoặc TEMPORARY trong ca đang mở, trả về Map định dạng chuẩn. | Thay thế hoàn toàn request `GET /locations/customer?phone=...`. |
+| `deleteCustomer(id)` | Kiểm tra ràng buộc: từ chối xóa nếu khách đang có điểm giao trong ca `PREPARING` hoặc `IN_PROGRESS`. Xóa mềm bằng `deleted_at = currentIsoUtc()`. | Remote chưa hỗ trợ xóa khách hàng; Local hỗ trợ xóa mềm an toàn. |
+
+#### B. LocationRepository ([location_repository.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/location_repository.dart))
+
+| Phương Thức Interface | Triển Khai SQLite Cục Bộ ([LocalLocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_location_repository.dart)) | Khác Biệt So Với Remote ([RemoteLocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/remote/remote_location_repository.dart)) |
+| :--- | :--- | :--- |
+| `getMySavedLocations()` | Truy vấn `saved_locations` JOIN `customers` (`deleted_at IS NULL`), map sang `MasterSavedLocationModel`. | Dữ liệu tức thì cho bản đồ chính, tạm thời `photoCount = 0`, `photos = []` (chờ bước Photo). |
+| `getSavedLocationsInBounds(...)` | Lọc theo khung nhìn tọa độ `BETWEEN minLat AND maxLat` và `BETWEEN minLng AND maxLng` bằng index không gian SQLite. | Tối ưu hóa hiệu năng render marker theo khung nhìn bản đồ. |
+| `saveCustomerLocation(...)` | Kiểm tra tọa độ (-90..90, -180..180), upsert `saved_locations` trong transaction, tự động đồng bộ điểm giao trong ca sang `VERIFIED` (LOCATION-RULES-012). | Không cần hàng đợi offline vì dữ liệu lưu thẳng vào SQLite chính. |
+| `updateCustomerLocationAndPhoto(...)` | Hỗ trợ gán cho cả customerId hoặc số điện thoại mới toanh (tự sinh khách + lưu vị trí trong 1 transaction). Đồng bộ điểm trong ca. | Trả về `updatedShiftPointsCount` chính xác và ghi `activity_log`. |
+| `deleteCustomerLocation(id)` | Xóa `saved_locations`, bảo toàn `location_history` (`saved_location_id = NULL`), chuyển điểm giao `VERIFIED` trong ca về `NO_LOCATION`, giữ nguyên điểm `TEMPORARY`. | Ghi nhận nhật ký vào `activity_log`. |
+| `updateTemporaryLocation(...)` | Cập nhật `shift_delivery_points` với `location_status = 'TEMPORARY'` riêng cho ca đó. | Tọa độ tạm thời không bao giờ làm ô nhiễm bảng `saved_locations`. |
+| `getPendingSyncCount()` | Trả về `0` (dữ liệu Local-First luôn sẵn sàng và nhất quán). | Không dùng hàng đợi đồng bộ v2 khi ở chế độ Local. |
+| `syncOfflineQueue()` | Hoàn thành ngay lập tức (không gọi mạng). | Chờ module P2P/Cloud Sync ở các bước sau. |
+| `getLocationHistory(customerId)` | Truy vấn `location_history` theo `customer_id` sắp xếp mới nhất trước. | Phục vụ xem lịch sử cổng nhà của khách hàng. |
+
+---
+
+### 6.2. Chính Sách Khu Vực (areaId): Tạm Giữ Khu Vực Ảo Để Dọn Ở Bước 6
+
+- Trong mô hình Local-First, mỗi thiết bị là một không gian dữ liệu độc lập của shipper, không còn nhu cầu phân chia khu vực bảo mật giữa các nhân viên.
+- Nhằm tránh làm vỡ giao diện Flutter hiện có (các bộ lọc khu vực, badge hiển thị), các phương thức cục bộ trả về một khu vực ảo mặc định:
+  * `areaId = 'local-area-default'`
+  * `areaName = 'Của tôi'`
+- **Kế hoạch dọn dẹp:** Toàn bộ các tham số và UI chọn khu vực sẽ được dọn dẹp triệt để trong **Bước 6 (Local-First Cleanup & Hardening)**.
+
+---
+
+### 6.3. Hướng Dẫn Bật Chế Độ Thử Nghiệm Local-First
+
+1. **Bật qua Mã Nguồn (Code Switch):**
+   ```dart
+   RepositoryProvider.useLocalData = true;
+   ```
+2. **Bật qua Cờ Biên Dịch (Compile Flag):**
+   ```bash
+   flutter run --dart-define=LOCAL_DATA=true
+   flutter build apk --debug --dart-define=LOCAL_DATA=true
+   ```
+3. **Bỏ Qua Màn Hình Đăng Nhập:**
+   Khi `RepositoryProvider.useLocalData = true`, [main.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/main.dart) tự động chuyển hướng thẳng vào [HomeShellView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/home_shell_view.dart) mà không cần kiểm tra JWT token hay bắt shipper đăng nhập.
+
+

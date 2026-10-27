@@ -710,12 +710,13 @@ class AppDatabase {
 
   /// Ghi nhật ký hoạt động (không ghi mật khẩu hay thông tin nhạy cảm)
   Future<String> logActivity({
+    DatabaseExecutor? executor,
     required String action,
     required String entity,
     String? entityId,
     Map<String, dynamic>? details,
   }) async {
-    final db = await database;
+    final db = executor ?? (await database);
     final logId = generateId();
     final now = currentIsoUtc();
 

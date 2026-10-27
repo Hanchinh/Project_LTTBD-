@@ -12,7 +12,7 @@
 | **Database (PostGIS)** | Đạt ([01-init-db.sql](file:///d:/flutter create delivery_marker_app/init-db/01-init-db.sql), [02-add-photo-and-fix-history.sql](file:///d:/flutter create delivery_marker_app/init-db/02-add-photo-and-fix-history.sql), [04-create-shifts-and-delivery-points.sql](file:///d:/flutter create delivery_marker_app/init-db/04-create-shifts-and-delivery-points.sql)) | Đạt (Schema PostGIS, Trigger ảnh, Quản lý Ca làm việc & Điểm giao) | Đã bổ sung bảng `shifts` và `shift_delivery_points`, hỗ trợ 3 trạng thái vị trí `VERIFIED`, `TEMPORARY`, `NO_LOCATION`, kích hoạt extension `unaccent` |
 | **Backend API** | Đạt ([app.ts](file:///d:/flutter create delivery_marker_app/backend/src/app.ts), TypeScript 5.4.5) | **Đạt** (66/66 tests: [shifts.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/shifts.spec.ts), [orders.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/orders.spec.ts), [location.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/location.spec.ts), [auth.spec.ts](file:///d:/flutter create delivery_marker_app/backend/test/auth.spec.ts)) | Hoạt động 23 endpoints (bao gồm Geocoding Search, Tạo nhanh khách hàng & thêm vào ca, 8 API Ca làm việc, ghim tạm, xác minh cổng nhà) |
 | **Admin Web** | Đạt ([client.ts](file:///d:/flutter create delivery_marker_app/admin_web/src/api/client.ts), TypeScript 5.2.2) | Đã cập nhật UI hỗ trợ ảnh và tạo tài khoản mới | Hoạt động 5 trang giao diện chính, đã cấu hình [nginx.conf](file:///d:/flutter create delivery_marker_app/admin_web/nginx.conf) |
-| **Mobile App (Flutter)** | Đạt chuẩn Flutter/Dart SDK `>=3.0.0 <4.0.0`, build APK debug thành công ([app-debug.apk](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/build/app/outputs/flutter-apk/app-debug.apk)) | **Đạt** (162/162 tests: [local_first_sqlite_schema_02_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_sqlite_schema_02_test.dart), [local_first_repository_layer_01_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_repository_layer_01_test.dart), [ui_overflow_fix_024_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/ui_overflow_fix_024_test.dart), [shift_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/shift_test.dart), [widget_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/widget_test.dart)) | **Đã kích hoạt:** Cơ sở dữ liệu SQLite cục bộ `local_data_v1.db` (Local-First 02), Tách tầng Repository (Local-First 01), Tạo nhanh khách hàng chưa có hồ sơ, Bản đồ ca làm thật |
+| **Mobile App (Flutter)** | Đạt chuẩn Flutter/Dart SDK `>=3.0.0 <4.0.0`, build APK debug thành công ([app-debug.apk](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/build/app/outputs/flutter-apk/app-debug.apk)) | **Đạt** (173/173 tests: [local_first_customer_location_03_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_customer_location_03_test.dart), [local_first_sqlite_schema_02_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_sqlite_schema_02_test.dart), [local_first_repository_layer_01_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/local_first_repository_layer_01_test.dart), [ui_overflow_fix_024_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/ui_overflow_fix_024_test.dart), [shift_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/shift_test.dart), [widget_test.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/test/widget_test.dart)) | **Đã kích hoạt:** Local Repositories Customer & Location (Local-First 03), Cơ sở dữ liệu SQLite cục bộ `local_data_v1.db` (Local-First 02), Tách tầng Repository (Local-First 01) |
 
 ---
 
@@ -1509,6 +1509,73 @@ Tất cả các màn hình, sheet và widget nghiệp vụ trong `mobile_app/lib
   * Kết quả: **Thành công (Built build\app\outputs\flutter-apk\app-debug.apk in 15.0s)**.
 - **Trạng Thái Kiểm Thử Thiết Bị Thực Tế:**
   * **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
+---
+
+## 17. Tiến Độ Local-First: Tầng Repository Cục Bộ Khách Hàng & Vị Trí (TASK: LOCAL-FIRST-03-LOCAL-REPOSITORY-CUSTOMER-LOCATION)
+
+### 17.1. Bối Cảnh & Mục Tiêu Nghiệp Vụ
+- Tiếp nối việc trừu tượng hóa Repository (Task 01) và thiết lập cơ sở dữ liệu SQLite `local_data_v1.db` (Task 02), Task 03 triển khai hoàn chỉnh tầng truy cập dữ liệu cục bộ cho hai nhóm cốt lõi: **Khách hàng** ([LocalCustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_customer_repository.dart)) và **Vị trí** ([LocalLocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_location_repository.dart)).
+- Giữ nguyên hợp đồng giao tiếp (Contract) của [CustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/customer_repository.dart) và [LocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/location_repository.dart) cùng các Data Model hiện hữu ([CustomerDirectoryModel](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/models/customer_model.dart), [MasterSavedLocationModel](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/models/master_saved_location_model.dart), [BulkCreateCustomersResult](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/models/customer_model.dart)).
+
+### 17.2. Các Quy Tắc Nghiệp Vụ Đã Cài Đặt & Xác Minh
+
+1. **Khách hàng ([LocalCustomerRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_customer_repository.dart)):**
+   - **Tạo khách chỉ cần SĐT:** Tự động chuẩn hóa bằng [phone_utils.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/utils/phone_utils.dart). Tên mặc định `"Khách [SĐT]"`, địa chỉ `"Chưa cập nhật địa chỉ"`.
+   - **Chống trùng SĐT:** Nếu SĐT đã có trong SQLite, trả về bản ghi khách hiện có với cờ `isExisting: true`, tuyệt đối không tạo trùng lặp.
+   - **Xóa mềm an toàn (`deleted_at`):** Từ chối xóa mềm (ném ngoại lệ nghiệp vụ) nếu khách hàng đang nằm trong ca có trạng thái `PREPARING` hoặc `IN_PROGRESS`.
+   - **Danh bạ & Tìm kiếm không dấu:** Hỗ trợ phân trang (`limit`, `offset`), tìm không phân biệt dấu/hoa/thường qua cột `search_text LIKE ?`, lọc theo `locationState` (`ALL`, `VERIFIED`, `TEMPORARY`, `NO_LOCATION`), trả về counts (`total`, `verified`, `temporary`, `noLocation`) và đối tượng `CustomerPaginationModel` hoàn toàn tương thích Remote.
+   - **Xác định trạng thái vị trí (`locationState`):**
+     * `VERIFIED`: Đã có bản ghi trong `saved_locations`.
+     * `TEMPORARY`: Chưa có `saved_locations` nhưng có điểm `TEMPORARY` trong ca `PREPARING`/`IN_PROGRESS`.
+     * `NO_LOCATION`: Các trường hợp còn lại. (Mô hình Local-First loại bỏ khái niệm "của shipper khác").
+   - **Thêm hàng loạt SĐT (`createBulkCustomers`):** Tách danh sách theo ký tự xuống dòng (`\n`, `\r\n`), dấu phẩy (`,`), dấu chấm phẩy (`;`), giữ nguyên khoảng trắng và dấu chấm bên trong số, chuẩn hóa bằng `parseAndNormalizeBulkPhones`, lọc trùng lặp, chặn tối đa 200 số. Toàn bộ lô chạy trong đúng **1 transaction duy nhất**, phân loại thành 3 nhóm: `created`, `alreadyExists`, `rejected` kèm lý do chi tiết. Ghi log vào `activity_log`.
+
+2. **Vị trí ([LocalLocationRepository](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/local/local_location_repository.dart)):**
+   - **Lưu/Cập nhật vị trí đã xác nhận:** Kiểm tra tọa độ hợp lệ (`latitude` trong `[-90, 90]`, `longitude` trong `[-180, 180]`). Thực thi trong transaction: khách đã có vị trí thì `UPDATE` (trigger SQLite tự sinh `location_history`), khách chưa có thì `INSERT` vào `saved_locations`.
+   - **Ghim vị trí mới gán cho SĐT bất kỳ:** Nếu SĐT chưa có trong CSDL, tự động tạo khách hàng (chỉ cần SĐT) và lưu vị trí trong **CÙNG 1 transaction**. Nếu lưu vị trí thất bại, giao dịch rollback toàn bộ, không bao giờ để lại bản ghi khách hàng mồ côi.
+   - **Xóa vị trí:** Bảo toàn 100% dữ liệu lịch sử trong `location_history` (`saved_location_id` tự động đặt về `NULL` theo khóa ngoại). Các điểm giao `VERIFIED` trong ca `PREPARING`/`IN_PROGRESS` của khách đó tự động chuyển về `NO_LOCATION` (tọa độ về `NULL`). Các điểm `TEMPORARY` giữ nguyên. Ghi `activity_log`.
+   - **Xác nhận vị trí qua luồng Danh bạ:** Đồng bộ tức thì các điểm giao trong ca đang mở của khách hàng đó từ `NO_LOCATION`/`TEMPORARY` sang `VERIFIED` theo tọa độ mới (theo quy tắc LOCATION-RULES-012). Ghi số điểm cập nhật vào `activity_log`.
+   - **Lịch sử vị trí:** Truy vấn `location_history` theo `customer_id` với thứ tự mới nhất trước (`created_at DESC`).
+   - **Dữ liệu bản đồ chính & Bounding Box:** Truy vấn toàn bộ điểm đã lưu `MasterSavedLocationModel` (tạm thời `photoCount = 0`, `photos = []` chờ bước Photos). Hỗ trợ lọc theo khung nhìn bản đồ (`getSavedLocationsInBounds`) qua điều kiện `BETWEEN minLat AND maxLat` và `BETWEEN minLng AND maxLng`.
+
+3. **Bỏ khái niệm khu vực (`areaId`):**
+   - Các phương thức liên quan khu vực trả về 1 khu vực ảo mặc định `"Của tôi"` (`local-area-default`) để giữ nguyên giao diện UI cũ không bị vỡ. Sẽ được dọn sạch ở Bước 6.
+
+4. **Công tắc chạy thử Local-First:**
+   - [RepositoryProvider.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/repositories/repository_provider.dart) bổ sung cờ `useLocalData` (mặc định `false`, giữ nguyên ứng dụng chạy như cũ).
+   - Đọc từ cờ biên dịch `--dart-define=LOCAL_DATA=true` hoặc gán `RepositoryProvider.useLocalData = true`.
+   - Khi bật: `customer` và `location` dùng Local SQLite, các nhóm ca/ảnh/chia sẻ/hồ sơ vẫn dùng Remote.
+   - Khi chạy chế độ Local, [main.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/main.dart) bỏ qua bước kiểm tra đăng nhập/token mạng, vào thẳng [HomeShellView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/home_shell_view.dart).
+
+### 17.3. Kết Quả Kiểm Thử Thực Tế (Evidence-Based Verification)
+
+- **Phân tích tĩnh & Lints:**
+  * Lệnh: `flutter analyze`
+  * Kết quả: **No issues found!** (ran in 2.6s)
+- **Kiểm thử tự động (In-Memory SQLite FFI, không dùng backend):**
+  * Lệnh: `flutter test test/local_first_customer_location_03_test.dart`
+  * Kết quả: **11/11 tests passed (100%)**:
+    1. Tạo khách hàng chỉ cần SĐT, kiểm tra chống trùng `isExisting: true`: **PASSED**.
+    2. Sửa thông tin khách hàng và xóa mềm an toàn (chặn khi có ca active): **PASSED**.
+    3. Phân trang Danh bạ, tìm kiếm không dấu và đếm counts: **PASSED**.
+    4. Trạng thái vị trí `locationState` đủ 3 trường hợp (VERIFIED, TEMPORARY, NO_LOCATION): **PASSED**.
+    5. Bulk thêm SĐT đa định dạng, lọc trùng, giới hạn 200 số trong 1 transaction: **PASSED**.
+    6. Lưu & Cập nhật vị trí đã xác nhận, kiểm tra tọa độ hợp lệ, trigger sinh lịch sử: **PASSED**.
+    7. Ghim vị trí cho SĐT mới trong 1 transaction (rollback không để khách mồ côi): **PASSED**.
+    8. Xóa vị trí bảo toàn lịch sử và hạ điểm VERIFIED trong ca về NO_LOCATION: **PASSED**.
+    9. Xác nhận vị trí từ Danh bạ nâng cấp điểm trong ca sang VERIFIED và ghi log: **PASSED**.
+    10. Lấy dữ liệu bản đồ chính MasterSavedLocationModel và lọc theo khung nhìn bbox: **PASSED**.
+    11. Tương thích dữ liệu UI: Fake vs Local cho ra cùng mô hình dữ liệu: **PASSED**.
+- **Toàn bộ bộ kiểm thử Mobile App:**
+  * Lệnh: `flutter test`
+  * Kết quả: **173/173 tests passed (100%)** (Toàn bộ 162 bài test cũ + 11 bài test mới).
+- **Biên dịch gói APK Debug:**
+  * Lệnh: `flutter build apk --debug`
+  * Kết quả: **Thành công (Built build\app\outputs\flutter-apk\app-debug.apk in 154.3s)**.
+- **Trạng Thái Kiểm Thử Thiết Bị Thực Tế:**
+  * **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
 
 
 

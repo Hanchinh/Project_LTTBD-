@@ -114,6 +114,9 @@ class FakeCustomerRepository implements CustomerRepository {
 
   @override
   Future<Map<String, dynamic>?> lookupCustomerLocationByPhone(String phoneNumber) async => null;
+
+  @override
+  Future<bool> deleteCustomer(String customerId) async => true;
 }
 
 void main() {

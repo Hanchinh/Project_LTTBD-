@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'repositories/repository_provider.dart';
 import 'services/api_service.dart';
 import 'views/home_shell_view.dart';
 import 'views/login_view.dart';
@@ -50,10 +51,11 @@ class _AuthSplashScreenState extends State<AuthSplashScreen> {
   }
 
   Future<void> _checkAuthState() async {
+    final isLocalMode = RepositoryProvider.useLocalData;
     final token = await ApiService.getToken();
     if (!mounted) return;
 
-    if (token != null && token.isNotEmpty) {
+    if (isLocalMode || (token != null && token.isNotEmpty)) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomeShellView()),
