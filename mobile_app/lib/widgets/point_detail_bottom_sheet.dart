@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/customer_photo_model.dart';
 import '../services/api_service.dart';
 import 'customer_photos_strip_widget.dart';
+import 'data_share_send_sheet.dart';
 import '../theme/app_buttons.dart';
 
 /// Thẻ chi tiết điểm giao / vị trí đã lưu thiết kế cho SHIPPER ĐI XE MỘT TAY (TASK: MULTI-PHOTO-AND-THUMB-UI-015A)
@@ -337,6 +338,21 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
                             ),
                           ),
                         ],
+                        const SizedBox(width: 6),
+                        IconButton(
+                          key: const Key('btn_quick_share_point'),
+                          icon: const Icon(Icons.share_outlined, color: Color(0xFF0F172A), size: 22),
+                          tooltip: 'Chia sẻ điểm này',
+                          padding: const EdgeInsets.all(8),
+                          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                          onPressed: () {
+                            DataShareSendSheet.show(
+                              context,
+                              initialCustomerIds: [widget.customerId],
+                              singleCustomerName: widget.customerName,
+                            );
+                          },
+                        ),
                       ],
                     ),
 

@@ -10,6 +10,7 @@ import 'package:delivery_marker_mobile/repositories/location_repository.dart';
 import 'package:delivery_marker_mobile/repositories/photo_repository.dart';
 import 'package:delivery_marker_mobile/repositories/profile_repository.dart';
 import 'package:delivery_marker_mobile/repositories/shift_repository.dart';
+import 'package:delivery_marker_mobile/repositories/local/local_sharing_repository.dart';
 import 'package:delivery_marker_mobile/repositories/remote/remote_customer_repository.dart';
 import 'package:delivery_marker_mobile/repositories/remote/remote_location_repository.dart';
 import 'package:delivery_marker_mobile/repositories/remote/remote_photo_repository.dart';
@@ -140,7 +141,7 @@ void main() {
       expect(RepositoryProvider.location, isA<LocationRepository>());
       expect(RepositoryProvider.photo, isA<PhotoRepository>());
       expect(RepositoryProvider.shift, isA<ShiftRepository>());
-      expect(RepositoryProvider.sharing, isA<RemoteSharingRepository>());
+      expect(RepositoryProvider.sharing, isA<LocalSharingRepository>());
       expect(RepositoryProvider.profile, isA<ProfileRepository>());
 
       // Chuyển sang Remote:

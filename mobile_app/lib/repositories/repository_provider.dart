@@ -14,6 +14,7 @@ import 'local/local_customer_repository.dart';
 import 'local/local_location_repository.dart';
 import 'local/local_photo_repository.dart';
 import 'local/local_profile_repository.dart';
+import 'local/local_sharing_repository.dart';
 import 'local/local_shift_repository.dart';
 
 /// Service locator & provider cho toàn bộ các Repository trong ứng dụng.
@@ -35,6 +36,7 @@ class RepositoryProvider {
     _locationRepository = null;
     _photoRepository = null;
     _shiftRepository = null;
+    _sharingRepository = null;
     _profileRepository = null;
   }
 
@@ -58,7 +60,13 @@ class RepositoryProvider {
       _shiftRepository ??= (useLocalData ? LocalShiftRepository() : RemoteShiftRepository());
 
   static SharingRepository get sharing =>
-      _sharingRepository ??= RemoteSharingRepository();
+      _sharingRepository ??= (useLocalData ? LocalSharingRepository() : RemoteSharingRepository());
+
+  static LocalSharingRepository get localSharing {
+    final s = sharing;
+    if (s is LocalSharingRepository) return s;
+    return LocalSharingRepository();
+  }
 
   static ProfileRepository get profile =>
       _profileRepository ??= (useLocalData ? LocalProfileRepository() : RemoteProfileRepository());

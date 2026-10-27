@@ -8,6 +8,7 @@ import '../widgets/authenticated_image.dart';
 import '../widgets/customer_photos_strip_widget.dart';
 import '../widgets/create_shift_dialog.dart';
 import '../widgets/bulk_paste_phone_sheet.dart';
+import '../widgets/data_share_send_sheet.dart';
 import '../theme/app_buttons.dart';
 import 'crosshair_location_picker_view.dart';
 
@@ -1016,6 +1017,22 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
           'Hồ sơ & Vị trí khách hàng',
           style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Color(0xFF0F172A)),
         ),
+        actions: [
+          IconButton(
+            key: const Key('btn_share_customer_detail'),
+            icon: const Icon(Icons.share_outlined, color: Color(0xFF0F172A)),
+            tooltip: 'Chia sẻ điểm này',
+            onPressed: () {
+              DataShareSendSheet.show(
+                context,
+                initialCustomerIds: [_customer.id],
+                singleCustomerName: _nameController.text.trim().isNotEmpty
+                    ? _nameController.text.trim()
+                    : _customer.fullName,
+              );
+            },
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(color: const Color(0xFFE2E8F0), height: 1),

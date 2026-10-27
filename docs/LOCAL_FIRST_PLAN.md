@@ -546,6 +546,87 @@ Khi kích hoạt `RepositoryProvider.useLocalData = true`:
    - Lưu thời điểm sao lưu thành công gần nhất vào `app_meta` (`last_backup_at`).
    - Nếu đã quá 14 ngày kể từ lần sao lưu gần nhất (và trong SQLite đã có dữ liệu khách hoặc vị trí), hiển thị thẻ nhắc nhở màu vàng nhẹ nhàng ở đầu tab "Cá nhân" kèm nút "Sao lưu ngay", hoàn toàn không làm phiền ở các màn hình tác nghiệp khác.
 
+---
+
+## 10. Triển Khai Chia Sẻ Dữ Liệu Ngang Hàng Bằng File & Mã QR (TASK: LOCAL-FIRST-07-SHARE-BY-FILE-AND-QR)
+
+### 10.1. Mô Hình Chia Sẻ Ngang Hàng (P2P Data Sharing Model)
+1. **Quyền Riêng Tư & Cảnh Báo Không Thể Thu Hồi (Irrevocable Disclosure):**
+   - Không qua máy chủ trung gian, dữ liệu được truyền thẳng giữa các thiết bị người dùng.
+   - Hiển thị dòng cảnh báo cố định và nổi bật trên giao diện gửi:
+     > *"Dữ liệu chứa số điện thoại và địa chỉ khách. Đã gửi thì không thu hồi được. Chỉ gửi cho người bạn tin tưởng."*
+2. **Phạm Vi Chia Sẻ Linh Hoạt (Export Scopes):**
+   - **Tất cả điểm đã lưu:** Toàn bộ điểm trong bảng `saved_locations`.
+   - **Một ca làm việc:** Các điểm thuộc ca giao hàng được lựa chọn từ danh sách ca.
+   - **Các điểm tôi chọn:** Cho phép tích chọn các điểm cụ thể.
+   - **Chia sẻ nhanh 1 điểm:** Nút bấm tiện lợi trên [PointDetailBottomSheet](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/point_detail_bottom_sheet.dart) và [CustomerDetailEditView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/views/customer_directory_view.dart).
+3. **Công Tắc Kiểm Soát Dữ Liệu (Privacy Toggles):**
+   - **"Kèm ảnh nhà":** Mặc định TẮT khi tạo mã QR (do giới hạn dung lượng QR), có thể BẬT khi xuất file `.dshare`. Sử dụng ảnh nén tối ưu (1600px).
+   - **"Kèm tên và địa chỉ khách":** Mặc định BẬT; cho phép người dùng TẮT để giảm thiểu thông tin cá nhân được chia sẻ theo nguyên tắc bảo vệ quyền riêng tư.
+4. **Cấu Trúc Điểm Chia Sẻ ([SharedPointPayload](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/models/local_share_models.dart)):**
+   - Chuẩn hóa số điện thoại theo chuẩn Việt Nam (`PhoneUtils.normalizeCustomerPhone`).
+   - Tên khách hàng, địa chỉ, tọa độ (vĩ độ, kinh độ, độ chính xác GPS), ghi chú giao hàng.
+   - Thông tin người gửi (`senderName` lấy từ `app_profile.display_name`), thời điểm tạo, phiên bản schema.
+   - **Bảo mật:** Triệt để KHÔNG xuất ID nội bộ SQLite, không chứa `activity_log`, không chứa `location_history`.
+
+---
+
+### 10.2. Định Dạng Gói Tin `.dshare` & Bảo Vệ Mật Mã
+1. **Định Dạng Gói Tin `.dshare`:**
+   - Bản chất là tệp nén ZIP gồm:
+     - `manifest.json`: Chứa metadata, số lượng điểm, số ảnh, cờ mã hóa, checksum SHA-256 của từng tệp.
+     - `points.json` (hoặc `points.enc` nếu được mã hóa): Danh sách các điểm chia sẻ.
+     - Thư mục `photos/`: Chứa các ảnh mặt tiền nhà đi kèm tương ứng.
+   - Chia sẻ qua Share Sheet hệ thống (`share_plus`) tới Zalo, Telegram, Google Drive, hoặc lưu vào bộ nhớ máy.
+2. **Mã Hóa Bằng Mật Khẩu Tùy Chọn ([ShareCryptoUtils](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/utils/share_crypto_utils.dart)):**
+   - Thuật toán chuẩn bảo mật AES-GCM 256-bit kết hợp Salt ngẫu nhiên 16 bytes.
+   - Dẫn xuất khóa mật mã từ mật khẩu qua PBKDF2 HMAC-SHA256 (10,000 vòng lặp).
+   - Cảnh báo người dùng minh bạch: *"Mất mật khẩu sẽ không thể mở và khôi phục nội dung gói chia sẻ."*
+
+---
+
+### 10.3. Chia Sẻ Bằng Chuỗi Mã QR Đa Mảnh (Multi-Chunk QR Codes)
+1. **Giới Hạn & Tối Ưu Nén Dữ Liệu:**
+   - Dành riêng cho gói dữ liệu nhỏ không kèm ảnh.
+   - Nén luồng dữ liệu bằng GZip + Base64Url để tối đa dung lượng tải trọng (payload density).
+   - Tự động chia nhỏ thành các mảnh (chunk) an toàn kích thước tối đa 1.2KB cho mỗi mã QR.
+   - Định dạng giao thức mảnh: `DSHARE:<chunk_index>:<total_chunks>:<checksum8>:<chunk_data>`.
+2. **Hiển Thị & Điều Hướng Mã QR ([DataShareQrView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/data_share_qr_view.dart)):**
+   - Render mã QR cỡ lớn độ tương phản cao bằng thư viện `qr_flutter`.
+   - Hiển thị thanh tiến trình mảnh ("Mã 1/N") kèm nút điều hướng chuyển mã kế tiếp/trước đó.
+   - Nhắc nhở người dùng tăng độ sáng màn hình điện thoại để bên nhận quét dễ dàng.
+3. **Quét & Tích Lũy Mảnh QR ([DataShareQrScannerView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/data_share_qr_scanner_view.dart)):**
+   - Sử dụng `mobile_scanner` với khung quét máy ảnh và yêu cầu quyền truy cập Camera rõ ràng.
+   - Bộ gom mảnh `QrChunkCollector` kiểm tra tính hợp lệ và checksum từng mảnh.
+   - Hiển thị số lượng mảnh đã quét và thông báo trực quan nếu còn thiếu mảnh. Tự động hoàn tất và chuyển sang màn hình xem trước ngay khi thu thập đủ 100% các mảnh.
+
+---
+
+### 10.4. Kiểm Duyệt An Toàn & Tiếp Nhận Dữ Liệu (Import & Preview)
+1. **Kiểm Soát An Toàn Tuyệt Đối (Security Checks):**
+   - **Giới hạn kích thước:** Từ chối tệp vượt quá 50MB hoặc danh sách vượt quá 2000 điểm.
+   - **Chống Path Traversal:** Tuyệt đối ngăn chặn giải nén tệp chứa `../` hoặc đường dẫn tuyệt đối ghi đè ra ngoài thư mục ứng dụng.
+   - **Kiểm tra phiên bản & đối soát checksum:** Kiểm tra phiên bản schema (từ chối tệp có phiên bản mới hơn app) và mã băm SHA-256.
+   - **Validate từng điểm:** Kiểm tra số điện thoại hợp lệ, tọa độ không gian nằm trong dải chuẩn `[-90..90, -180..180]`, độ dài chuỗi ký tự. Điểm lỗi bị cô lập và báo cáo chi tiết lý do, không làm gián đoạn toàn bộ gói.
+2. **Màn Hình Xem Trước Minh Bạch ([DataShareImportPreviewSheet](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/widgets/data_share_import_preview_sheet.dart)):**
+   - Tiêu đề thông tin: *"Từ [tên người gửi], N điểm, M ảnh"*.
+   - Phân loại trực quan từng điểm nhận được:
+     - 🟢 **MỚI:** Khách hàng chưa có trong danh bạ trên máy.
+     - 🟡 **TRÙNG SĐT (Chưa có vị trí):** Khách hàng đã có nhưng chưa lưu tọa độ định vị.
+     - 🟠 **TRÙNG SĐT (Đã có vị trí):** Khách hàng đã có tọa độ trên máy; tính và hiển thị khoảng cách địa lý chính xác giữa 2 tọa độ (ví dụ: `Cách vị trí hiện tại: 120m`).
+   - Cho phép người dùng tích chọn lọc từng điểm muốn nhận hoặc bỏ qua.
+3. **Chế Độ Tiếp Nhận Dữ Liệu:**
+   - **"Chỉ thêm điểm mới" (Mặc định):** Bỏ qua các điểm trùng SĐT đã có vị trí để tránh ghi đè âm thầm.
+   - **"Thay vị trí cũ bằng vị trí nhận được":** Có cảnh báo xác nhận. Tọa độ cũ tự động lưu vết vào `location_history` thông qua Trigger SQLite của CSDL, đảm bảo toàn vẹn kiểm toán.
+   - **Tùy chọn "Nhập thành một ca mới":** Tự động tạo ca mới mang tên `Từ [Người gửi] dd/MM` và gắn các điểm đã nhận vào ca ở trạng thái `VERIFIED`.
+4. **An Toàn Giao Dịch & Kiểm Toán:**
+   - Thực thi toàn bộ quá trình nhập trong một Transaction SQLite duy nhất; nếu lỗi giữa chừng, toàn bộ giao dịch được hoàn nguyên (Rollback) và dọn sạch các file ảnh vừa giải nén tạm.
+   - Ghi hoạt động vào `activity_log` với số lượng bản ghi đã thêm / thay thế / bỏ qua (TUYỆT ĐỐI không ghi số điện thoại hay địa chỉ khách).
+5. **Giao Diện & Tích Hợp Hệ Điều Hành:**
+   - Khối "Chia sẻ dữ liệu" trong Tab "Cá nhân" với 2 nút lớn: "GỬI DỮ LIỆU" và "NHẬN DỮ LIỆU".
+   - Khai báo `<intent-filter>` trong `AndroidManifest.xml` hỗ trợ mở trực tiếp tệp `.dshare`.
+
+
 
 
 
