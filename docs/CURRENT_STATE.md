@@ -623,3 +623,30 @@ Tất cả các màn hình, sheet và widget nghiệp vụ trong `mobile_app/lib
 
 
 
+
+---
+
+## 21. Lột Xác Thiết Kế Thực Địa & Diệt AI Slop (Task IMPECCABLE-BOLDER-018)
+
+### 21.1. Các Cải Tiến Thiết Kế Công Thái Học Thực Địa (Industrial Ergonomics)
+1. **Triệt tiêu Anti-Patterns & AI Slop:**
+   - Xóa bỏ toàn bộ các ô vuông bo góc màu pastel bao bọc icon (`rounded-square pastel icon tiles`) trên màn Cá nhân, Ca làm việc, Danh bạ. Icon được hiển thị trực tiếp với màu nhấn rõ ràng (`accent colors`).
+   - Đập bỏ cấu trúc card bo tròn 16dp tù túng lồng nhau; chuyển sang bố cục phẳng ngăn cách bằng khoảng trắng (whitespace), tiêu đề nhóm chữ in hoa kỹ thuật (`11sp, FontWeight.w800, letterSpacing: 1.2`) và đường hairline 1px.
+   - Áp dụng `FontFeature.tabularFigures()` cho toàn bộ con số thống kê, số điện thoại, số điểm giao, mã ca làm việc, ngày tháng và tọa độ địa lý để hiển thị thẳng hàng, chính xác như thiết bị đo đạc thực địa.
+2. **Tab Cá Nhân (Profile):**
+   - Khối thống kê: Chuyển đổi thành dải đo lường thực địa liền mạch (Telemetry Strip) 3 cột ngăn cách bằng `VerticalDivider` 1px, số hiển thị cực đại 28sp `FontWeight.w900` với tabular figures.
+   - Khối chức năng: Thiết kế thành các hàng điều khiển phẳng sắc gọn (`Control Rows`), bọc trong `Material` chuẩn tránh lỗi assertion hiển thị.
+3. **Tab Ca Làm Việc (Shifts):**
+   - Thẻ ca làm việc biến thành phiếu điều vận thực địa ("Dispatch Tickets") với vạch chỉ thị trạng thái 4dp ở cạnh trái (Vàng amber: đang chuẩn bị, Xanh dương: đang thực hiện, Xanh lá: hoàn tất, Đỏ: đã hủy).
+   - Phân cấp 2 dòng rõ ràng: Dòng 1 tiêu đề ca (15sp Bold), Dòng 2 mã ca + ngày tháng + huy hiệu trạng thái kỹ thuật (hairline border, tabular figures).
+   - Thẻ ca đang thực hiện (`ShiftInProgressCard`): Giữ nguyên tiến độ, tóm tắt và 2 nút hành động bản lớn 48dp.
+4. **Tab Danh Bạ (Directory):**
+   - Thanh lọc chuyển thành thanh tab xúc giác kỹ thuật ("Tactile Segmented Tabs") với góc bo 8dp, chiều cao 38dp, trạng thái chọn có độ tương phản cao, số lượng hiển thị với `FontFeature.tabularFigures()`.
+   - Dòng khách hàng (`CustomerListItemWidget`): Nhấn mạnh số điện thoại 15sp `FontWeight.w800` với tabular figures, nút "+" bo vuông kỹ thuật 40x40dp chuẩn công thái học thực địa.
+   - Ô tìm kiếm và bộ đếm tổng số: Bo góc 10dp, viền hairline 1px, huy hiệu đếm tabular figures.
+
+### 21.2. Bằng Chứng Kiểm Thử & Kiểm Soát Mã Nguồn
+- **Phân tích tĩnh:** `flutter analyze` $\to$ **No issues found!** (0 errors, 0 warnings, 0 infos).
+- **Kiểm thử tự động:** `flutter test` $\to$ **182/182 tests passed!** (100% 26 test suites xanh).
+- **Kiểm soát dung lượng file:** 100% các tệp trong `mobile_app/lib/` đều $\le 350$ dòng code.
+- **Git Commit:** `203d706` trên nhánh `ui-redesign`.
