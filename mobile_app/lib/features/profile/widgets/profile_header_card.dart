@@ -112,13 +112,17 @@ class ProfileHeaderCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text(
-                        'Chế độ Local-First (Dữ liệu trên máy)',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF16A34A),
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.2,
+                      const Expanded(
+                        child: Text(
+                          'Chế độ Local-First (Dữ liệu trên máy)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF16A34A),
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],

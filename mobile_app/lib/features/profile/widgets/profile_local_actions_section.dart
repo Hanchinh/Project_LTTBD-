@@ -133,10 +133,19 @@ class ProfileLocalActionsSection extends StatelessWidget {
                       height: 48,
                       child: ElevatedButton.icon(
                         key: const Key('profile_btn_send_share'),
-                        style: AppButtons.primary(minHeight: 48, borderRadius: 10),
+                        style: AppButtons.primary(
+                          minHeight: 48,
+                          borderRadius: 10,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                        ),
                         onPressed: () => DataShareSendSheet.show(context),
                         icon: const Icon(Icons.upload_rounded, size: 18),
-                        label: const Text('GỬI DỮ LIỆU'),
+                        label: const Text(
+                          'GỬI DỮ LIỆU',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
                   ),
@@ -146,13 +155,22 @@ class ProfileLocalActionsSection extends StatelessWidget {
                       height: 48,
                       child: OutlinedButton.icon(
                         key: const Key('profile_btn_receive_share'),
-                        style: AppButtons.secondary(minHeight: 48, borderRadius: 10),
+                        style: AppButtons.secondary(
+                          minHeight: 48,
+                          borderRadius: 10,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                        ),
                         onPressed: () => ReceiveShareModal.show(
                           context: context,
                           onImportSuccess: onDataReload,
                         ),
                         icon: const Icon(Icons.download_rounded, size: 18),
-                        label: const Text('NHẬN DỮ LIỆU'),
+                        label: const Text(
+                          'NHẬN DỮ LIỆU',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
                   ),
