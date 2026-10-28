@@ -80,3 +80,13 @@ admin_web/
 backend/
 node_modules/
 dist/
+
+
+
+# impeccable-start
+**/.impeccable/config.local.json
+**/.impeccable/hook.cache.json
+**/.impeccable/*.png
+**/.impeccable/live/**
+**/.impeccable/questions/**
+# impeccable-end
