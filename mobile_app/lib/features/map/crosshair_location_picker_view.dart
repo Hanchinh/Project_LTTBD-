@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -156,22 +157,22 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF8FAFC),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)), tooltip: 'Quay lại', onPressed: () => Navigator.pop(context)),
+        leading: IconButton(icon: Icon(Icons.arrow_back_rounded, color: Theme.of(context).colorScheme.onSurface), tooltip: 'Quay lại', onPressed: () => Navigator.pop(context)),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Chọn vị trí bằng tâm ngắm', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-            Text('Khách: ${widget.point.customerName}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)), overflow: TextOverflow.ellipsis),
+            Text('Chọn vị trí bằng tâm ngắm', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface)),
+            Text('Khách: ${widget.point.customerName}', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
           ],
         ),
-        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1, color: Color(0xFFE2E8F0))),
+        bottom: PreferredSize(preferredSize: const Size.fromHeight(1), child: Divider(height: 1, color: Theme.of(context).dividerTheme.color ?? const Color(0xFFE2E8F0))),
         actions: [
           IconButton(
             tooltip: 'Hướng dẫn',
-            icon: const Icon(Icons.help_outline_rounded, color: Color(0xFF475569)),
+            icon: Icon(Icons.help_outline_rounded, color: Theme.of(context).colorScheme.onSurfaceVariant),
             onPressed: () => showDialog(
               context: context,
               builder: (ctx) => AlertDialog(
@@ -197,8 +198,11 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
                   maxZoom: 19.0,
                   minZoom: 10.0,
                   onMapReady: () => _isMapReady = true,
-                  onPositionChanged: (pos, _) {
-                    if (pos.center != null) setState(() => _currentCrosshairCenter = pos.center!);
+                  onPositionChanged: (pos, hasGesture) {
+                    if (pos.center != null) {
+                      if (hasGesture) HapticFeedback.selectionClick();
+                      setState(() => _currentCrosshairCenter = pos.center!);
+                    }
                   },
                 ),
                 children: [
@@ -250,6 +254,7 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
               isSaving: _isSaving,
               onCancel: () => Navigator.pop(context),
               onConfirm: () {
+                HapticFeedback.mediumImpact();
                 if (widget.shiftId.isNotEmpty) {
                   _saveTemporaryLocation();
                 } else {

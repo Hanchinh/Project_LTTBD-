@@ -21,13 +21,17 @@ class CustomerDetailLocationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final hasLocation = latitude != null && longitude != null;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0),
+        ),
         boxShadow: const [
           BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
         ],
@@ -36,9 +40,9 @@ class CustomerDetailLocationCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'TỌA ĐỘ & GHI CHÚ VỊ TRÍ',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colorScheme.onSurface),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -51,10 +55,10 @@ class CustomerDetailLocationCard extends StatelessWidget {
                 OutlinedButton.icon(
                   key: const Key('btn_delete_customer_location'),
                   style: AppButtons.secondary(minHeight: 48, borderRadius: 8),
-                  icon: const Icon(Icons.delete_outline_rounded, size: 16, color: Color(0xFF0F172A)),
-                  label: const Text(
+                  icon: Icon(Icons.delete_outline_rounded, size: 16, color: colorScheme.onSurface),
+                  label: Text(
                     'Xóa vị trí',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
                   ),
                   onPressed: isSaving ? null : onDeleteLocation,
                 ),
@@ -72,7 +76,7 @@ class CustomerDetailLocationCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -82,7 +86,7 @@ class CustomerDetailLocationCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Tọa độ: ${latitude!.toStringAsFixed(6)}, ${longitude!.toStringAsFixed(6)}',
-                      style: const TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                      style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -114,7 +118,7 @@ class CustomerDetailLocationCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          const Text('GHI CHÚ NHẬN DIỆN (ĐẶC ĐIỂM CỔNG/CỬA)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+          Text('GHI CHÚ NHẬN DIỆN (ĐẶC ĐIỂM CỔNG/CỬA)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
           const SizedBox(height: 6),
           TextField(
             controller: notesController,
@@ -122,10 +126,10 @@ class CustomerDetailLocationCard extends StatelessWidget {
             decoration: InputDecoration(
               hintText: 'Ví dụ: Cổng sắt màu xanh, hẻm cụt, chuông cửa bên phải...',
               filled: true,
-              fillColor: const Color(0xFFF8FAFC),
+              fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.dividerTheme.color ?? const Color(0xFFCBD5E1))),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.dividerTheme.color ?? const Color(0xFFCBD5E1))),
             ),
           ),
         ],
@@ -133,4 +137,3 @@ class CustomerDetailLocationCard extends StatelessWidget {
     );
   }
 }
-

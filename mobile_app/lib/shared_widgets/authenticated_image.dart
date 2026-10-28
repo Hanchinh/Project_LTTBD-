@@ -12,6 +12,8 @@ class AuthenticatedImage extends StatelessWidget {
   final int? cacheVersion;
   final bool bustCache;
   final BorderRadius? borderRadius;
+  final int? cacheWidth;
+  final int? cacheHeight;
 
   const AuthenticatedImage({
     super.key,
@@ -24,6 +26,8 @@ class AuthenticatedImage extends StatelessWidget {
     this.cacheVersion,
     this.bustCache = false,
     this.borderRadius,
+    this.cacheWidth,
+    this.cacheHeight,
   });
 
   @override
@@ -74,8 +78,8 @@ class AuthenticatedImage extends StatelessWidget {
             width: width,
             height: height,
             fit: fit,
-            cacheWidth: width != null && width! > 0 ? (width! * 2).toInt() : null,
-            cacheHeight: height != null && height! > 0 ? (height! * 2).toInt() : null,
+            cacheWidth: cacheWidth ?? (width != null && width! > 0 ? (width! * 2).toInt() : null),
+            cacheHeight: cacheHeight ?? (height != null && height! > 0 ? (height! * 2).toInt() : null),
             errorBuilder: (context, error, stackTrace) {
               return errorWidget ??
                   Container(

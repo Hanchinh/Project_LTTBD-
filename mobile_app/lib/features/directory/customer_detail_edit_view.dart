@@ -136,23 +136,40 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)), tooltip: 'Quay lại', onPressed: () => Navigator.pop(context)),
-        title: const Text('Hồ sơ & Vị trí khách hàng', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Color(0xFF0F172A))),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_rounded, color: colorScheme.onSurface),
+          tooltip: 'Quay lại',
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Hồ sơ & Vị trí khách hàng',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: colorScheme.onSurface),
+        ),
         actions: [
           IconButton(
             key: const Key('btn_share_customer_detail'),
-            icon: const Icon(Icons.share_outlined, color: Color(0xFF0F172A)),
+            icon: Icon(Icons.share_outlined, color: colorScheme.onSurface),
             tooltip: 'Chia sẻ điểm này',
-            onPressed: () => DataShareSendSheet.show(context, initialCustomerIds: [_customer.id], singleCustomerName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : _customer.fullName),
+            onPressed: () => DataShareSendSheet.show(
+              context,
+              initialCustomerIds: [_customer.id],
+              singleCustomerName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : _customer.fullName,
+            ),
           ),
         ],
-        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1, color: Color(0xFFE2E8F0))),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0)),
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -160,7 +177,11 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Container(
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0)),
+              ),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,9 +189,23 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
                   Row(children: [
                     const Icon(Icons.photo_camera_rounded, size: 20, color: Color(0xFF2563EB)),
                     const SizedBox(width: 8),
-                    const Expanded(child: Text('Ảnh mặt tiền / cổng nhà', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    Expanded(
+                      child: Text(
+                        'Ảnh mặt tiền / cổng nhà',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: colorScheme.onSurface),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Flexible(child: Text('Tối đa 10 ảnh', style: TextStyle(fontSize: 12, color: Colors.grey.shade500), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    Flexible(
+                      child: Text(
+                        'Tối đa 10 ảnh',
+                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ]),
                   const SizedBox(height: 12),
                   CustomerPhotosStripWidget(
@@ -194,24 +229,28 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
             ),
             const SizedBox(height: 14),
             Container(
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0)),
+              ),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('THÔNG TIN LIÊN HỆ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                  Text('THÔNG TIN LIÊN HỆ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
                   const SizedBox(height: 12),
-                  const Text('TÊN KHÁCH HÀNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                  Text('TÊN KHÁCH HÀNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 6),
-                  TextField(controller: _nameController, decoration: _inputDeco()),
+                  TextField(controller: _nameController, decoration: _inputDeco(context)),
                   const SizedBox(height: 12),
-                  const Text('SỐ ĐIỆN THOẠI *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                  Text('SỐ ĐIỆN THOẠI *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 6),
-                  TextField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: _inputDeco()),
+                  TextField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: _inputDeco(context)),
                   const SizedBox(height: 12),
-                  const Text('ĐỊA CHỈ KHÁCH HÀNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
+                  Text('ĐỊA CHỈ KHÁCH HÀNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 6),
-                  TextField(controller: _addressController, maxLines: 2, decoration: _inputDeco()),
+                  TextField(controller: _addressController, maxLines: 2, decoration: _inputDeco(context)),
                 ],
               ),
             ),
@@ -229,9 +268,19 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                icon: _isSaving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save_rounded, size: 20),
-                label: Text(_isSaving ? 'ĐANG LƯU HỒ SƠ...' : 'LƯU TẤT CẢ THAY ĐỔI', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: _isSaving
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.save_rounded, size: 20),
+                label: Text(
+                  _isSaving ? 'ĐANG LƯU HỒ SƠ...' : 'LƯU TẤT CẢ THAY ĐỔI',
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
                 onPressed: _isSaving ? null : _handleSave,
               ),
             ),
@@ -242,11 +291,21 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
     );
   }
 
-  InputDecoration _inputDeco() => InputDecoration(
-    filled: true,
-    fillColor: const Color(0xFFF8FAFC),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-  );
+  InputDecoration _inputDeco(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return InputDecoration(
+      filled: true,
+      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: theme.dividerTheme.color ?? const Color(0xFFCBD5E1)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: theme.dividerTheme.color ?? const Color(0xFFCBD5E1)),
+      ),
+    );
+  }
 }

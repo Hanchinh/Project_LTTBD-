@@ -479,3 +479,27 @@ Táº¥t cáº£ cÃ¡c mÃ n hÃ¬nh, sheet vÃ  widget nghiá»‡p vá»¥ trong `mobile_app/lib
 
 
 
+
+---
+
+## 20. Hoàn Thi?n Tinh Ch?nh Giao Di?n (Task UI-REFINEMENT-POLISH-FINAL-015)
+
+### 20.1. Các H?ng M?c Ðã X? Lý
+1. **T?i uu RAM Thumbnail ?nh (P2 - Performance):**
+   - B? sung cacheWidth và cacheHeight vào authenticated_image.dart.
+   - Truy?n cacheWidth: 300 trong photo_strip_item.dart và cacheWidth: 150 trong customer_list_item.dart.
+2. **Thích ?ng Tablet Màn Hình R?ng (P2 - Adaptivity):**
+   - Trong home_shell_view.dart: T? d?ng phát hi?n màn hình r?ng (width >= 600dp). Chuy?n sang thanh di?u hu?ng d?c NavigationRail ? c?nh trái k?t h?p VerticalDivider, ?n bottomNavigationBar.
+3. **Ð?ng B? Màu B? M?t Card (P2 - Theming):**
+   - Rà soát và lo?i b? các mã màu c?ng (Colors.white) trong point_detail_bottom_sheet.dart, customer_list_item.dart, customer_detail_edit_view.dart, customer_detail_location_card.dart, và crosshair_bottom_panel.dart.
+   - Áp d?ng các token chu?n Material 3: colorScheme.surface, onSurface, onSurfaceVariant, surfaceContainerHighest.
+4. **Ph?n H?i Rung Haptic (P3 - Delight):**
+   - Trong crosshair_location_picker_view.dart: B? sung HapticFeedback.selectionClick() khi di chuy?n tâm ng?m và HapticFeedback.mediumImpact() khi xác nh?n ghim v? trí.
+5. **Typography & Material Elevation (P3):**
+   - Nâng c? ch? ghi chú trong point_detail_bottom_sheet.dart lên fontSize: 14.
+   - Chuy?n bóng d? tùy ch?nh sang Material(elevation: 8).
+
+### 20.2. B?ng Ch?ng Ki?m Th?
+- flutter analyze: No issues found!
+- flutter test: 182/182 tests passed! (100% test suites).
+- Gi?i h?n dòng: T?t c? các file trong lib/ d?u <= 350 dòng (dài nh?t là point_detail_bottom_sheet.dart v?i 342 dòng).

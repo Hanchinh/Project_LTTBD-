@@ -18,6 +18,9 @@ class CustomerListItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     Color dotColor;
     switch (customer.locationState) {
       case LocationStatus.verified:
@@ -32,10 +35,13 @@ class CustomerListItemWidget extends StatelessWidget {
     }
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
         border: Border(
-          bottom: BorderSide(color: Color(0xFFF1F5F9), width: 1),
+          bottom: BorderSide(
+            color: theme.dividerTheme.color ?? const Color(0xFFF1F5F9),
+            width: 1,
+          ),
         ),
       ),
       child: Material(
@@ -54,9 +60,11 @@ class CustomerListItemWidget extends StatelessWidget {
                       width: 48,
                       height: 48,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
+                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                          color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0),
+                        ),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
@@ -64,6 +72,7 @@ class CustomerListItemWidget extends StatelessWidget {
                             ? AuthenticatedImage(
                                 photoUrl: customer.effectivePhotoUrl,
                                 fit: BoxFit.cover,
+                                cacheWidth: 150,
                                 errorWidget: const Icon(Icons.photo_camera_outlined, color: Color(0xFF94A3B8), size: 22),
                               )
                             : const Center(
@@ -80,7 +89,7 @@ class CustomerListItemWidget extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: dotColor,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: colorScheme.surface, width: 2),
                         ),
                       ),
                     ),
@@ -95,10 +104,10 @@ class CustomerListItemWidget extends StatelessWidget {
                     children: [
                       Text(
                         '${customer.formattedPhoneNumber} · ${customer.fullName}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
+                          color: colorScheme.onSurface,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -106,9 +115,9 @@ class CustomerListItemWidget extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         customer.addressText.isNotEmpty ? customer.addressText : 'Chưa có địa chỉ',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Color(0xFF64748B),
+                          color: colorScheme.onSurfaceVariant,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -122,19 +131,24 @@ class CustomerListItemWidget extends StatelessWidget {
                 SizedBox(
                   width: 48,
                   height: 48,
-                  child: Center(
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(8),
-                      onTap: () => onAddToShift(customer),
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                  child: Tooltip(
+                    message: 'Thêm vào ca',
+                    child: Center(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () => onAddToShift(customer),
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: theme.dividerTheme.color ?? const Color(0xFFCBD5E1),
+                            ),
+                          ),
+                          child: Icon(Icons.add_rounded, size: 20, color: colorScheme.onSurface),
                         ),
-                        child: const Icon(Icons.add_rounded, size: 20, color: Color(0xFF0F172A)),
                       ),
                     ),
                   ),

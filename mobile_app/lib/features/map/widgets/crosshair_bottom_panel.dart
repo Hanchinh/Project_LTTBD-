@@ -23,6 +23,9 @@ class CrosshairBottomPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     Color badgeBg;
     Color badgeText;
     IconData badgeIcon;
@@ -47,11 +50,15 @@ class CrosshairBottomPanel extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
-        boxShadow: [
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border(
+          top: BorderSide(
+            color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0),
+          ),
+        ),
+        boxShadow: const [
           BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2)),
         ],
       ),
@@ -100,14 +107,14 @@ class CrosshairBottomPanel extends StatelessWidget {
                     children: [
                       Text(
                         point.customerName,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: colorScheme.onSurface),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 2),
                       Text(
                         point.customerAddress,
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                        style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -145,26 +152,28 @@ class CrosshairBottomPanel extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(
+                  color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0),
+                ),
               ),
               child: Row(
                 children: [
                   const Icon(Icons.gps_fixed_rounded, size: 16, color: Color(0xFFEF4444)),
                   const SizedBox(width: 6),
-                  const Text(
+                  Text(
                     'Tọa độ tâm ngắm: ',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: colorScheme.onSurfaceVariant),
                   ),
                   Expanded(
                     child: Text(
                       '${currentCrosshairCenter.latitude.toStringAsFixed(6)}, ${currentCrosshairCenter.longitude.toStringAsFixed(6)}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontFamily: 'monospace',
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
+                        color: colorScheme.onSurface,
                       ),
                     ),
                   ),

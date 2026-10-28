@@ -156,6 +156,10 @@ void main() {
 
   group('MAP-FIRST-ARCHITECTURE-005: HomeShellView Widget Structure Tests', () {
     testWidgets('HomeShellView renders 3 main navigation destinations: Bản đồ, Danh bạ, Ca làm việc', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
         const MaterialApp(
           home: HomeShellView(initialTab: 0),

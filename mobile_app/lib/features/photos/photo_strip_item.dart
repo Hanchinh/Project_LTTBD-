@@ -53,6 +53,7 @@ class PhotoStripItem extends StatelessWidget {
               },
               onLongPress: allowDelete ? onDelete : null,
               child: AuthenticatedImage(
+                cacheWidth: 300,
                 photoUrl: photo.imageUrl,
                 fit: BoxFit.cover,
                 errorWidget: Container(
