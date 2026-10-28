@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 
 class PointDetailActionButtons extends StatelessWidget {
@@ -28,7 +29,10 @@ class PointDetailActionButtons extends StatelessWidget {
                 borderRadius: 14,
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               ),
-              onPressed: onCall,
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onCall();
+              },
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -58,7 +62,10 @@ class PointDetailActionButtons extends StatelessWidget {
                 borderRadius: 14,
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               ),
-              onPressed: onDirections,
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onDirections();
+              },
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -90,7 +97,12 @@ class PointDetailActionButtons extends StatelessWidget {
                 borderRadius: 14,
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               ),
-              onPressed: onRepin,
+              onPressed: onRepin == null
+                  ? null
+                  : () {
+                      HapticFeedback.lightImpact();
+                      onRepin!();
+                    },
               child: const Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,

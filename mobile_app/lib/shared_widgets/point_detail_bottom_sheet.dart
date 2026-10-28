@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 import 'package:delivery_marker_mobile/core/utils/map_navigation_helper.dart';
@@ -6,7 +7,7 @@ import 'package:delivery_marker_mobile/features/photos/customer_photos_strip_wid
 import 'package:delivery_marker_mobile/features/sharing/data_share_send_sheet.dart';
 import 'package:delivery_marker_mobile/shared_widgets/point_detail/point_detail_action_buttons.dart';
 
-/// Thẻ chi tiết điểm giao / vị trí đã lưu thiết kế cho Shipper một tay
+/// Thẻ chi tiết điểm giao / vị trí đã lưu thiết kế công thái học cho Shipper
 class PointDetailBottomSheet extends StatefulWidget {
   final String customerId, customerName, customerPhone, customerAddress;
   final String? locationStatusText, identificationNotes, legacyImageUrl;
@@ -19,26 +20,11 @@ class PointDetailBottomSheet extends StatefulWidget {
   final ScrollController? scrollController;
 
   const PointDetailBottomSheet({
-    super.key,
-    required this.customerId,
-    required this.customerName,
-    required this.customerPhone,
-    this.customerAddress = '',
-    this.locationStatusText,
-    this.statusBadgeBg,
-    this.statusBadgeTextColor,
-    this.statusBadgeIcon,
-    this.identificationNotes,
-    this.latitude,
-    this.longitude,
-    this.initialPhotos = const [],
-    this.legacyImageUrl,
-    this.onCall,
-    this.onDirections,
-    this.onRepin,
-    this.onPhotosUpdated,
-    this.onClose,
-    this.scrollController,
+    super.key, required this.customerId, required this.customerName, required this.customerPhone,
+    this.customerAddress = '', this.locationStatusText, this.statusBadgeBg, this.statusBadgeTextColor,
+    this.statusBadgeIcon, this.identificationNotes, this.latitude, this.longitude,
+    this.initialPhotos = const [], this.legacyImageUrl, this.onCall, this.onDirections,
+    this.onRepin, this.onPhotosUpdated, this.onClose, this.scrollController,
   });
 
   static Future<void> show(
@@ -110,6 +96,7 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
   }
 
   Future<void> _makePhoneCall() async {
+    HapticFeedback.lightImpact();
     if (widget.onCall != null) return widget.onCall!();
     final clean = widget.customerPhone.replaceAll(RegExp(r'\D'), '');
     if (clean.isEmpty) return;
@@ -118,6 +105,7 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
   }
 
   Future<void> _openNavigation() async {
+    HapticFeedback.lightImpact();
     if (widget.onDirections != null) return widget.onDirections!();
     if (widget.latitude != null && widget.longitude != null) {
       await MapNavigationHelper.openExternalNavigation(widget.latitude!, widget.longitude!);
@@ -128,12 +116,13 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
     final h = media.size.height;
     final isShort = h < 480;
     final curH = _isExpanded
         ? (h * 0.85).clamp(isShort ? h * 0.85 : 450.0, 750.0)
-        : (h * 0.46).clamp(isShort ? h * 0.58 : 365.0, isShort ? h * 0.92 : 480.0);
+        : (h * 0.48).clamp(isShort ? h * 0.58 : 385.0, isShort ? h * 0.92 : 500.0);
 
     return Material(
       elevation: 8,
@@ -149,6 +138,7 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
           top: false,
           child: Column(
             children: [
+              // Thanh kéo mở rộng và Nút đóng
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onVerticalDragEnd: (d) {
@@ -159,20 +149,16 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
                     setState(() => _isExpanded = true);
                   }
                 },
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(16, 6, 12, 4),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 12, 2),
                   child: Row(
                     children: [
                       const SizedBox(width: 48),
                       Expanded(
                         child: Center(
                           child: Container(
-                            width: 44,
-                            height: 5,
-                            decoration: BoxDecoration(
-                              color: theme.dividerTheme.color ?? const Color(0xFFCBD5E1),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
+                            width: 44, height: 5,
+                            decoration: BoxDecoration(color: theme.dividerTheme.color ?? const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(3)),
                           ),
                         ),
                       ),
@@ -188,14 +174,8 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
                               borderRadius: BorderRadius.circular(24),
                               onTap: widget.onClose,
                               child: Container(
-                                width: 48,
-                                height: 48,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0)),
-                                ),
+                                width: 48, height: 48, alignment: Alignment.center,
+                                decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5), shape: BoxShape.circle),
                                 child: Icon(Icons.close_rounded, size: 24, color: colorScheme.onSurface),
                               ),
                             ),
@@ -206,6 +186,8 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
                   ),
                 ),
               ),
+
+              // Nội dung chi tiết
               Expanded(
                 child: NotificationListener<ScrollNotification>(
                   onNotification: (n) {
@@ -216,82 +198,72 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
                   },
                   child: SingleChildScrollView(
                     controller: widget.scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Dải ảnh mặt tiền mốc nhà
                         CustomerPhotosStripWidget(
                           key: const ValueKey('point_detail_photo_area'),
-                          customerId: widget.customerId,
-                          customerName: widget.customerName,
-                          initialPhotos: _photos,
-                          legacyImageUrl: widget.legacyImageUrl,
-                          onPhotosUpdated: (u) {
-                            setState(() => _photos = u);
-                            widget.onPhotosUpdated?.call(u);
-                          },
+                          customerId: widget.customerId, customerName: widget.customerName,
+                          initialPhotos: _photos, legacyImageUrl: widget.legacyImageUrl,
+                          onPhotosUpdated: (u) { setState(() => _photos = u); widget.onPhotosUpdated?.call(u); },
                         ),
                         const SizedBox(height: 8),
+
+                        // Tên khách hàng, Trạng thái & Nút chia sẻ nhanh
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Expanded(
                               child: Text(
                                 widget.customerName.isNotEmpty ? widget.customerName : 'Khách hàng',
-                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: colorScheme.onSurface, letterSpacing: -0.3),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: colorScheme.onSurface, letterSpacing: -0.3),
+                                maxLines: 2, overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (widget.locationStatusText != null) ...[
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: widget.statusBadgeBg ?? const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
+                                decoration: BoxDecoration(color: widget.statusBadgeBg ?? const Color(0xFFDCFCE7), borderRadius: BorderRadius.circular(6)),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(widget.statusBadgeIcon ?? Icons.check_circle_rounded, color: widget.statusBadgeTextColor ?? const Color(0xFF15803D), size: 14),
                                     const SizedBox(width: 4),
-                                    Text(
-                                      widget.locationStatusText!,
-                                      style: TextStyle(color: widget.statusBadgeTextColor ?? const Color(0xFF15803D), fontSize: 11, fontWeight: FontWeight.bold),
-                                    ),
+                                    Text(widget.locationStatusText!, style: TextStyle(color: widget.statusBadgeTextColor ?? const Color(0xFF15803D), fontSize: 11, fontWeight: FontWeight.bold)),
                                   ],
                                 ),
                               ),
                             ],
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 4),
                             IconButton(
                               key: const Key('btn_quick_share_point'),
                               icon: Icon(Icons.share_outlined, color: colorScheme.onSurface, size: 22),
                               tooltip: 'Chia sẻ điểm này',
                               padding: const EdgeInsets.all(8),
                               constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                              onPressed: () => DataShareSendSheet.show(
-                                context,
-                                initialCustomerIds: [widget.customerId],
-                                singleCustomerName: widget.customerName,
-                              ),
+                              onPressed: () => DataShareSendSheet.show(context, initialCustomerIds: [widget.customerId], singleCustomerName: widget.customerName),
                             ),
                           ],
                         ),
                         const SizedBox(height: 2),
+
+                        // Số điện thoại liên hệ (Nhấn gọi ngay)
                         GestureDetector(
                           onTap: _makePhoneCall,
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.phone_rounded, color: colorScheme.primary, size: 18),
                               const SizedBox(width: 6),
-                              Text(
-                                widget.customerPhone,
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: colorScheme.primary, decoration: TextDecoration.underline),
-                              ),
+                              Text(widget.customerPhone, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: colorScheme.primary, letterSpacing: 0.3)),
                             ],
                           ),
                         ),
+
+                        // Địa chỉ hành chính (Hiển thị trực tiếp)
                         if (widget.customerAddress.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Row(
@@ -300,32 +272,52 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
                               Icon(Icons.location_on_outlined, color: colorScheme.onSurfaceVariant, size: 16),
                               const SizedBox(width: 4),
                               Expanded(
-                                child: Text(widget.customerAddress, style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                child: Text(widget.customerAddress, style: TextStyle(fontSize: 13, height: 1.3, color: colorScheme.onSurfaceVariant), maxLines: 2, overflow: TextOverflow.ellipsis),
                               ),
                             ],
                           ),
                         ],
+
+                        // Bảng tin thực địa: Mốc nhận diện cổng nhà / cửa vào (Tương phản cao ngoài nắng)
                         if (widget.identificationNotes != null && widget.identificationNotes!.trim().isNotEmpty) ...[
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
                             decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0)),
+                              color: isDark ? const Color(0xFF1E2638) : const Color(0xFFFFFBEB),
+                              borderRadius: const BorderRadius.horizontal(right: Radius.circular(8)),
+                              border: Border(left: BorderSide(color: isDark ? const Color(0xFFF59E0B) : const Color(0xFFD97706), width: 4)),
                             ),
-                            child: Text(
-                              'Ghi chú: ${widget.identificationNotes!}',
-                              style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.flag_rounded, size: 13, color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706)),
+                                    const SizedBox(width: 5),
+                                    Text('MỐC NHẬN DIỆN THỰC ĐỊA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.8, color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309))),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Text(widget.identificationNotes!.trim(), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3, color: isDark ? const Color(0xFFFEF3C7) : const Color(0xFF451A03))),
+                              ],
                             ),
                           ),
                         ],
+
                         const SizedBox(height: 10),
+
+                        // Action Bar bản lớn công thái học (GỌI, CHỈ ĐƯỜNG, GHIM LẠI)
                         PointDetailActionButtons(
                           onCall: _makePhoneCall,
                           onDirections: _openNavigation,
-                          onRepin: widget.onRepin,
+                          onRepin: widget.onRepin == null
+                              ? null
+                              : () {
+                                  HapticFeedback.lightImpact();
+                                  widget.onRepin!();
+                                },
                         ),
                         const SizedBox(height: 8),
                       ],
