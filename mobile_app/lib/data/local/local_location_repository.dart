@@ -7,15 +7,12 @@ import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
 import 'package:delivery_marker_mobile/data/repositories/location_repository.dart';
 import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
 
-/// Triển khai LocationRepository cục bộ bằng SQLite (Local-First)
-/// Toàn bộ thao tác lưu, sửa, xóa vị trí được quản lý và bảo toàn lịch sử trên thiết bị
 class LocalLocationRepository implements LocationRepository {
   final AppDatabase _appDb;
   final LocalPhotoRepository _photoRepo;
 
   LocalLocationRepository({AppDatabase? appDb, LocalPhotoRepository? photoRepo})
-      : _appDb = appDb ?? AppDatabase.instance,
-        _photoRepo = photoRepo ?? LocalPhotoRepository(appDb: appDb ?? AppDatabase.instance);
+      : _appDb = appDb ?? AppDatabase.instance, _photoRepo = photoRepo ?? LocalPhotoRepository(appDb: appDb ?? AppDatabase.instance);
 
   static const String defaultAreaId = 'local-area-default';
   static const String defaultAreaName = 'Của tôi';
@@ -23,115 +20,51 @@ class LocalLocationRepository implements LocationRepository {
   @override
   Future<List<MasterSavedLocationModel>> getMySavedLocations() async {
     final db = await _appDb.database;
-    final rows = await db.rawQuery('''
-      SELECT sl.*, c.customer_code, c.full_name, c.phone_number, c.address_text
-      FROM saved_locations sl
-      JOIN customers c ON sl.customer_id = c.id
-      WHERE c.deleted_at IS NULL
-      ORDER BY sl.updated_at DESC
-    ''');
-
-    final customerIds = rows.map((r) => r['customer_id'] as String).toList();
-    final photoSummaries = await _photoRepo.getBatchPhotoSummaries(customerIds);
-
-    return rows.map((r) {
-      final cid = r['customer_id'] as String;
-      return _mapToMasterSavedLocation(r, photoSummaries[cid]);
-    }).toList();
+    final rows = await db.rawQuery('SELECT sl.*, c.customer_code, c.full_name, c.phone_number, c.address_text FROM saved_locations sl JOIN customers c ON sl.customer_id = c.id WHERE c.deleted_at IS NULL ORDER BY sl.updated_at DESC');
+    final summaries = await _photoRepo.getBatchPhotoSummaries(rows.map((r) => r['customer_id'] as String).toList());
+    return rows.map((r) => _mapToMasterSavedLocation(r, summaries[r['customer_id'] as String])).toList();
   }
 
   @override
-  Future<List<MasterSavedLocationModel>> getSavedLocationsInBounds({
-    required double minLat,
-    required double maxLat,
-    required double minLng,
-    required double maxLng,
-  }) async {
+  Future<List<MasterSavedLocationModel>> getSavedLocationsInBounds({required double minLat, required double maxLat, required double minLng, required double maxLng}) async {
     final db = await _appDb.database;
-    final rows = await db.rawQuery('''
-      SELECT sl.*, c.customer_code, c.full_name, c.phone_number, c.address_text
-      FROM saved_locations sl
-      JOIN customers c ON sl.customer_id = c.id
-      WHERE c.deleted_at IS NULL
-        AND sl.latitude BETWEEN ? AND ?
-        AND sl.longitude BETWEEN ? AND ?
-      ORDER BY sl.updated_at DESC
-    ''', [minLat, maxLat, minLng, maxLng]);
-
-    final customerIds = rows.map((r) => r['customer_id'] as String).toList();
-    final photoSummaries = await _photoRepo.getBatchPhotoSummaries(customerIds);
-
-    return rows.map((r) {
-      final cid = r['customer_id'] as String;
-      return _mapToMasterSavedLocation(r, photoSummaries[cid]);
-    }).toList();
+    final rows = await db.rawQuery('SELECT sl.*, c.customer_code, c.full_name, c.phone_number, c.address_text FROM saved_locations sl JOIN customers c ON sl.customer_id = c.id WHERE c.deleted_at IS NULL AND sl.latitude BETWEEN ? AND ? AND sl.longitude BETWEEN ? AND ? ORDER BY sl.updated_at DESC', [minLat, maxLat, minLng, maxLng]);
+    final summaries = await _photoRepo.getBatchPhotoSummaries(rows.map((r) => r['customer_id'] as String).toList());
+    return rows.map((r) => _mapToMasterSavedLocation(r, summaries[r['customer_id'] as String])).toList();
   }
 
   @override
-  Future<bool> saveCustomerLocation(
-    SavedLocationModel location, {
-    String? imageBase64,
-  }) async {
-    final result = await updateCustomerLocationAndPhoto(
-      customerId: location.customerId,
-      latitude: location.latitude,
-      longitude: location.longitude,
-      gpsAccuracy: location.gpsAccuracy,
-      identificationNotes: location.identificationNotes,
-      imageBase64: imageBase64,
+  Future<bool> saveCustomerLocation(SavedLocationModel location, {String? imageBase64}) async {
+    final res = await updateCustomerLocationAndPhoto(
+      customerId: location.customerId, latitude: location.latitude, longitude: location.longitude,
+      gpsAccuracy: location.gpsAccuracy, identificationNotes: location.identificationNotes, imageBase64: imageBase64,
     );
-    return result['success'] == true;
+    return res['success'] == true;
   }
 
   @override
   Future<Map<String, dynamic>> updateCustomerLocationAndPhoto({
-    required String customerId,
-    required double latitude,
-    required double longitude,
-    double? gpsAccuracy,
-    required String identificationNotes,
-    String? imageBase64,
-    bool? deletePhoto,
+    required String customerId, required double latitude, required double longitude,
+    double? gpsAccuracy, required String identificationNotes, String? imageBase64, bool? deletePhoto,
   }) async {
-    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      throw ArgumentError('Tọa độ không hợp lệ (-90..90, -180..180)');
-    }
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) throw ArgumentError('Tọa độ không hợp lệ (-90..90, -180..180)');
 
     return await _appDb.transaction<Map<String, dynamic>>((txn) async {
-      // 1. Xác định ID khách hàng hợp lệ (nếu customerId là SĐT thì tìm hoặc tạo mới)
-      String resolvedCustomerId = customerId;
-      var custRows = await txn.query(
-        'customers',
-        where: 'id = ? AND deleted_at IS NULL',
-        whereArgs: [customerId],
-        limit: 1,
-      );
-
+      String resCustId = customerId;
+      var custRows = await txn.query('customers', where: 'id = ? AND deleted_at IS NULL', whereArgs: [customerId], limit: 1);
       if (custRows.isEmpty) {
         final cleanPhone = normalizeCustomerPhone(customerId);
         if (isValidVnPhone(cleanPhone)) {
-          final byPhone = await txn.query(
-            'customers',
-            where: 'phone_number = ? AND deleted_at IS NULL',
-            whereArgs: [cleanPhone],
-            limit: 1,
-          );
+          final byPhone = await txn.query('customers', where: 'phone_number = ? AND deleted_at IS NULL', whereArgs: [cleanPhone], limit: 1);
           if (byPhone.isNotEmpty) {
-            resolvedCustomerId = byPhone.first['id'] as String;
+            resCustId = byPhone.first['id'] as String;
           } else {
-            // Tạo khách hàng mới trong CÙNG một transaction
-            resolvedCustomerId = UuidUtils.generate();
+            resCustId = UuidUtils.generate();
             final now = AppDatabase.currentIsoUtc();
             await txn.insert('customers', {
-              'id': resolvedCustomerId,
-              'customer_code': 'CUST-${cleanPhone.substring(cleanPhone.length - 4)}',
-              'full_name': 'Khách $cleanPhone',
-              'phone_number': cleanPhone,
-              'address_text': 'Chưa cập nhật địa chỉ',
-              'notes': null,
-              'created_at': now,
-              'updated_at': now,
-              'deleted_at': null,
+              'id': resCustId, 'customer_code': 'CUST-${cleanPhone.substring(cleanPhone.length - 4)}',
+              'full_name': 'Khách $cleanPhone', 'phone_number': cleanPhone, 'address_text': 'Chưa cập nhật địa chỉ',
+              'created_at': now, 'updated_at': now, 'deleted_at': null,
             });
           }
         } else {
@@ -140,216 +73,68 @@ class LocalLocationRepository implements LocationRepository {
       }
 
       final now = AppDatabase.currentIsoUtc();
-      final newLocId = UuidUtils.generate();
-
-      // 2. Lưu hoặc cập nhật vị trí vào saved_locations (kích hoạt trigger nếu UPDATE)
       await txn.rawInsert('''
         INSERT INTO saved_locations (id, customer_id, latitude, longitude, gps_accuracy, identification_notes, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(customer_id) DO UPDATE SET
-          latitude = excluded.latitude,
-          longitude = excluded.longitude,
-          gps_accuracy = excluded.gps_accuracy,
-          identification_notes = excluded.identification_notes,
-          updated_at = excluded.updated_at
-      ''', [
-        newLocId,
-        resolvedCustomerId,
-        latitude,
-        longitude,
-        gpsAccuracy ?? 0.0,
-        identificationNotes,
-        now,
-        now,
-      ]);
+          latitude = excluded.latitude, longitude = excluded.longitude, gps_accuracy = excluded.gps_accuracy,
+          identification_notes = excluded.identification_notes, updated_at = excluded.updated_at
+      ''', [UuidUtils.generate(), resCustId, latitude, longitude, gpsAccuracy ?? 0.0, identificationNotes, now, now]);
 
-      // 3. Quy tắc LOCATION-RULES-012: Điểm giao trong ca của khách đang NO_LOCATION/TEMPORARY chuyển sang VERIFIED
       final updatedPoints = await txn.rawUpdate('''
-        UPDATE shift_delivery_points
-        SET location_status = 'VERIFIED',
-            latitude = ?,
-            longitude = ?,
-            gps_accuracy = ?,
-            identification_notes = ?,
-            updated_at = ?
-        WHERE customer_id = ?
-          AND location_status IN ('NO_LOCATION', 'TEMPORARY')
-          AND shift_id IN (
-            SELECT id FROM shifts WHERE status IN ('PREPARING', 'IN_PROGRESS')
-          )
-      ''', [
-        latitude,
-        longitude,
-        gpsAccuracy ?? 0.0,
-        identificationNotes,
-        now,
-        resolvedCustomerId,
-      ]);
+        UPDATE shift_delivery_points SET location_status = 'VERIFIED', latitude = ?, longitude = ?,
+               gps_accuracy = ?, identification_notes = ?, updated_at = ?
+        WHERE customer_id = ? AND location_status IN ('NO_LOCATION', 'TEMPORARY')
+          AND shift_id IN (SELECT id FROM shifts WHERE status IN ('PREPARING', 'IN_PROGRESS'))
+      ''', [latitude, longitude, gpsAccuracy ?? 0.0, identificationNotes, now, resCustId]);
 
-      // 4. Ghi activity_log
-      await _appDb.logActivity(
-        executor: txn,
-        action: 'UPDATE_CUSTOMER_LOCATION',
-        entity: 'LOCATION',
-        entityId: resolvedCustomerId,
-        details: {
-          'latitude': latitude,
-          'longitude': longitude,
-          'updatedShiftPointsCount': updatedPoints,
-        },
-      );
-
-      return {
-        'success': true,
-        'message': 'Cập nhật vị trí khách hàng thành công',
-        'updatedShiftPointsCount': updatedPoints,
-      };
+      await _appDb.logActivity(executor: txn, action: 'UPDATE_CUSTOMER_LOCATION', entity: 'LOCATION', entityId: resCustId, details: {'latitude': latitude, 'longitude': longitude, 'updatedShiftPointsCount': updatedPoints});
+      return {'success': true, 'message': 'Cập nhật vị trí khách hàng thành công', 'updatedShiftPointsCount': updatedPoints};
     });
   }
 
   @override
   Future<void> deleteCustomerLocation(String customerId) async {
     await _appDb.transaction((txn) async {
-      // 1. Xóa vị trí đã lưu (foreign key ON DELETE SET NULL sẽ giữ lại location_history với saved_location_id = NULL)
-      await txn.delete(
-        'saved_locations',
-        where: 'customer_id = ?',
-        whereArgs: [customerId],
-      );
-
-      // 2. Điểm giao VERIFIED trong ca PREPARING/IN_PROGRESS của khách chuyển về NO_LOCATION
-      // (Điểm TEMPORARY giữ nguyên vị trí ghim tạm của ca đó)
+      await txn.delete('saved_locations', where: 'customer_id = ?', whereArgs: [customerId]);
       await txn.rawUpdate('''
-        UPDATE shift_delivery_points
-        SET location_status = 'NO_LOCATION',
-            latitude = NULL,
-            longitude = NULL,
-            gps_accuracy = NULL,
-            updated_at = ?
-        WHERE customer_id = ?
-          AND location_status = 'VERIFIED'
-          AND shift_id IN (
-            SELECT id FROM shifts WHERE status IN ('PREPARING', 'IN_PROGRESS')
-          )
+        UPDATE shift_delivery_points SET location_status = 'NO_LOCATION', latitude = NULL, longitude = NULL, gps_accuracy = NULL, updated_at = ?
+        WHERE customer_id = ? AND location_status = 'VERIFIED' AND shift_id IN (SELECT id FROM shifts WHERE status IN ('PREPARING', 'IN_PROGRESS'))
       ''', [AppDatabase.currentIsoUtc(), customerId]);
-
-      // 3. Ghi activity_log
-      await _appDb.logActivity(
-        executor: txn,
-        action: 'DELETE_CUSTOMER_LOCATION',
-        entity: 'LOCATION',
-        entityId: customerId,
-      );
+      await _appDb.logActivity(executor: txn, action: 'DELETE_CUSTOMER_LOCATION', entity: 'LOCATION', entityId: customerId);
     });
   }
 
   @override
-  Future<ShiftDeliveryPointModel> updateTemporaryLocation(
-    String shiftId,
-    String pointId, {
-    required double latitude,
-    required double longitude,
-    String? locationNotes,
-    String? identificationNotes,
-  }) async {
-    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      throw ArgumentError('Tọa độ không hợp lệ (-90..90, -180..180)');
-    }
+  Future<ShiftDeliveryPointModel> updateTemporaryLocation(String shiftId, String pointId, {required double latitude, required double longitude, String? locationNotes, String? identificationNotes}) async {
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) throw ArgumentError('Tọa độ không hợp lệ (-90..90, -180..180)');
+    final db = await _appDb.database, now = AppDatabase.currentIsoUtc(), notes = identificationNotes ?? locationNotes;
 
-    final db = await _appDb.database;
-    final now = AppDatabase.currentIsoUtc();
-    final effectiveNotes = identificationNotes ?? locationNotes;
-
-    // Lấy customer_id của điểm giao cần ghim tạm
-    final targetPointRows = await db.query(
-      'shift_delivery_points',
-      columns: ['customer_id'],
-      where: 'shift_id = ? AND id = ?',
-      whereArgs: [shiftId, pointId],
-      limit: 1,
-    );
-
-    if (targetPointRows.isEmpty) {
-      throw Exception('Không tìm thấy điểm giao hàng trong ca');
-    }
-
-    final customerId = targetPointRows.first['customer_id'] as String;
+    final target = await db.query('shift_delivery_points', columns: ['customer_id'], where: 'shift_id = ? AND id = ?', whereArgs: [shiftId, pointId], limit: 1);
+    if (target.isEmpty) throw Exception('Không tìm thấy điểm giao hàng trong ca');
+    final custId = target.first['customer_id'] as String;
 
     await db.transaction((txn) async {
-      // 1. Cập nhật điểm giao trong ca hiện tại thành TEMPORARY (KHÔNG ghi vào saved_locations)
-      await txn.update(
-        'shift_delivery_points',
-        {
-          'location_status': 'TEMPORARY',
-          'latitude': latitude,
-          'longitude': longitude,
-          'identification_notes': effectiveNotes,
-          'updated_at': now,
-        },
-        where: 'shift_id = ? AND id = ?',
-        whereArgs: [shiftId, pointId],
-      );
-
-      // 2. Đồng bộ tọa độ tạm thời này sang các ca PREPARING hoặc IN_PROGRESS khác có chứa cùng khách hàng
+      await txn.update('shift_delivery_points', {'location_status': 'TEMPORARY', 'latitude': latitude, 'longitude': longitude, 'identification_notes': notes, 'updated_at': now}, where: 'shift_id = ? AND id = ?', whereArgs: [shiftId, pointId]);
       await txn.rawUpdate('''
-        UPDATE shift_delivery_points
-        SET location_status = 'TEMPORARY',
-            latitude = ?,
-            longitude = ?,
-            identification_notes = COALESCE(?, identification_notes),
-            updated_at = ?
-        WHERE customer_id = ?
-          AND id != ?
-          AND shift_id IN (
-            SELECT id FROM shifts WHERE status IN ('PREPARING', 'IN_PROGRESS')
-          )
-      ''', [latitude, longitude, effectiveNotes, now, customerId, pointId]);
-
-      // 3. Ghi activity_log
-      await _appDb.logActivity(
-        action: 'PIN_TEMPORARY_LOCATION',
-        entity: 'shift_delivery_points',
-        entityId: pointId,
-        details: {
-          'shiftId': shiftId,
-          'customerId': customerId,
-          'latitude': latitude,
-          'longitude': longitude,
-        },
-        executor: txn,
-      );
+        UPDATE shift_delivery_points SET location_status = 'TEMPORARY', latitude = ?, longitude = ?, identification_notes = COALESCE(?, identification_notes), updated_at = ?
+        WHERE customer_id = ? AND id != ? AND shift_id IN (SELECT id FROM shifts WHERE status IN ('PREPARING', 'IN_PROGRESS'))
+      ''', [latitude, longitude, notes, now, custId, pointId]);
+      await _appDb.logActivity(action: 'PIN_TEMPORARY_LOCATION', entity: 'shift_delivery_points', entityId: pointId, details: {'shiftId': shiftId, 'customerId': custId, 'latitude': latitude, 'longitude': longitude}, executor: txn);
     });
 
-    final rows = await db.rawQuery('''
-      SELECT sdp.*, c.customer_code, c.full_name, c.phone_number, c.address_text
-      FROM shift_delivery_points sdp
-      JOIN customers c ON sdp.customer_id = c.id
-      WHERE sdp.shift_id = ? AND sdp.id = ?
-      LIMIT 1
-    ''', [shiftId, pointId]);
-
-    if (rows.isEmpty) {
-      throw Exception('Không tìm thấy điểm giao hàng trong ca');
-    }
-
+    final rows = await db.rawQuery('SELECT sdp.*, c.customer_code, c.full_name, c.phone_number, c.address_text FROM shift_delivery_points sdp JOIN customers c ON sdp.customer_id = c.id WHERE sdp.shift_id = ? AND sdp.id = ? LIMIT 1', [shiftId, pointId]);
+    if (rows.isEmpty) throw Exception('Không tìm thấy điểm giao hàng trong ca');
     final r = rows.first;
+
     return ShiftDeliveryPointModel(
-      id: r['id'] as String,
-      shiftId: r['shift_id'] as String,
-      customerId: r['customer_id'] as String,
-      customerName: (r['full_name'] as String?) ?? '',
-      customerPhone: (r['phone_number'] as String?) ?? '',
-      customerAddress: (r['address_text'] as String?) ?? '',
-      areaId: defaultAreaId,
-      areaName: defaultAreaName,
-      sequenceNumber: (r['delivery_order_index'] as num?)?.toInt() ?? 0,
-      deliveryStatus: 'PENDING',
-      locationStatus: LocationStatus.temporary,
-      latitude: (r['latitude'] as num?)?.toDouble(),
-      longitude: (r['longitude'] as num?)?.toDouble(),
-      locationNotes: r['identification_notes'] as String?,
-      createdAt: DateTime.tryParse(r['created_at']?.toString() ?? ''),
-      updatedAt: DateTime.tryParse(r['updated_at']?.toString() ?? ''),
+      id: r['id'] as String, shiftId: r['shift_id'] as String, customerId: r['customer_id'] as String,
+      customerName: (r['full_name'] as String?) ?? '', customerPhone: (r['phone_number'] as String?) ?? '',
+      customerAddress: (r['address_text'] as String?) ?? '', areaId: defaultAreaId, areaName: defaultAreaName,
+      sequenceNumber: (r['delivery_order_index'] as num?)?.toInt() ?? 0, deliveryStatus: 'PENDING',
+      locationStatus: LocationStatus.temporary, latitude: (r['latitude'] as num?)?.toDouble(),
+      longitude: (r['longitude'] as num?)?.toDouble(), locationNotes: r['identification_notes'] as String?,
+      createdAt: DateTime.tryParse(r['created_at']?.toString() ?? ''), updatedAt: DateTime.tryParse(r['updated_at']?.toString() ?? ''),
     );
   }
 
@@ -360,36 +145,16 @@ class LocalLocationRepository implements LocationRepository {
   Future<void> syncOfflineQueue() async {}
 
   @override
-  Future<List<Map<String, dynamic>>> getLocationHistory(String customerId) async {
-    return await _appDb.getLocationHistory(customerId);
-  }
+  Future<List<Map<String, dynamic>>> getLocationHistory(String customerId) => _appDb.getLocationHistory(customerId);
 
-  MasterSavedLocationModel _mapToMasterSavedLocation(
-    Map<String, dynamic> r, [
-    Map<String, dynamic>? photoSummary,
-  ]) {
-    final photos = (photoSummary?['photos'] as List<CustomerPhotoModel>?) ?? const [];
-    final count = (photoSummary?['photoCount'] as int?) ?? 0;
-    final firstThumb = photoSummary?['firstThumbnailUrl'] as String?;
-
-    return MasterSavedLocationModel(
-      id: r['id'] as String,
-      customerId: r['customer_id'] as String,
-      customerCode: (r['customer_code'] as String?) ?? 'KH',
-      customerName: (r['full_name'] as String?) ?? '',
-      customerPhone: (r['phone_number'] as String?) ?? '',
-      customerAddress: (r['address_text'] as String?) ?? '',
-      areaId: defaultAreaId,
-      areaName: defaultAreaName,
-      latitude: (r['latitude'] as num).toDouble(),
-      longitude: (r['longitude'] as num).toDouble(),
-      gpsAccuracy: (r['gps_accuracy'] as num?)?.toDouble() ?? 0.0,
-      identificationNotes: (r['identification_notes'] as String?) ?? '',
-      imageUrl: firstThumb,
-      photoCount: count,
-      photos: photos,
-      createdAt: DateTime.tryParse(r['created_at']?.toString() ?? ''),
-      updatedAt: DateTime.tryParse(r['updated_at']?.toString() ?? ''),
-    );
-  }
+  MasterSavedLocationModel _mapToMasterSavedLocation(Map<String, dynamic> r, [Map<String, dynamic>? photoSummary]) => MasterSavedLocationModel(
+    id: r['id'] as String, customerId: r['customer_id'] as String, customerCode: (r['customer_code'] as String?) ?? 'KH',
+    customerName: (r['full_name'] as String?) ?? '', customerPhone: (r['phone_number'] as String?) ?? '',
+    customerAddress: (r['address_text'] as String?) ?? '', areaId: defaultAreaId, areaName: defaultAreaName,
+    latitude: (r['latitude'] as num).toDouble(), longitude: (r['longitude'] as num).toDouble(),
+    gpsAccuracy: (r['gps_accuracy'] as num?)?.toDouble() ?? 0.0, identificationNotes: (r['identification_notes'] as String?) ?? '',
+    imageUrl: photoSummary?['firstThumbnailUrl'] as String?, photoCount: (photoSummary?['photoCount'] as int?) ?? 0,
+    photos: (photoSummary?['photos'] as List<CustomerPhotoModel>?) ?? const [],
+    createdAt: DateTime.tryParse(r['created_at']?.toString() ?? ''), updatedAt: DateTime.tryParse(r['updated_at']?.toString() ?? ''),
+  );
 }

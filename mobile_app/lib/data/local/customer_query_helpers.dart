@@ -20,59 +20,35 @@ class CustomerQueryHelpers {
     String defaultAreaName = LocalCustomerRepository.defaultAreaName,
   }) async {
     final db = await appDb.database;
-
-    // 1. Lọc khách hàng chưa xóa mềm
-    List<Map<String, dynamic>> customerRows;
     final cleanQuery = query != null ? normalizeSearchQuery(query) : '';
+    final customerRows = cleanQuery.isNotEmpty
+        ? await appDb.searchCustomers(query!, limit: 10000, offset: 0)
+        : await db.query('customers', where: 'deleted_at IS NULL', orderBy: 'updated_at DESC, created_at DESC');
 
-    if (cleanQuery.isNotEmpty) {
-      customerRows = await appDb.searchCustomers(query!, limit: 10000, offset: 0);
-    } else {
-      customerRows = await db.query(
-        'customers',
-        where: 'deleted_at IS NULL',
-        orderBy: 'updated_at DESC, created_at DESC',
-      );
-    }
-
-    // 2. Lấy toàn bộ vị trí đã lưu và điểm ghim tạm trong ca đang mở để xác định locationState
     final savedLocRows = await db.query('saved_locations');
-    final savedLocMap = <String, Map<String, dynamic>>{};
-    for (final r in savedLocRows) {
-      savedLocMap[r['customer_id'] as String] = r;
-    }
+    final savedLocMap = {for (final r in savedLocRows) r['customer_id'] as String: r};
 
-    // Lấy các điểm giao TEMPORARY trong ca PREPARING hoặc IN_PROGRESS
     final activeTempPoints = await db.rawQuery('''
       SELECT sdp.customer_id, sdp.latitude, sdp.longitude, sdp.identification_notes, sdp.gps_accuracy
-      FROM shift_delivery_points sdp
-      JOIN shifts s ON s.id = sdp.shift_id
-      WHERE sdp.location_status = 'TEMPORARY'
-        AND s.status IN ('PREPARING', 'IN_PROGRESS')
+      FROM shift_delivery_points sdp JOIN shifts s ON s.id = sdp.shift_id
+      WHERE sdp.location_status = 'TEMPORARY' AND s.status IN ('PREPARING', 'IN_PROGRESS')
       ORDER BY sdp.updated_at DESC
     ''');
     final tempPointMap = <String, Map<String, dynamic>>{};
     for (final r in activeTempPoints) {
-      final custId = r['customer_id'] as String;
-      tempPointMap.putIfAbsent(custId, () => r);
+      tempPointMap.putIfAbsent(r['customer_id'] as String, () => r);
     }
 
-    // 3. Xây dựng danh sách CustomerDirectoryModel và tính toán Counts
     final allModels = <CustomerDirectoryModel>[];
-    int verifiedCount = 0;
-    int temporaryCount = 0;
-    int noLocationCount = 0;
+    int verifiedCount = 0, temporaryCount = 0, noLocationCount = 0;
 
     for (final c in customerRows) {
       final custId = c['id'] as String;
       final savedLoc = savedLocMap[custId];
       final tempPoint = tempPointMap[custId];
-
       LocationStatus locState = LocationStatus.noLocation;
-      double? lat;
-      double? lng;
-      String? notes;
-      String? savedLocId;
+      double? lat, lng;
+      String? notes, savedLocId;
 
       if (savedLoc != null && savedLoc['latitude'] != null && savedLoc['longitude'] != null) {
         locState = LocationStatus.verified;
@@ -88,7 +64,6 @@ class CustomerQueryHelpers {
         notes = tempPoint['identification_notes'] as String?;
         temporaryCount++;
       } else {
-        locState = LocationStatus.noLocation;
         noLocationCount++;
       }
 
@@ -112,41 +87,31 @@ class CustomerQueryHelpers {
       ));
     }
 
-    // 4. Lọc theo tab status nếu có yêu cầu
-    List<CustomerDirectoryModel> filtered = allModels;
+    var filtered = allModels;
     if (status != null && status.toUpperCase() != 'ALL') {
-      final targetStatus = LocationStatus.fromString(status);
-      filtered = allModels.where((m) => m.locationState == targetStatus).toList();
+      final target = LocationStatus.fromString(status);
+      filtered = allModels.where((m) => m.locationState == target).toList();
     }
 
-    final totalCountForTab = filtered.length;
     final effOffset = offset ?? 0;
     final effLimit = limit ?? 30;
+    final paged = filtered.skip(effOffset).take(effLimit).toList();
 
-    final pagedItems = filtered.skip(effOffset).take(effLimit).toList();
-
-    // 5. Nạp photoCount và tối đa 3 ảnh thumbnail cho danh sách khách hàng hiển thị
-    final customerIds = pagedItems.map((c) => c.id).toList();
-    final photoSummaries = await photoRepo.getBatchPhotoSummaries(customerIds);
-
-    final enrichedItems = pagedItems.map((c) {
-      final summary = photoSummaries[c.id];
-      if (summary != null) {
-        final count = summary['photoCount'] as int;
-        final photos = summary['photos'] as List<CustomerPhotoModel>;
-        final firstThumb = summary['firstThumbnailUrl'] as String?;
-        return c.copyWith(
-          photoCount: count,
-          photos: photos,
-          firstThumbnailUrl: firstThumb,
-          imageUrl: firstThumb ?? c.imageUrl,
-        );
-      }
-      return c;
+    final photoSummaries = await photoRepo.getBatchPhotoSummaries(paged.map((c) => c.id).toList());
+    final enriched = paged.map((c) {
+      final s = photoSummaries[c.id];
+      if (s == null) return c;
+      final thumb = s['firstThumbnailUrl'] as String?;
+      return c.copyWith(
+        photoCount: s['photoCount'] as int,
+        photos: s['photos'] as List<CustomerPhotoModel>,
+        firstThumbnailUrl: thumb,
+        imageUrl: thumb ?? c.imageUrl,
+      );
     }).toList();
 
     return CustomerDirectoryResponse(
-      items: enrichedItems,
+      items: enriched,
       counts: CustomerTabCounts(
         total: allModels.length,
         verified: verifiedCount,
@@ -154,12 +119,11 @@ class CustomerQueryHelpers {
         noLocation: noLocationCount,
       ),
       pagination: CustomerPagination(
-        total: totalCountForTab,
+        total: filtered.length,
         limit: effLimit,
         offset: effOffset,
-        hasMore: effOffset + pagedItems.length < totalCountForTab,
+        hasMore: effOffset + paged.length < filtered.length,
       ),
     );
   }
 }
-

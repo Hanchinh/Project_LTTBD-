@@ -7,16 +7,11 @@ import 'package:delivery_marker_mobile/features/photos/customer_photos_strip_wid
 import 'package:delivery_marker_mobile/features/sharing/data_share_send_sheet.dart';
 import 'package:delivery_marker_mobile/features/map/crosshair_location_picker_view.dart';
 
-/// Màn hình Chi Tiết & Toàn Quyền Chỉnh Sửa Khách Hàng (Tên, SĐT, Vị trí, Ghi chú, Ảnh)
 class CustomerDetailEditView extends StatefulWidget {
   final CustomerDirectoryModel customer;
   final Function(CustomerDirectoryModel)? onCustomerUpdated;
 
-  const CustomerDetailEditView({
-    super.key,
-    required this.customer,
-    this.onCustomerUpdated,
-  });
+  const CustomerDetailEditView({super.key, required this.customer, this.onCustomerUpdated});
 
   @override
   State<CustomerDetailEditView> createState() => _CustomerDetailEditViewState();
@@ -32,7 +27,6 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
   double? _currentLat;
   double? _currentLng;
   String? _currentPhotoUrl;
-
   bool _isSaving = false;
 
   @override
@@ -62,65 +56,34 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Xác nhận xóa vị trí đã lưu?'),
-        content: Text(
-          'Vị trí cổng nhà đã lưu của khách hàng "${_nameController.text.trim()}" sẽ bị xóa khỏi hồ sơ hệ thống.\n\n'
-          'Các điểm giao trong ca đang chạy của khách này sẽ quay về trạng thái "Chưa có vị trí".\n\n'
-          'Lịch sử đối soát trước đây vẫn được lưu trữ an toàn trong hệ thống.',
-        ),
+        content: Text('Vị trí cổng nhà đã lưu của khách hàng "${_nameController.text.trim()}" sẽ bị xóa khỏi hồ sơ hệ thống.\n\nCác điểm giao trong ca đang chạy của khách này sẽ quay về trạng thái "Chưa có vị trí".\n\nLịch sử đối soát trước đây vẫn được lưu trữ an toàn trong hệ thống.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Xóa vị trí'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444), foregroundColor: Colors.white), onPressed: () => Navigator.pop(ctx, true), child: const Text('Xóa vị trí')),
         ],
       ),
     );
-
     if (confirm != true) return;
 
     setState(() => _isSaving = true);
     try {
       await RepositoryProvider.location.deleteCustomerLocation(_customer.id);
-
-      setState(() {
-        _currentLat = null;
-        _currentLng = null;
-        _currentPhotoUrl = null;
-      });
-
+      setState(() { _currentLat = null; _currentLng = null; _currentPhotoUrl = null; });
       PaintingBinding.instance.imageCache.clear();
       PaintingBinding.instance.imageCache.clearLiveImages();
-
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã xóa vị trí đã lưu thành công (lịch sử đối soát được bảo toàn)'),
-          backgroundColor: Color(0xFF10B981),
-        ),
-      );
-
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã xóa vị trí đã lưu thành công (lịch sử đối soát được bảo toàn)'), backgroundColor: Color(0xFF10B981)));
       final updated = await RepositoryProvider.customer.getCustomerDetail(_customer.id);
       widget.onCustomerUpdated?.call(updated);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e'), backgroundColor: const Color(0xFFEF4444)),
-      );
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi: $e'), backgroundColor: const Color(0xFFEF4444)));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
   void _openCrosshairPicker() async {
-    final dummyPoint = ShiftDeliveryPointModel(
+    final dummy = ShiftDeliveryPointModel(
       id: 'dir-${_customer.id}',
       shiftId: '',
       customerId: _customer.id,
@@ -132,78 +95,40 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
       longitude: _currentLng,
       locationNotes: _notesController.text.trim(),
     );
-
-    final result = await Navigator.push<CrosshairLocationPickerResult>(
+    final res = await Navigator.push<CrosshairLocationPickerResult>(
       context,
-      MaterialPageRoute(
-        builder: (context) => CrosshairLocationPickerView(
-          point: dummyPoint,
-          shiftId: '',
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => CrosshairLocationPickerView(point: dummy, shiftId: '')),
     );
-
-    if (result != null) {
-      setState(() {
-        _currentLat = result.latitude;
-        _currentLng = result.longitude;
-      });
-    }
+    if (res != null) setState(() { _currentLat = res.latitude; _currentLng = res.longitude; });
   }
 
   Future<void> _handleSave() async {
-    final name = _nameController.text.trim();
-    final phone = _phoneController.text.trim();
-    final address = _addressController.text.trim();
-    final notes = _notesController.text.trim();
-
+    final name = _nameController.text.trim(), phone = _phoneController.text.trim();
     if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Số điện thoại không được để trống'), backgroundColor: Colors.red),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Số điện thoại không được để trống'), backgroundColor: Colors.red));
       return;
     }
-
     setState(() => _isSaving = true);
-
     try {
-      // 1. Cập nhật thông tin khách hàng
-      await RepositoryProvider.customer.updateCustomer(
-        customerId: _customer.id,
-        fullName: name,
-        phoneNumber: phone,
-        addressText: address,
-      );
-
-      // 2. Nếu có cập nhật vị trí hoặc ảnh
+      await RepositoryProvider.customer.updateCustomer(customerId: _customer.id, fullName: name, phoneNumber: phone, addressText: _addressController.text.trim());
       if (_currentLat != null && _currentLng != null) {
+        final notes = _notesController.text.trim();
         await RepositoryProvider.location.updateCustomerLocationAndPhoto(
           customerId: _customer.id,
           latitude: _currentLat!,
           longitude: _currentLng!,
           identificationNotes: notes.isNotEmpty ? notes : 'Vị trí đã lưu',
         );
-
         PaintingBinding.instance.imageCache.clear();
         PaintingBinding.instance.imageCache.clearLiveImages();
       }
-
-      // 3. Tải lại chi tiết mới nhất
       final updated = await RepositoryProvider.customer.getCustomerDetail(_customer.id);
-
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã cập nhật hồ sơ khách hàng thành công!'), backgroundColor: Color(0xFF10B981)),
-      );
-
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã cập nhật hồ sơ khách hàng thành công!'), backgroundColor: Color(0xFF10B981)));
       widget.onCustomerUpdated?.call(updated);
       Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi lưu: $e'), backgroundColor: const Color(0xFFEF4444)),
-        );
-      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi lưu: $e'), backgroundColor: const Color(0xFFEF4444)));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -217,74 +142,36 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Hồ sơ & Vị trí khách hàng',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Color(0xFF0F172A)),
-        ),
+        leading: IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)), onPressed: () => Navigator.pop(context)),
+        title: const Text('Hồ sơ & Vị trí khách hàng', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Color(0xFF0F172A))),
         actions: [
           IconButton(
             key: const Key('btn_share_customer_detail'),
             icon: const Icon(Icons.share_outlined, color: Color(0xFF0F172A)),
             tooltip: 'Chia sẻ điểm này',
-            onPressed: () {
-              DataShareSendSheet.show(
-                context,
-                initialCustomerIds: [_customer.id],
-                singleCustomerName: _nameController.text.trim().isNotEmpty
-                    ? _nameController.text.trim()
-                    : _customer.fullName,
-              );
-            },
+            onPressed: () => DataShareSendSheet.show(context, initialCustomerIds: [_customer.id], singleCustomerName: _nameController.text.trim().isNotEmpty ? _nameController.text.trim() : _customer.fullName),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFE2E8F0), height: 1),
-        ),
+        bottom: const PreferredSize(preferredSize: Size.fromHeight(1), child: Divider(height: 1, color: Color(0xFFE2E8F0))),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 1. Ảnh khách hàng (Multi-photo strip)
             Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.photo_camera_rounded, size: 20, color: Color(0xFF2563EB)),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'Ảnh mặt tiền / cổng nhà',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          'Tối đa 10 ảnh',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
+                  Row(children: [
+                    const Icon(Icons.photo_camera_rounded, size: 20, color: Color(0xFF2563EB)),
+                    const SizedBox(width: 8),
+                    const Expanded(child: Text('Ảnh mặt tiền / cổng nhà', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    const SizedBox(width: 8),
+                    Flexible(child: Text('Tối đa 10 ảnh', style: TextStyle(fontSize: 12, color: Colors.grey.shade500), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  ]),
                   const SizedBox(height: 12),
                   CustomerPhotosStripWidget(
                     customerId: _customer.id,
@@ -297,11 +184,7 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
                     onPhotosUpdated: (photos) {
                       setState(() {
                         _currentPhotoUrl = photos.isNotEmpty ? photos.first.imageUrl : null;
-                        _customer = _customer.copyWith(
-                          photos: photos,
-                          photoCount: photos.length,
-                          imageUrl: _currentPhotoUrl,
-                        );
+                        _customer = _customer.copyWith(photos: photos, photoCount: photos.length, imageUrl: _currentPhotoUrl);
                       });
                       widget.onCustomerUpdated?.call(_customer);
                     },
@@ -309,16 +192,9 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
                 ],
               ),
             ),
-
             const SizedBox(height: 14),
-
-            // 2. Thông tin khách hàng
             Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -327,51 +203,19 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
                   const SizedBox(height: 12),
                   const Text('TÊN KHÁCH HÀNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                   const SizedBox(height: 6),
-                  TextField(
-                    controller: _nameController,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                    ),
-                  ),
+                  TextField(controller: _nameController, decoration: _inputDeco()),
                   const SizedBox(height: 12),
                   const Text('SỐ ĐIỆN THOẠI *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                   const SizedBox(height: 6),
-                  TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                    ),
-                  ),
+                  TextField(controller: _phoneController, keyboardType: TextInputType.phone, decoration: _inputDeco()),
                   const SizedBox(height: 12),
                   const Text('ĐỊA CHỈ KHÁCH HÀNG', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF64748B))),
                   const SizedBox(height: 6),
-                  TextField(
-                    controller: _addressController,
-                    maxLines: 2,
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                    ),
-                  ),
+                  TextField(controller: _addressController, maxLines: 2, decoration: _inputDeco()),
                 ],
               ),
             ),
-
             const SizedBox(height: 14),
-
-            // 3. Tọa độ & Ghi chú nhận diện vị trí
             CustomerDetailLocationCard(
               latitude: _currentLat,
               longitude: _currentLng,
@@ -380,35 +224,29 @@ class _CustomerDetailEditViewState extends State<CustomerDetailEditView> {
               onPickOnMap: _openCrosshairPicker,
               onDeleteLocation: _confirmAndDeleteLocation,
             ),
-
             const SizedBox(height: 24),
-
-            // Nút Lưu thay đổi
             SizedBox(
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F172A),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                icon: _isSaving
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.save_rounded, size: 20),
-                label: Text(
-                  _isSaving ? 'ĐANG LƯU HỒ SƠ...' : 'LƯU TẤT CẢ THAY ĐỔI',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                icon: _isSaving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Icon(Icons.save_rounded, size: 20),
+                label: Text(_isSaving ? 'ĐANG LƯU HỒ SƠ...' : 'LƯU TẤT CẢ THAY ĐỔI', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 onPressed: _isSaving ? null : _handleSave,
               ),
             ),
-
             const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
+
+  InputDecoration _inputDeco() => InputDecoration(
+    filled: true,
+    fillColor: const Color(0xFFF8FAFC),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+  );
 }

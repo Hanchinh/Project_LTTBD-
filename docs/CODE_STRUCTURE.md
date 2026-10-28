@@ -279,3 +279,42 @@ Bảng xếp hạng 20 tệp có số dòng lớn nhất hiện tại trong `mob
 > - Toàn bộ các file dài 1,000 – 2,300 dòng ban đầu đã được giải quyết triệt để.
 > - **100% tệp giao diện UI và Repositories nghiệp vụ đều đã hạ xuống mức chuẩn (< 500 dòng)**, chỉ trừ 4 tệp logic đối soát/DTOs đặc thù ở mức ~525-558 dòng.
 > - Cấu trúc dự án gọn gàng, trong sáng, từng thành phần đều có trách nhiệm duy nhất (Single Responsibility Principle) và chú thích tiếng Việt đầy đủ.
+
+
+---
+
+---
+
+## 8. Báo Cáo Tối Ưu Siêu Gọn Mã Nguồn (TASK: ULTRA-COMPACT-CODEBASE-SLIMDOWN-013)
+
+- **Nhánh thực hiện:** project
+- **Mục tiêu:** Rút gọn toàn bộ mã nguồn mobile_app/lib xuống mức tối thiểu, loại bỏ boilerplate lặp lại, tận dụng tối đa cú pháp Dart 3 hiện đại, đưa 100% tệp về mức dưới 350 dòng (lý tưởng 200 - 330 dòng) trong khi bảo toàn 100% tính năng và 182/182 automated tests pass.
+
+### 8.1. So Sánh Chỉ Số Trước & Sau Khi Tối Ưu
+
+| Chỉ Số Đo Lường | Trước Task 013 | Sau Task 013 (Hiện Tại) | Mức Độ Giảm / Cải Thiện |
+| :--- | :---: | :---: | :---: |
+| **Tổng số tệp Dart (mobile_app/lib)** | 133 tệp | **129 tệp** | Gộp 4 tệp vụn vặt thừa |
+| **Tổng số dòng mã (Total LoC)** | 26,556 dòng | **19,961 dòng** | **-6,595 dòng (-24.8%)** |
+| **Số tệp vượt quá 350 dòng** | ~25 tệp | **0 tệp** (100% đạt chuẩn) | **-100% tệp quá khổ** |
+| **Số tệp nằm trong khoảng 300 - 343 dòng** | Nhiều | **5 tệp** | Đều $\le$ 343 dòng |
+| **Số tệp nằm trong khoảng 200 - 300 dòng** | 12 tệp | **37 tệp** | Tập trung vùng vàng (Golden Range) |
+| **Số tệp dưới 200 dòng** | Nhiều | **87 tệp** | Siêu gọn, dễ đọc, dễ kiểm thử |
+| **Tệp dài nhất toàn dự án** | 558 dòng (shift_model.dart) | **343 dòng** (point_detail_bottom_sheet.dart) | **-215 dòng (-38.5%)** |
+| **Phân tích tĩnh (lutter analyze)** | 0 warning / error | **No issues found!** (0 issues) | Giữ vững chuẩn sạch |
+| **Kiểm thử tự động (lutter test)** | 182/182 tests passed | **182/182 tests passed** (100%) | Đạt 100% xanh toàn bộ 26 test suites |
+
+### 8.2. Danh Sách 10 Tệp Dài Nhất Hiện Tại (Tất Cả Đều $\le$ 343 dòng)
+
+| STT | Tên Tệp | Số Dòng | Phân Loại |
+| :---: | :--- | :---: | :--- |
+| 1 | shared_widgets/point_detail_bottom_sheet.dart | 343 | Bottom sheet chi tiết điểm giao hàng & 3 nút lớn |
+| 2 | data/local/local_customer_repository.dart | 334 | SQLite Customer Repository & tra cứu danh bạ |
+| 3 | eatures/shifts/shift_map_view.dart | 320 | Bản đồ lộ trình ca giao hàng |
+| 4 | eatures/map/main_map_view.dart | 313 | Bản đồ chính hiển thị điểm đã lưu & lọc theo khu vực |
+| 5 | shared_widgets/bulk_paste_phone_sheet.dart | 309 | Bottom sheet dán SĐT hàng loạt vào ca hoặc danh bạ |
+| 6 | eatures/sharing/data_share_send_sheet.dart | 299 | Bottom sheet xuất file .dshare & mã QR chia sẻ |
+| 7 | eatures/directory/customer_directory_view.dart | 292 | Danh bạ khách hàng tìm kiếm không dấu & phân trang |
+| 8 | eatures/sharing/data_share_import_preview_sheet.dart | 286 | Bottom sheet đối soát và nhập gói chia sẻ ngoại tuyến |
+| 9 | eatures/shifts/shift_preparation_view.dart | 279 | Màn hình chuẩn bị ca giao hàng tại kho |
+| 10 | core/utils/share_crypto_utils.dart | 279 | Tiện ích nén zip, chunking QR và mã hóa PBKDF2/AES-GCM |

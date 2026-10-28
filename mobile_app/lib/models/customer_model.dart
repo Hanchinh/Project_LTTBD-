@@ -3,325 +3,151 @@ import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 
 class CustomerDirectoryModel {
-  final String id;
-  final String customerCode;
-  final String fullName;
-  final String phoneNumber;
-  final String addressText;
-  final String? areaId;
-  final String? areaName;
-  final LocationStatus locationStatus;
-  final LocationStatus locationState;
-  final bool hasLocation;
-  final double? latitude;
-  final double? longitude;
-  final String? identificationNotes;
-  final String? imageUrl;
-  final String? firstThumbnailUrl;
+  final String id, customerCode, fullName, phoneNumber, addressText;
+  final String? areaId, areaName, identificationNotes, imageUrl, firstThumbnailUrl, savedLocationId;
+  final LocationStatus locationStatus, locationState;
+  final bool hasLocation, isExisting;
+  final double? latitude, longitude;
   final int photoCount;
   final List<CustomerPhotoModel> photos;
-  final String? savedLocationId;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
-  final bool isExisting;
+  final DateTime? createdAt, updatedAt;
 
   CustomerDirectoryModel({
-    required this.id,
-    required this.customerCode,
-    required this.fullName,
-    required this.phoneNumber,
-    required this.addressText,
-    this.areaId,
-    this.areaName,
-    this.locationStatus = LocationStatus.noLocation,
-    LocationStatus? locationState,
-    this.hasLocation = false,
-    this.latitude,
-    this.longitude,
-    this.identificationNotes,
-    this.imageUrl,
-    this.firstThumbnailUrl,
-    this.photoCount = 0,
-    this.photos = const [],
-    this.savedLocationId,
-    this.createdAt,
-    this.updatedAt,
-    this.isExisting = false,
+    required this.id, required this.customerCode, required this.fullName,
+    required this.phoneNumber, required this.addressText, this.areaId, this.areaName,
+    this.locationStatus = LocationStatus.noLocation, LocationStatus? locationState,
+    this.hasLocation = false, this.latitude, this.longitude, this.identificationNotes,
+    this.imageUrl, this.firstThumbnailUrl, this.photoCount = 0, this.photos = const [],
+    this.savedLocationId, this.createdAt, this.updatedAt, this.isExisting = false,
   }) : locationState = locationState ?? locationStatus;
 
   bool get hasValidCoordinates => latitude != null && longitude != null;
-
   LatLng? get latLng => hasValidCoordinates ? LatLng(latitude!, longitude!) : null;
-
   bool get hasPhoto => photoCount > 0 || (imageUrl != null && imageUrl!.trim().isNotEmpty) || (firstThumbnailUrl != null && firstThumbnailUrl!.trim().isNotEmpty);
-
   String get effectivePhotoUrl => firstThumbnailUrl ?? imageUrl ?? (photos.isNotEmpty ? photos.first.imageUrl : '');
 
-  /// Định dạng số điện thoại chuẩn Việt Nam: ví dụ "0908 333 166" hoặc "090 833 3166"
   String get formattedPhoneNumber {
-    final clean = phoneNumber.replaceAll(RegExp(r'\D'), '');
-    if (clean.length == 10 && clean.startsWith('0')) {
-      // 0908 333 166
-      return '${clean.substring(0, 4)} ${clean.substring(4, 7)} ${clean.substring(7)}';
-    } else if (clean.length == 11 && clean.startsWith('84')) {
-      final vn = '0${clean.substring(2)}';
-      return '${vn.substring(0, 4)} ${vn.substring(4, 7)} ${vn.substring(7)}';
-    }
+    final c = phoneNumber.replaceAll(RegExp(r'\D'), '');
+    if (c.length == 10 && c.startsWith('0')) return '${c.substring(0, 4)} ${c.substring(4, 7)} ${c.substring(7)}';
+    if (c.length == 11 && c.startsWith('84')) { final vn = '0${c.substring(2)}'; return '${vn.substring(0, 4)} ${vn.substring(4, 7)} ${vn.substring(7)}'; }
     return phoneNumber;
   }
 
-  factory CustomerDirectoryModel.fromJson(Map<String, dynamic> json) {
-    double? parseCoord(dynamic value) {
-      if (value == null) return null;
-      if (value is num) return value.toDouble();
-      return double.tryParse(value.toString());
-    }
-
-    List<CustomerPhotoModel> parsedPhotos = [];
-    if (json['photos'] != null && json['photos'] is List) {
-      parsedPhotos = (json['photos'] as List)
-          .map((item) => CustomerPhotoModel.fromJson(item as Map<String, dynamic>, defaultCustomerId: json['id']?.toString()))
-          .toList();
-    }
-
-    final pCount = json['photoCount'] is int
-        ? json['photoCount'] as int
-        : (int.tryParse(json['photoCount']?.toString() ?? '') ?? parsedPhotos.length);
-
-    final rawImageUrl = json['imageUrl']?.toString() ?? (parsedPhotos.isNotEmpty ? parsedPhotos.first.imageUrl : null);
-    final rawFirstThumb = json['firstThumbnailUrl']?.toString() ?? rawImageUrl;
-
-    final locStatus = LocationStatus.fromString(json['locationStatus']?.toString());
-    final locState = json['locationState'] != null
-        ? LocationStatus.fromString(json['locationState']?.toString())
-        : locStatus;
+  factory CustomerDirectoryModel.fromJson(Map<String, dynamic> j) {
+    double? parseCoord(dynamic v) => v == null ? null : (v is num ? v.toDouble() : double.tryParse(v.toString()));
+    final rawPhotos = j['photos'];
+    final photos = rawPhotos is List ? rawPhotos.whereType<Map<String, dynamic>>().map((i) => CustomerPhotoModel.fromJson(i, defaultCustomerId: j['id']?.toString())).toList() : <CustomerPhotoModel>[];
+    final pCount = j['photoCount'] is int ? j['photoCount'] as int : (int.tryParse(j['photoCount']?.toString() ?? '') ?? photos.length);
+    final rawImg = j['imageUrl']?.toString() ?? (photos.isNotEmpty ? photos.first.imageUrl : null);
+    final locStatus = LocationStatus.fromString(j['locationStatus']?.toString());
 
     return CustomerDirectoryModel(
-      id: json['id']?.toString() ?? '',
-      customerCode: json['customerCode']?.toString() ?? '',
-      fullName: json['fullName']?.toString() ?? 'Khách hàng',
-      phoneNumber: json['phoneNumber']?.toString() ?? '',
-      addressText: json['addressText']?.toString() ?? 'Chưa có địa chỉ chi tiết',
-      areaId: json['areaId']?.toString(),
-      areaName: json['areaName']?.toString(),
+      id: j['id']?.toString() ?? '', customerCode: j['customerCode']?.toString() ?? '',
+      fullName: j['fullName']?.toString() ?? 'Khách hàng', phoneNumber: j['phoneNumber']?.toString() ?? '',
+      addressText: j['addressText']?.toString() ?? 'Chưa có địa chỉ chi tiết',
+      areaId: j['areaId']?.toString(), areaName: j['areaName']?.toString(),
       locationStatus: locStatus,
-      locationState: locState,
-      hasLocation: json['hasLocation'] == true || (json['latitude'] != null && json['longitude'] != null),
-      latitude: parseCoord(json['latitude']),
-      longitude: parseCoord(json['longitude']),
-      identificationNotes: json['identificationNotes']?.toString(),
-      imageUrl: rawImageUrl,
-      firstThumbnailUrl: rawFirstThumb,
-      photoCount: pCount,
-      photos: parsedPhotos,
-      savedLocationId: json['savedLocationId']?.toString(),
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
-      updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt'].toString()) : null,
-      isExisting: json['isExisting'] == true,
+      locationState: j['locationState'] != null ? LocationStatus.fromString(j['locationState']?.toString()) : locStatus,
+      hasLocation: j['hasLocation'] == true || (j['latitude'] != null && j['longitude'] != null),
+      latitude: parseCoord(j['latitude']), longitude: parseCoord(j['longitude']),
+      identificationNotes: j['identificationNotes']?.toString(), imageUrl: rawImg,
+      firstThumbnailUrl: j['firstThumbnailUrl']?.toString() ?? rawImg,
+      photoCount: pCount, photos: photos, savedLocationId: j['savedLocationId']?.toString(),
+      createdAt: j['createdAt'] != null ? DateTime.tryParse(j['createdAt'].toString()) : null,
+      updatedAt: j['updatedAt'] != null ? DateTime.tryParse(j['updatedAt'].toString()) : null,
+      isExisting: j['isExisting'] == true,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'customerCode': customerCode,
-      'fullName': fullName,
-      'phoneNumber': phoneNumber,
-      'addressText': addressText,
-      'areaId': areaId,
-      'areaName': areaName,
-      'locationStatus': locationStatus.toApiString(),
-      'locationState': locationState.toApiString(),
-      'hasLocation': hasLocation,
-      'latitude': latitude,
-      'longitude': longitude,
-      'identificationNotes': identificationNotes,
-      'imageUrl': imageUrl,
-      'firstThumbnailUrl': firstThumbnailUrl,
-      'photoCount': photoCount,
-      'photos': photos.map((p) => p.toJson()).toList(),
-      'savedLocationId': savedLocationId,
-      'createdAt': createdAt?.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
-      'isExisting': isExisting,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'id': id, 'customerCode': customerCode, 'fullName': fullName, 'phoneNumber': phoneNumber,
+    'addressText': addressText, 'areaId': areaId, 'areaName': areaName,
+    'locationStatus': locationStatus.toApiString(), 'locationState': locationState.toApiString(),
+    'hasLocation': hasLocation, 'latitude': latitude, 'longitude': longitude,
+    'identificationNotes': identificationNotes, 'imageUrl': imageUrl,
+    'firstThumbnailUrl': firstThumbnailUrl, 'photoCount': photoCount,
+    'photos': photos.map((p) => p.toJson()).toList(), 'savedLocationId': savedLocationId,
+    'createdAt': createdAt?.toIso8601String(), 'updatedAt': updatedAt?.toIso8601String(), 'isExisting': isExisting,
+  };
 
   CustomerDirectoryModel copyWith({
-    String? id,
-    String? customerCode,
-    String? fullName,
-    String? phoneNumber,
-    String? addressText,
-    String? areaId,
-    String? areaName,
-    LocationStatus? locationStatus,
-    LocationStatus? locationState,
-    bool? hasLocation,
-    double? latitude,
-    double? longitude,
-    String? identificationNotes,
-    String? imageUrl,
-    String? firstThumbnailUrl,
-    int? photoCount,
-    List<CustomerPhotoModel>? photos,
-    String? savedLocationId,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    bool? isExisting,
-  }) {
-    return CustomerDirectoryModel(
-      id: id ?? this.id,
-      customerCode: customerCode ?? this.customerCode,
-      fullName: fullName ?? this.fullName,
-      phoneNumber: phoneNumber ?? this.phoneNumber,
-      addressText: addressText ?? this.addressText,
-      areaId: areaId ?? this.areaId,
-      areaName: areaName ?? this.areaName,
-      locationStatus: locationStatus ?? this.locationStatus,
-      locationState: locationState ?? this.locationState,
-      hasLocation: hasLocation ?? this.hasLocation,
-      latitude: latitude ?? this.latitude,
-      longitude: longitude ?? this.longitude,
-      identificationNotes: identificationNotes ?? this.identificationNotes,
-      imageUrl: imageUrl ?? this.imageUrl,
-      firstThumbnailUrl: firstThumbnailUrl ?? this.firstThumbnailUrl,
-      photoCount: photoCount ?? this.photoCount,
-      photos: photos ?? this.photos,
-      savedLocationId: savedLocationId ?? this.savedLocationId,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      isExisting: isExisting ?? this.isExisting,
-    );
-  }
+    String? id, customerCode, fullName, phoneNumber, addressText, areaId, areaName,
+    identificationNotes, imageUrl, firstThumbnailUrl, savedLocationId,
+    LocationStatus? locationStatus, locationState, bool? hasLocation, isExisting,
+    double? latitude, longitude, int? photoCount, List<CustomerPhotoModel>? photos,
+    DateTime? createdAt, updatedAt,
+  }) => CustomerDirectoryModel(
+    id: id ?? this.id, customerCode: customerCode ?? this.customerCode,
+    fullName: fullName ?? this.fullName, phoneNumber: phoneNumber ?? this.phoneNumber,
+    addressText: addressText ?? this.addressText, areaId: areaId ?? this.areaId,
+    areaName: areaName ?? this.areaName, locationStatus: locationStatus ?? this.locationStatus,
+    locationState: locationState ?? this.locationState, hasLocation: hasLocation ?? this.hasLocation,
+    latitude: latitude ?? this.latitude, longitude: longitude ?? this.longitude,
+    identificationNotes: identificationNotes ?? this.identificationNotes,
+    imageUrl: imageUrl ?? this.imageUrl, firstThumbnailUrl: firstThumbnailUrl ?? this.firstThumbnailUrl,
+    photoCount: photoCount ?? this.photoCount, photos: photos ?? this.photos,
+    savedLocationId: savedLocationId ?? this.savedLocationId,
+    createdAt: createdAt ?? this.createdAt, updatedAt: updatedAt ?? this.updatedAt,
+    isExisting: isExisting ?? this.isExisting,
+  );
 }
 
 class CustomerTabCounts {
-  final int total;
-  final int verified;
-  final int temporary;
-  final int noLocation;
-
-  const CustomerTabCounts({
-    this.total = 0,
-    this.verified = 0,
-    this.temporary = 0,
-    this.noLocation = 0,
-  });
-
-  factory CustomerTabCounts.fromJson(Map<String, dynamic>? json) {
-    if (json == null) return const CustomerTabCounts();
-    return CustomerTabCounts(
-      total: (json['total'] as num?)?.toInt() ?? 0,
-      verified: (json['verified'] as num?)?.toInt() ?? 0,
-      temporary: (json['temporary'] as num?)?.toInt() ?? 0,
-      noLocation: (json['noLocation'] as num?)?.toInt() ?? 0,
-    );
-  }
+  final int total, verified, temporary, noLocation;
+  const CustomerTabCounts({this.total = 0, this.verified = 0, this.temporary = 0, this.noLocation = 0});
+  factory CustomerTabCounts.fromJson(Map<String, dynamic>? j) => CustomerTabCounts(
+    total: (j?['total'] as num?)?.toInt() ?? 0, verified: (j?['verified'] as num?)?.toInt() ?? 0,
+    temporary: (j?['temporary'] as num?)?.toInt() ?? 0, noLocation: (j?['noLocation'] as num?)?.toInt() ?? 0,
+  );
 }
 
 class CustomerPagination {
-  final int total;
-  final int limit;
-  final int offset;
+  final int total, limit, offset;
   final bool hasMore;
-
-  const CustomerPagination({
-    this.total = 0,
-    this.limit = 30,
-    this.offset = 0,
-    this.hasMore = false,
-  });
-
-  factory CustomerPagination.fromJson(Map<String, dynamic>? json) {
-    if (json == null) return const CustomerPagination();
-    return CustomerPagination(
-      total: (json['total'] as num?)?.toInt() ?? 0,
-      limit: (json['limit'] as num?)?.toInt() ?? 30,
-      offset: (json['offset'] as num?)?.toInt() ?? 0,
-      hasMore: json['hasMore'] == true,
-    );
-  }
+  const CustomerPagination({this.total = 0, this.limit = 30, this.offset = 0, this.hasMore = false});
+  factory CustomerPagination.fromJson(Map<String, dynamic>? j) => CustomerPagination(
+    total: (j?['total'] as num?)?.toInt() ?? 0, limit: (j?['limit'] as num?)?.toInt() ?? 30,
+    offset: (j?['offset'] as num?)?.toInt() ?? 0, hasMore: j?['hasMore'] == true,
+  );
 }
 
 class CustomerDirectoryResponse {
   final List<CustomerDirectoryModel> items;
   final CustomerTabCounts counts;
   final CustomerPagination pagination;
-
-  const CustomerDirectoryResponse({
-    this.items = const [],
-    this.counts = const CustomerTabCounts(),
-    this.pagination = const CustomerPagination(),
-  });
+  const CustomerDirectoryResponse({this.items = const [], this.counts = const CustomerTabCounts(), this.pagination = const CustomerPagination()});
 }
 
 class BulkCustomerItem {
-  final String id;
-  final String customerCode;
-  final String phoneNumber;
-  final String fullName;
-  final String addressText;
+  final String id, customerCode, phoneNumber, fullName, addressText;
   final String? areaId;
   final LocationStatus locationState;
-
-  BulkCustomerItem({
-    required this.id,
-    required this.customerCode,
-    required this.phoneNumber,
-    required this.fullName,
-    required this.addressText,
-    this.areaId,
-    this.locationState = LocationStatus.noLocation,
-  });
-
-  factory BulkCustomerItem.fromJson(Map<String, dynamic> json) {
-    return BulkCustomerItem(
-      id: json['id']?.toString() ?? '',
-      customerCode: json['customerCode']?.toString() ?? '',
-      phoneNumber: json['phoneNumber']?.toString() ?? json['phone']?.toString() ?? '',
-      fullName: json['fullName']?.toString() ?? json['name']?.toString() ?? '',
-      addressText: json['addressText']?.toString() ?? json['address']?.toString() ?? '',
-      areaId: json['areaId']?.toString(),
-      locationState: LocationStatus.fromString(json['locationState']?.toString()),
-    );
-  }
+  BulkCustomerItem({required this.id, required this.customerCode, required this.phoneNumber, required this.fullName, required this.addressText, this.areaId, this.locationState = LocationStatus.noLocation});
+  factory BulkCustomerItem.fromJson(Map<String, dynamic> j) => BulkCustomerItem(
+    id: j['id']?.toString() ?? '', customerCode: j['customerCode']?.toString() ?? '',
+    phoneNumber: j['phoneNumber']?.toString() ?? j['phone']?.toString() ?? '',
+    fullName: j['fullName']?.toString() ?? j['name']?.toString() ?? '',
+    addressText: j['addressText']?.toString() ?? j['address']?.toString() ?? '',
+    areaId: j['areaId']?.toString(), locationState: LocationStatus.fromString(j['locationState']?.toString()),
+  );
 }
 
 class BulkCreateCustomersResult {
-  final List<BulkCustomerItem> created;
-  final List<BulkCustomerItem> alreadyExists;
+  final List<BulkCustomerItem> created, alreadyExists;
   final List<RejectedPhoneItem> rejected;
-  final int total;
-  final int createdCount;
-  final int alreadyExistsCount;
-  final int rejectedCount;
-
-  BulkCreateCustomersResult({
-    required this.created,
-    required this.alreadyExists,
-    required this.rejected,
-    required this.total,
-    required this.createdCount,
-    required this.alreadyExistsCount,
-    required this.rejectedCount,
-  });
-
-  factory BulkCreateCustomersResult.fromJson(Map<String, dynamic> json) {
-    final rawCreated = json['created'] as List? ?? [];
-    final rawAlready = json['alreadyExists'] as List? ?? [];
-    final rawRejected = json['rejected'] as List? ?? [];
-    final summary = json['summary'] as Map<String, dynamic>? ?? {};
-
+  final int total, createdCount, alreadyExistsCount, rejectedCount;
+  BulkCreateCustomersResult({required this.created, required this.alreadyExists, required this.rejected, required this.total, required this.createdCount, required this.alreadyExistsCount, required this.rejectedCount});
+  factory BulkCreateCustomersResult.fromJson(Map<String, dynamic> j) {
+    final c = (j['created'] as List? ?? []).whereType<Map<String, dynamic>>().map(BulkCustomerItem.fromJson).toList();
+    final a = (j['alreadyExists'] as List? ?? []).whereType<Map<String, dynamic>>().map(BulkCustomerItem.fromJson).toList();
+    final r = (j['rejected'] as List? ?? []).whereType<Map<String, dynamic>>().map(RejectedPhoneItem.fromJson).toList();
+    final s = j['summary'] as Map<String, dynamic>? ?? {};
     return BulkCreateCustomersResult(
-      created: rawCreated.whereType<Map<String, dynamic>>().map((e) => BulkCustomerItem.fromJson(e)).toList(),
-      alreadyExists: rawAlready.whereType<Map<String, dynamic>>().map((e) => BulkCustomerItem.fromJson(e)).toList(),
-      rejected: rawRejected.whereType<Map<String, dynamic>>().map((e) => RejectedPhoneItem.fromJson(e)).toList(),
-      total: int.tryParse(summary['total']?.toString() ?? '') ?? (rawCreated.length + rawAlready.length + rawRejected.length),
-      createdCount: int.tryParse(summary['createdCount']?.toString() ?? '') ?? rawCreated.length,
-      alreadyExistsCount: int.tryParse(summary['alreadyExistsCount']?.toString() ?? '') ?? rawAlready.length,
-      rejectedCount: int.tryParse(summary['rejectedCount']?.toString() ?? '') ?? rawRejected.length,
+      created: c, alreadyExists: a, rejected: r,
+      total: int.tryParse(s['total']?.toString() ?? '') ?? (c.length + a.length + r.length),
+      createdCount: int.tryParse(s['createdCount']?.toString() ?? '') ?? c.length,
+      alreadyExistsCount: int.tryParse(s['alreadyExistsCount']?.toString() ?? '') ?? a.length,
+      rejectedCount: int.tryParse(s['rejectedCount']?.toString() ?? '') ?? r.length,
     );
   }
 }
-
