@@ -318,7 +318,10 @@ void main() {
 
       await tester.runAsync(() async {
         await tester.tap(find.byKey(const Key('welcome_start_btn')));
-        await Future.delayed(const Duration(milliseconds: 500));
+        for (int i = 0; i < 60; i++) {
+          if (startFinished) break;
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
       });
       await tester.pump();
 
@@ -364,7 +367,7 @@ void main() {
 
       await tester.runAsync(() async {
         await tester.tap(find.byKey(const Key('pin_submit_btn')));
-        await Future.delayed(const Duration(milliseconds: 300));
+        await Future.delayed(const Duration(milliseconds: 600));
       });
       await tester.pump();
 
@@ -380,7 +383,10 @@ void main() {
 
       await tester.runAsync(() async {
         await tester.tap(find.byKey(const Key('pin_submit_btn')));
-        await Future.delayed(const Duration(milliseconds: 300));
+        for (int i = 0; i < 60; i++) {
+          if (unlocked) break;
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
       });
       await tester.pump();
 

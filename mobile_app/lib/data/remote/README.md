@@ -1,5 +1,9 @@
 # Remote Data (Server Mode)
 
+> **Lưu ý:** Đây là bản cài đặt giao tiếp máy chủ, giữ lại để tương thích với bản có máy chủ ở tag `v1.0-full`. Trong bản nộp `submit-app-only`, app chạy mặc định ở chế độ Local-First và không gọi các file này.
+
+---
+
 Tầng giao tiếp mạng dành riêng cho chế độ kết nối với máy chủ trung tâm (Server Mode):
 
 - **`api_client.dart`**: Trình quản lý HTTP Client chung, lưu trữ base URL, JWT token, cấu hình timeout (15s), và xử lý chuẩn hóa ngoại lệ mạng.
@@ -14,4 +18,3 @@ Tầng giao tiếp mạng dành riêng cho chế độ kết nối với máy ch
 - **`api_service.dart`**: Lớp bao facade mỏng gom các API con, duy trì tương thích 100% cho mã nguồn cũ.
 - **`remote_*_repository.dart`**: Các triển khai của `*Repository` kết nối tới API REST của máy chủ.
 - **`offline_storage_service.dart`**: Dịch vụ đệm ngoại tuyến cũ của phiên bản có máy chủ.
-

@@ -1,5 +1,5 @@
 # =============================================================================
-# Root .gitignore for Delivery Location Marker System
+# Root .gitignore for Delivery Location Marker System (App-Only)
 # =============================================================================
 
 # Operating System & Artifacts
@@ -31,17 +31,11 @@ Thumbs.db
 *.jks
 *.keystore
 
-# Node.js & Web Packages / Build Artifacts (Backend & Admin Web)
-node_modules/
-dist/
-admin_web/dist/
-.vite/
-admin_web/.vite/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+# Android Keystore and signing properties
+key.properties
+**/key.properties
+!key.properties.example
+!**/key.properties.example
 
 # Logs, Cache & Test Reports
 logs/
@@ -70,22 +64,18 @@ mobile_app/android/app/profile
 mobile_app/android/app/release
 mobile_app/.widget_preview/
 
-# NOTE: Lockfiles (package-lock.json, mobile_app/pubspec.lock) are deliberately TRACKED.
+# NOTE: Lockfiles (mobile_app/pubspec.lock) are deliberately TRACKED.
 
-project_context.txt
-
-backend/.env
-backend/uploads/
+# Archive & Database Artifacts
 *.apk
 *.dump
 *.zip
 *.sql
-!init-db/*.sql
 backups/
 backup_*
 
-# Android Keystore and signing properties
-key.properties
-**/key.properties
-*.jks
-*.keystore
+# Preserved/Untracked local folders from server branches (when switching branches)
+admin_web/
+backend/
+node_modules/
+dist/

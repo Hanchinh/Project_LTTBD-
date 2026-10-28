@@ -1,6 +1,7 @@
 # Architecture Decision Records (ADR): Delivery Location Marker System
 
-> **Tập hợp các quyết định kiến trúc đã được xác minh trong mã nguồn và các đề xuất kỹ thuật đang chờ duyệt.**
+> **Tài liệu của bản có máy chủ. Bản này (submit-app-only) không còn backend. Xem tag v1.0-full.**  
+> **Lưu ý:** Các quyết định ADR-001 đến ADR-003 bên dưới áp dụng cho kiến trúc Client-Server tại tag `v1.0-full`. Bản nộp `submit-app-only` vận hành theo mô hình Local-First độc lập (xem [docs/BRAIN.md](docs/BRAIN.md)).
 
 ---
 

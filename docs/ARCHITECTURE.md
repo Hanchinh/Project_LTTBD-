@@ -1,6 +1,7 @@
 # System Architecture: Delivery Location Marker System
 
-> **Tài liệu đặc tả kiến trúc kỹ thuật phục vụ phối hợp giữa Project Architect và Software Engineer.**
+> **Tài liệu của bản có máy chủ. Bản này (submit-app-only) không còn backend. Xem tag v1.0-full.**  
+> **Lưu ý:** Xem [docs/BRAIN.md](docs/BRAIN.md) để nắm cấu trúc kiến trúc Local-First của bản nộp hiện tại.
 
 ---
 

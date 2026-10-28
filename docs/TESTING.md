@@ -1,10 +1,12 @@
 # Testing Guide & Verification Log: Delivery Location Marker System
 
+> **Tài liệu của bản có máy chủ. Bản này (submit-app-only) không còn backend. Xem tag v1.0-full.**  
+> **Lưu ý:** Các phần kiểm thử Backend (`npm test`) và Admin Web bên dưới thuộc về phiên bản có máy chủ tại tag `v1.0-full`. Trên nhánh `submit-app-only` (bản nộp App-Only), kiểm thử tập trung hoàn toàn vào `mobile_app` (`flutter test` với 231+ tests và `flutter analyze`).
+
 > **Tài liệu hướng dẫn kiểm thử và biên bản kết quả kiểm tra thực tế trên hệ thống.**  
 > **Nguyên tắc cốt lõi:** Không tuyên bố test thành công nếu chưa thực sự chạy lệnh và ghi nhận kết quả.
 
 ---
-
 ## 1. Môi Trường Yêu Cầu Để Chạy Kiểm Thử (Testing Prerequisites)
 
 - **Node.js:** Phiên bản `>= 20.x` kèm `npm >= 10.x`

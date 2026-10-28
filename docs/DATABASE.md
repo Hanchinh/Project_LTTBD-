@@ -1,6 +1,7 @@
 # Database Documentation: Delivery Location Marker System
 
-> **Tài liệu đặc tả Cơ sở dữ liệu quan hệ và không gian địa lý (PostgreSQL 16 + PostGIS 3.4).**
+> **Tài liệu của bản có máy chủ. Bản này (submit-app-only) không còn backend. Xem tag v1.0-full.**
+> **Lưu ý:** Các phần đặc tả PostgreSQL / PostGIS 3.4 dưới đây chỉ áp dụng cho kiến trúc có máy chủ. Phiên bản Local-First hiện tại sử dụng SQLite cục bộ (chi tiết tại mục 7 và trong `mobile_app/lib/data/local/app_database.dart`).
 
 ---
 

@@ -1,7 +1,7 @@
 # Project Brief: Delivery Location Marker System (MVP)
 
-> **Tài liệu phục vụ phối hợp giữa Project Architect và Software Engineer.**  
-> **Trạng thái:** Hoàn tất khảo sát ban đầu. Không chứa thông tin suy diễn chưa xác minh.
+> **Tài liệu của bản có máy chủ. Bản này (submit-app-only) không còn backend. Xem tag v1.0-full.**  
+> **Lưu ý:** Xem [docs/BRAIN.md](docs/BRAIN.md) để nắm mục tiêu và kiến trúc của bản nộp App-Only hiện tại.
 
 ---
 
