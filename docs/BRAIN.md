@@ -51,3 +51,4 @@ Mọi lệnh thực thi tại thư mục `mobile_app/`:
    - `[CHƯA TRIỂN KHAI]`: Chưa có mã nguồn hoặc giao diện.
    - `[CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]`: Đã test trên máy ảo/unit test nhưng cần kiểm chứng cảm ứng, camera, GPS, intent trên thiết bị phần cứng thật.
 3. **An toàn bản nộp:** Không sửa đổi logic ứng dụng trong `mobile_app`. Mọi thay đổi tài liệu phải đồng bộ.
+
