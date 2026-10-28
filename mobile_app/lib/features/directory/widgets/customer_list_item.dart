@@ -3,7 +3,7 @@ import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/shared_widgets/authenticated_image.dart';
 
-/// Dòng hiển thị khách hàng trong danh bạ
+/// Dòng hiển thị khách hàng trong danh bạ chuẩn công thái học thực địa (Industrial Field Utility)
 class CustomerListItemWidget extends StatelessWidget {
   final CustomerDirectoryModel customer;
   final ValueChanged<CustomerDirectoryModel> onTap;
@@ -20,6 +20,9 @@ class CustomerListItemWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     Color dotColor;
     switch (customer.locationState) {
@@ -39,7 +42,7 @@ class CustomerListItemWidget extends StatelessWidget {
         color: colorScheme.surface,
         border: Border(
           bottom: BorderSide(
-            color: theme.dividerTheme.color ?? const Color(0xFFF1F5F9),
+            color: borderColor,
             width: 1,
           ),
         ),
@@ -62,9 +65,7 @@ class CustomerListItemWidget extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0),
-                        ),
+                        border: Border.all(color: borderColor),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(10),
@@ -105,9 +106,10 @@ class CustomerListItemWidget extends StatelessWidget {
                       Text(
                         '${customer.formattedPhoneNumber} · ${customer.fullName}',
                         style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
                           color: colorScheme.onSurface,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -117,7 +119,7 @@ class CustomerListItemWidget extends StatelessWidget {
                         customer.addressText.isNotEmpty ? customer.addressText : 'Chưa có địa chỉ',
                         style: TextStyle(
                           fontSize: 13,
-                          color: colorScheme.onSurfaceVariant,
+                          color: subtextColor,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -135,19 +137,18 @@ class CustomerListItemWidget extends StatelessWidget {
                     message: 'Thêm vào ca',
                     child: Center(
                       child: InkWell(
+                        key: const Key('btn_add_to_shift'),
                         borderRadius: BorderRadius.circular(8),
                         onTap: () => onAddToShift(customer),
                         child: Container(
-                          width: 34,
-                          height: 34,
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: theme.dividerTheme.color ?? const Color(0xFFCBD5E1),
-                            ),
+                            border: Border.all(color: borderColor),
                           ),
-                          child: Icon(Icons.add_rounded, size: 20, color: colorScheme.onSurface),
+                          child: Icon(Icons.add_rounded, size: 22, color: colorScheme.onSurface),
                         ),
                       ),
                     ),

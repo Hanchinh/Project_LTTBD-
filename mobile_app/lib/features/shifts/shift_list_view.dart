@@ -210,14 +210,24 @@ class _ShiftListViewState extends State<ShiftListView> {
                                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                                 children: [
                                   if (activeShift != null) ...[
-                                    Row(
-                                      children: [
-                                        Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
-                                        const SizedBox(width: 6),
-                                        const Text('ĐANG THỰC HIỆN', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF10B981), letterSpacing: 0.5)),
-                                      ],
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 2, bottom: 8),
+                                      child: Row(
+                                        children: [
+                                          Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle)),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            'ĐANG THỰC HIỆN',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 1.2,
+                                              color: Color(0xFF10B981),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    const SizedBox(height: 8),
                                     ShiftInProgressCard(
                                       shift: activeShift,
                                       onRename: () => _handleRenameShift(activeShift),
@@ -226,8 +236,19 @@ class _ShiftListViewState extends State<ShiftListView> {
                                       onOpenMap: () => _openShiftMap(activeShift),
                                     ),
                                   ],
-                                  Text('DANH SÁCH CA (${_shifts.length})', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: subtextColor, letterSpacing: 0.5)),
-                                  const SizedBox(height: 10),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 2, bottom: 8),
+                                    child: Text(
+                                      'DANH SÁCH CA (${_shifts.length})',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 1.2,
+                                        color: subtextColor,
+                                        fontFeatures: const [FontFeature.tabularFigures()],
+                                      ),
+                                    ),
+                                  ),
                                   ListView.separated(
                                     shrinkWrap: true,
                                     physics: const NeverScrollableScrollPhysics(),

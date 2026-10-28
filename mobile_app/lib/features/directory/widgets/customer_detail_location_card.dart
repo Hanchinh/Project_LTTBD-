@@ -23,18 +23,16 @@ class CustomerDetailLocationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
     final hasLocation = latitude != null && longitude != null;
 
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0),
-        ),
-        boxShadow: const [
-          BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2)),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -42,7 +40,12 @@ class CustomerDetailLocationCard extends StatelessWidget {
         children: [
           Text(
             'TỌA ĐỘ & GHI CHÚ VỊ TRÍ',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colorScheme.onSurface),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: subtextColor,
+            ),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -78,6 +81,7 @@ class CustomerDetailLocationCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: borderColor),
               ),
               child: Row(
                 children: [
@@ -86,7 +90,13 @@ class CustomerDetailLocationCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Tọa độ: ${latitude!.toStringAsFixed(6)}, ${longitude!.toStringAsFixed(6)}',
-                      style: TextStyle(fontSize: 13, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -99,18 +109,21 @@ class CustomerDetailLocationCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFFBEB),
+                color: isDark ? const Color(0xFF451A03).withValues(alpha: 0.4) : const Color(0xFFFFFBEB),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFFDE68A)),
+                border: Border.all(color: isDark ? const Color(0xFF92400E) : const Color(0xFFFDE68A)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFD97706)),
-                  SizedBox(width: 8),
+                  const Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFD97706)),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Khách hàng chưa có tọa độ ghim cổng nhà.',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF92400E)),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
+                      ),
                     ),
                   ),
                 ],
@@ -118,18 +131,29 @@ class CustomerDetailLocationCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          Text('GHI CHÚ NHẬN DIỆN (ĐẶC ĐIỂM CỔNG/CỬA)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: colorScheme.onSurfaceVariant)),
+          Text(
+            'GHI CHÚ NHẬN DIỆN (ĐẶC ĐIỂM CỔNG/CỬA)',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: subtextColor,
+            ),
+          ),
           const SizedBox(height: 6),
           TextField(
             controller: notesController,
             maxLines: 2,
+            style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: 'Ví dụ: Cổng sắt màu xanh, hẻm cụt, chuông cửa bên phải...',
+              hintStyle: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
               filled: true,
               fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
               contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.dividerTheme.color ?? const Color(0xFFCBD5E1))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.dividerTheme.color ?? const Color(0xFFCBD5E1))),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: borderColor)),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
             ),
           ),
         ],

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 
-/// Hàng tab lọc cuộn ngang: Tất cả | Đã xác minh | Vị trí tạm | Chưa có vị trí
+/// Hàng tab lọc dạng thanh công cụ thực địa kỹ thuật (Tactile Segmented Tabs)
+/// Tất cả | Đã xác minh | Vị trí tạm | Chưa có vị trí
 class DirectoryFilterTabs extends StatelessWidget {
   final String selectedFilter;
   final CustomerTabCounts tabCounts;
@@ -31,47 +32,54 @@ class DirectoryFilterTabs extends StatelessWidget {
         : colorScheme.surface;
     final borderColor = isSelected
         ? (isDark ? const Color(0xFF3B82F6) : const Color(0xFF0F172A))
-        : (theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)));
+        : (theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)));
     final textColor = isSelected
         ? Colors.white
         : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF475569));
 
     return Padding(
       padding: const EdgeInsets.only(right: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          if (selectedFilter != key) {
-            onFilterSelected(key);
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (dotColor != null) ...[
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () {
+            if (selectedFilter != key) {
+              onFilterSelected(key);
+            }
+          },
+          child: Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: borderColor),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (dotColor != null) ...[
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  '$label ($count)',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                    color: textColor,
+                    letterSpacing: 0.2,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
-                const SizedBox(width: 6),
               ],
-              Text(
-                '$label ($count)',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: textColor,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

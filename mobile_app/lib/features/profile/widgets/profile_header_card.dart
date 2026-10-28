@@ -49,29 +49,29 @@ class ProfileHeaderCard extends StatelessWidget {
 
     return Container(
       key: const Key('profile_header_card'),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Row(
         children: [
           CircleAvatar(
-            radius: 32,
+            radius: 30,
             backgroundColor: isDark ? const Color(0xFF2563EB) : const Color(0xFF0F172A),
             child: Text(
               _getInitials(user?.fullName ?? 'U'),
               key: const Key('user_avatar_initials'),
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
                 letterSpacing: 1.0,
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,9 +83,10 @@ class ProfileHeaderCard extends StatelessWidget {
                         user?.fullName ?? 'Người dùng',
                         key: const Key('user_full_name'),
                         style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
                           color: colorScheme.onSurface,
+                          letterSpacing: -0.2,
                         ),
                       ),
                     ),
@@ -100,9 +101,27 @@ class ProfileHeaderCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 if (isLocal)
-                  const Text(
-                    'Chế độ Local-First (Dữ liệu trên máy)',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF16A34A), fontWeight: FontWeight.w600),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF16A34A),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Chế độ Local-First (Dữ liệu trên máy)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF16A34A),
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
                   )
                 else ...[
                   Text(
@@ -111,23 +130,25 @@ class ProfileHeaderCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 14,
                       color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                   const SizedBox(height: 8),
                   Container(
                     key: const Key('user_role_badge'),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(6),
                       border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                     ),
                     child: Text(
                       _getRoleLabel(user?.role),
                       style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
                         color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF334155),
                       ),
                     ),

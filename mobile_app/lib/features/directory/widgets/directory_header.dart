@@ -49,15 +49,16 @@ class DirectoryHeader extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(6),
                     border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                   ),
                   child: Text(
                     '$totalCount',
                     style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
                       color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF475569),
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                 ),
@@ -96,13 +97,13 @@ class DirectoryHeader extends StatelessWidget {
           ),
         ),
 
-        // Ô tìm kiếm bo tròn "Tìm số điện thoại, tên, địa chỉ..."
+        // Ô tìm kiếm bo góc kỹ thuật "Tìm số điện thoại, tên, địa chỉ..."
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Container(
             decoration: BoxDecoration(
               color: colorScheme.surface,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: borderColor),
             ),
             child: TextField(
