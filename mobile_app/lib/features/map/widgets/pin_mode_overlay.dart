@@ -69,6 +69,7 @@ class PinModeOverlay extends StatelessWidget {
                       boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
                     ),
                     child: TextField(
+                      key: const Key('pin_address_search_field'),
                       controller: searchController,
                       decoration: InputDecoration(
                         hintText: 'Tìm địa chỉ (VD: Nguyễn Xiển, Thủ Đức)...',

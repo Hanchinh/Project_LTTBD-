@@ -2,19 +2,19 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
-import 'package:delivery_marker_mobile/local/app_database.dart';
+import 'package:delivery_marker_mobile/data/local/app_database.dart';
 import 'package:delivery_marker_mobile/models/user_model.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_customer_repository.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_location_repository.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_photo_repository.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_profile_repository.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_shift_repository.dart';
-import 'package:delivery_marker_mobile/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/services/backup_service.dart';
-import 'package:delivery_marker_mobile/utils/pin_crypto_utils.dart';
-import 'package:delivery_marker_mobile/views/account_profile_view.dart';
-import 'package:delivery_marker_mobile/views/pin_lock_screen.dart';
-import 'package:delivery_marker_mobile/views/welcome_onboarding_view.dart';
+import 'package:delivery_marker_mobile/data/local/local_customer_repository.dart';
+import 'package:delivery_marker_mobile/data/local/local_location_repository.dart';
+import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
+import 'package:delivery_marker_mobile/data/local/local_profile_repository.dart';
+import 'package:delivery_marker_mobile/data/local/local_shift_repository.dart';
+import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/local/backup_service.dart';
+import 'package:delivery_marker_mobile/core/utils/pin_crypto_utils.dart';
+import 'package:delivery_marker_mobile/features/profile/account_profile_view.dart';
+import 'package:delivery_marker_mobile/features/onboarding_lock/pin_lock_screen.dart';
+import 'package:delivery_marker_mobile/features/onboarding_lock/welcome_onboarding_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -316,12 +316,9 @@ void main() {
       await tester.enterText(find.byKey(const Key('welcome_display_name_input')), 'Trần Shipper');
       await tester.pump();
 
-      await tester.tap(find.byKey(const Key('welcome_start_btn')));
-      await tester.pump();
       await tester.runAsync(() async {
-        for (int i = 0; i < 30 && !startFinished; i++) {
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
+        await tester.tap(find.byKey(const Key('welcome_start_btn')));
+        await Future.delayed(const Duration(milliseconds: 500));
       });
       await tester.pump();
 
@@ -365,10 +362,9 @@ void main() {
       await tester.tap(find.byKey(const Key('pin_keypad_0')));
       await tester.pump();
 
-      await tester.tap(find.byKey(const Key('pin_submit_btn')));
-      await tester.pump();
       await tester.runAsync(() async {
-        await Future.delayed(const Duration(milliseconds: 500));
+        await tester.tap(find.byKey(const Key('pin_submit_btn')));
+        await Future.delayed(const Duration(milliseconds: 300));
       });
       await tester.pump();
 
@@ -382,12 +378,9 @@ void main() {
       await tester.tap(find.byKey(const Key('pin_keypad_4')));
       await tester.pump();
 
-      await tester.tap(find.byKey(const Key('pin_submit_btn')));
-      await tester.pump();
       await tester.runAsync(() async {
-        for (int i = 0; i < 30 && !unlocked; i++) {
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
+        await tester.tap(find.byKey(const Key('pin_submit_btn')));
+        await Future.delayed(const Duration(milliseconds: 300));
       });
       await tester.pump();
 

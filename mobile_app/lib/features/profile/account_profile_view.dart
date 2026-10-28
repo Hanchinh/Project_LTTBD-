@@ -3,6 +3,8 @@ import 'package:delivery_marker_mobile/models/user_model.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/data/remote/api_service.dart';
 import 'package:delivery_marker_mobile/data/local/backup_service.dart';
+import 'package:delivery_marker_mobile/data/local/app_storage_service.dart';
+import 'package:delivery_marker_mobile/core/constants/map_config.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 import 'package:delivery_marker_mobile/features/profile/widgets/backup_restore_bottom_sheet.dart';
 import 'package:delivery_marker_mobile/features/server_mode/change_password_view.dart';
@@ -33,6 +35,7 @@ class _AccountProfileViewState extends State<AccountProfileView> {
   String _currentBaseUrl = '';
   bool _isLoading = true;
   bool _shouldShowBackupReminder = false;
+  AppStorageStats? _storageStats;
 
   @override
   void initState() {
@@ -48,11 +51,13 @@ class _AccountProfileViewState extends State<AccountProfileView> {
 
       if (RepositoryProvider.useLocalData) {
         final reminder = await BackupService(appDb: RepositoryProvider.localProfile.appDb).shouldShowBackupReminder();
+        final storageStats = await AppStorageService(appDb: RepositoryProvider.localProfile.appDb).getStorageStats();
         if (mounted) {
           setState(() {
             _user = user;
             _stats = stats;
             _shouldShowBackupReminder = reminder;
+            _storageStats = storageStats;
             _isLoading = false;
           });
         }
@@ -77,6 +82,57 @@ class _AccountProfileViewState extends State<AccountProfileView> {
   }
 
 
+
+  Future<void> _handleClearCache() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.cleaning_services_rounded, color: Color(0xFF2563EB), size: 24),
+            SizedBox(width: 10),
+            Text('Dọn bộ nhớ đệm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: const Text(
+          'Thao tác này sẽ xóa các mảnh bản đồ tạm và tệp xuất chia sẻ tạm thời để giải phóng bộ nhớ. Dữ liệu khách hàng, vị trí đã lưu và ảnh nhà sẽ được giữ nguyên an toàn.',
+          style: TextStyle(fontSize: 14, color: Color(0xFF475569)),
+        ),
+        actions: [
+          OutlinedButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            key: const Key('confirm_clear_cache_btn'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Dọn dẹp'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final storageService = AppStorageService(appDb: RepositoryProvider.localProfile.appDb);
+      final freed = await storageService.clearCache();
+      final updated = await storageService.getStorageStats();
+      if (mounted) {
+        setState(() => _storageStats = updated);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã dọn dẹp ${AppStorageService.formatBytes(freed)} bộ nhớ đệm.'),
+            backgroundColor: const Color(0xFF10B981),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
 
   Future<void> _showEditDisplayNameDialog() async {
     final result = await ProfileEditNameDialog.show(
@@ -378,6 +434,135 @@ class _AccountProfileViewState extends State<AccountProfileView> {
                     const SizedBox(height: 20),
                   ],
 
+                  // 5B. DUNG LƯỢNG ỨNG DỤNG & DỌN BỘ NHỚ ĐỆM (LOCAL-FIRST)
+                  if (isLocal) ...[
+                    Material(
+                      color: bgCard,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(color: borderColor),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: const Icon(Icons.storage_rounded, color: Color(0xFF0F172A), size: 20),
+                                ),
+                                const SizedBox(width: 12),
+                                const Expanded(
+                                  child: Text(
+                                    'Dung lượng lưu trữ',
+                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                  ),
+                                ),
+                                if (_storageStats != null)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      _storageStats!.totalSizeFormatted,
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 1, color: borderColor),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Row(
+                                      children: [
+                                        Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF64748B)),
+                                        SizedBox(width: 8),
+                                        Text('Cơ sở dữ liệu:', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                                      ],
+                                    ),
+                                    Text(
+                                      _storageStats?.databaseSizeFormatted ?? '...',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Row(
+                                      children: [
+                                        Icon(Icons.photo_library_outlined, size: 16, color: Color(0xFF64748B)),
+                                        SizedBox(width: 8),
+                                        Text('Ảnh nhà khách hàng:', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                                      ],
+                                    ),
+                                    Text(
+                                      _storageStats?.photosSizeFormatted ?? '...',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Row(
+                                      children: [
+                                        Icon(Icons.cached_rounded, size: 16, color: Color(0xFF64748B)),
+                                        SizedBox(width: 8),
+                                        Text('Bộ nhớ đệm (Tile & Tệp tạm):', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
+                                      ],
+                                    ),
+                                    Text(
+                                      _storageStats?.cacheSizeFormatted ?? '...',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 1, color: borderColor),
+                          SizedBox(
+                            width: double.infinity,
+                            child: TextButton.icon(
+                              key: const Key('clear_cache_btn'),
+                              onPressed: _handleClearCache,
+                              icon: const Icon(Icons.cleaning_services_outlined, size: 18, color: Color(0xFF2563EB)),
+                              label: const Text(
+                                'Dọn bộ nhớ đệm',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF2563EB)),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+
                   // 6. THÔNG TIN HỆ THỐNG / PHIÊN BẢN
                   Material(
                     color: bgCard,
@@ -434,6 +619,26 @@ class _AccountProfileViewState extends State<AccountProfileView> {
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF64748B),
                             ),
+                          ),
+                        ),
+                        const Divider(height: 1, indent: 64, endIndent: 16, color: borderColor),
+                        ListTile(
+                          key: const Key('profile_map_attribution_item'),
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.map_outlined, color: Color(0xFF0F172A), size: 22),
+                          ),
+                          title: const Text(
+                            'Nguồn bản đồ & Bản quyền',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                          ),
+                          subtitle: const Text(
+                            MapConfig.defaultAttribution,
+                            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                           ),
                         ),
                       ],

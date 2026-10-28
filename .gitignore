@@ -83,3 +83,9 @@ backend/uploads/
 !init-db/*.sql
 backups/
 backup_*
+
+# Android Keystore and signing properties
+key.properties
+**/key.properties
+*.jks
+*.keystore

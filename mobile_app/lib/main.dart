@@ -18,7 +18,7 @@ class DeliveryLocationMarkerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Định Vị Giao Hàng',
+      title: 'Ghim Điểm Giao Hàng',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

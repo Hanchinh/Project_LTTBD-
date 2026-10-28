@@ -1,0 +1,8 @@
+# Mẫu cấu hình ký khóa phát hành (Release Keystore Signing)
+# HÃY SAO CHÉP TỆP NÀY THÀNH 'key.properties' TRONG THƯ MỤC 'mobile_app/android/'
+# VÀ ĐIỀN THÔNG TIN THỰC TẾ. TUYỆT ĐỐI KHÔNG COMMIT key.properties VÀ TỆP *.jks LÊN GIT!
+storePassword=mat_khau_keystore_cua_ban
+keyPassword=mat_khau_alias_cua_ban
+keyAlias=delivery_marker_release
+storeFile=D:\\keystores\\delivery_marker_upload.jks
+

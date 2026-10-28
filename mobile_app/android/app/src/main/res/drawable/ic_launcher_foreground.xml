@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:translateX="30"
+        android:translateY="30">
+        <!-- Location Pin -->
+        <path
+            android:fillColor="#2563EB"
+            android:pathData="M24,2C14.06,2 6,10.06 6,20c0,13.5 18,26 18,26s18,-12.5 18,-26C42,10.06 33.94,2 24,2z"/>
+        <!-- Inner White Circle -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M24,20a6,6 0 1,0 0,-12a6,6 0 0,0 0,12z"/>
+    </group>
+</vector>
+

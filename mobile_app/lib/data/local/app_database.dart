@@ -9,7 +9,7 @@ import 'package:delivery_marker_mobile/core/utils/vietnamese_utils.dart';
 /// Tách biệt hoàn toàn với delivery_offline_v2.db và hàng đợi đồng bộ cũ.
 class AppDatabase {
   static const String databaseFileName = 'local_data_v1.db';
-  static const int currentVersion = 1;
+  static const int currentVersion = 2;
 
   static AppDatabase? _instance;
   static AppDatabase get instance => _instance ??= AppDatabase();
@@ -128,6 +128,7 @@ class AppDatabase {
 
   static final Map<int, Future<void> Function(DatabaseExecutor db)> _migrations = {
     1: migrationV1,
+    2: migrationV2,
   };
 
   /// Lược đồ cơ sở dữ liệu phiên bản 1 (v1)
@@ -306,6 +307,14 @@ class AppDatabase {
       );
     ''');
     await db.execute('CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at);');
+  }
+
+  /// Lược đồ cơ sở dữ liệu phiên bản 2 (v2) - Tối ưu hóa chỉ mục hiệu năng (TASK: LOCAL-FIRST-09)
+  static Future<void> migrationV2(DatabaseExecutor db) async {
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_customers_deleted_updated ON customers(deleted_at, updated_at DESC);');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_shift_points_status ON shift_delivery_points(location_status);');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_customer_photos_active ON customer_photos(customer_id, deleted_at, created_at DESC);');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_customer_photos_deleted_at ON customer_photos(deleted_at);');
   }
 
   // ===========================================================================

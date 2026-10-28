@@ -4,6 +4,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/models/data_share_model.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
@@ -69,6 +70,9 @@ class MainMapViewState extends State<MainMapView> {
   bool _isLoadingShared = false;
   bool _isOutOfAreaBannerDismissed = false;
 
+  bool _isOffline = false;
+  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+
   LatLng? _shipperLocation;
   bool _isLocatingShipper = false;
 
@@ -98,14 +102,43 @@ class MainMapViewState extends State<MainMapView> {
     super.initState();
     _loadMasterData();
     _getShipperLocation();
+    _initConnectivity();
   }
 
   @override
   void dispose() {
+    try {
+      _connectivitySubscription?.cancel();
+    } catch (_) {}
     _addressSearchCtrl.dispose();
     _searchDebounceTimer?.cancel();
     _clusterDebounceTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _initConnectivity() async {
+    try {
+      final res = await Connectivity().checkConnectivity();
+      if (mounted) {
+        setState(() => _isOffline = res == ConnectivityResult.none);
+      }
+    } catch (_) {}
+    try {
+      _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
+        (res) {
+          if (mounted) {
+            setState(() => _isOffline = res == ConnectivityResult.none);
+          }
+        },
+        onError: (_) {},
+        cancelOnError: false,
+      );
+    } catch (_) {}
+  }
+
+  @visibleForTesting
+  void setOfflineForTesting(bool isOffline) {
+    setState(() => _isOffline = isOffline);
   }
 
   Future<void> _handleCreateShift() async {
@@ -371,6 +404,24 @@ class MainMapViewState extends State<MainMapView> {
       return;
     }
 
+    if (_isOffline) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            key: Key('offline_address_search_snackbar'),
+            content: Text('Cần kết nối mạng để tìm kiếm địa chỉ'),
+            backgroundColor: Color(0xFFDC2626),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      setState(() {
+        _addressSearchResults = [];
+        _isSearchingAddress = false;
+      });
+      return;
+    }
+
     _searchDebounceTimer = Timer(const Duration(milliseconds: 350), () async {
       setState(() => _isSearchingAddress = true);
       try {
@@ -382,7 +433,17 @@ class MainMapViewState extends State<MainMapView> {
           });
         }
       } catch (_) {
-        if (mounted) setState(() => _isSearchingAddress = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              key: Key('offline_address_search_snackbar'),
+              content: Text('Cần kết nối mạng để tìm kiếm địa chỉ'),
+              backgroundColor: Color(0xFFDC2626),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          setState(() => _isSearchingAddress = false);
+        }
       }
     });
   }
@@ -601,6 +662,36 @@ class MainMapViewState extends State<MainMapView> {
                 onToggleShared: _toggleSharedLocations,
                 onSwitchMapType: _switchMapType,
                 onReload: _loadMasterData,
+              ),
+
+            // Banner thông báo mất mạng (TASK: LOCAL-FIRST-09)
+            if (_isOffline)
+              Positioned(
+                top: _isPinningMode ? 86 : 68,
+                left: 14,
+                right: 14,
+                child: Container(
+                  key: const Key('map_offline_banner'),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.wifi_off_rounded, color: Color(0xFFDC2626), size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Đang mất kết nối mạng. Bản đồ hiển thị dữ liệu cục bộ / bộ nhớ đệm.',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF991B1B)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
 
             // Banner cảnh báo điểm ngoài khu vực

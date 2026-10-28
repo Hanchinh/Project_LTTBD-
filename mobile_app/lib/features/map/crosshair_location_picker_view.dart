@@ -7,6 +7,7 @@ import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/data/remote/api_service.dart';
 import 'package:delivery_marker_mobile/data/local/map_tile_cache_service.dart';
+import 'package:delivery_marker_mobile/core/constants/map_config.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/fixed_crosshair_target.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/crosshair_bottom_panel.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/crosshair_search_panel.dart';
@@ -99,10 +100,10 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
           _isSearchingAddress = false;
           _searchErrorMessage = null;
         });
-      } catch (e) {
+      } catch (_) {
         if (!mounted) return;
         setState(() {
-          _searchErrorMessage = e.toString().replaceAll('Exception: ', '');
+          _searchErrorMessage = 'Cần kết nối mạng để tìm kiếm địa chỉ';
           _isSearchingAddress = false;
         });
       }
@@ -329,9 +330,9 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
                 children: [
                   TileLayer(
                     key: const ValueKey('crosshair_picker_tile'),
-                    urlTemplate: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                    fallbackUrl: 'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.delivery_marker_mobile',
+                    urlTemplate: MapConfig.googleRoadsUrl,
+                    fallbackUrl: MapConfig.fallbackUrl,
+                    userAgentPackageName: MapConfig.userAgentPackageName,
                     panBuffer: 1,
                     keepBuffer: 2,
                     tileProvider: _tileProvider,
