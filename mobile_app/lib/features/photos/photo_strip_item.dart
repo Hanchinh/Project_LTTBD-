@@ -82,17 +82,25 @@ class PhotoStripItem extends StatelessWidget {
             // Nút xóa ảnh góc trên phải (nếu cho phép xóa)
             if (allowDelete)
               Positioned(
-                top: 4,
-                right: 4,
-                child: GestureDetector(
-                  onTap: onDelete,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      shape: BoxShape.circle,
+                top: 0,
+                right: 0,
+                child: Tooltip(
+                  message: 'Xóa ảnh này',
+                  child: GestureDetector(
+                    onTap: onDelete,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close_rounded, color: Colors.white, size: 14),
+                      ),
                     ),
-                    child: const Icon(Icons.close_rounded, color: Colors.white, size: 14),
                   ),
                 ),
               ),

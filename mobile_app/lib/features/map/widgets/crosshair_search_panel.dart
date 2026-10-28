@@ -75,6 +75,7 @@ class CrosshairSearchPanel extends StatelessWidget {
               else if (controller.text.isNotEmpty)
                 IconButton(
                   icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF64748B)),
+                  tooltip: 'Xóa tìm kiếm',
                   onPressed: onClear,
                 ),
               const SizedBox(width: 4),

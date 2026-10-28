@@ -107,8 +107,10 @@ class _HomeShellViewState extends State<HomeShellView> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: IndexedStack(
         index: _currentIndex,
         children: [
@@ -145,38 +147,38 @@ class _HomeShellViewState extends State<HomeShellView> with WidgetsBindingObserv
         ],
       ),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
           border: Border(
-            top: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
+            top: BorderSide(color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0), width: 1.0),
           ),
         ),
         child: NavigationBar(
           selectedIndex: _currentIndex,
           onDestinationSelected: _onTabSelected,
-          backgroundColor: Colors.white,
-          indicatorColor: const Color(0xFFE0E7FF),
+          backgroundColor: theme.colorScheme.surface,
+          indicatorColor: isDark ? const Color(0xFF334155) : const Color(0xFFE0E7FF),
           elevation: 0,
           height: 72,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           destinations: [
-            const NavigationDestination(
-              icon: Icon(Icons.map_outlined, color: Color(0xFF64748B), size: 24),
-              selectedIcon: Icon(Icons.map_rounded, color: Color(0xFF2563EB), size: 24),
+            NavigationDestination(
+              icon: Icon(Icons.map_outlined, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), size: 24),
+              selectedIcon: const Icon(Icons.map_rounded, color: Color(0xFF2563EB), size: 24),
               label: 'Bản đồ',
             ),
-            const NavigationDestination(
-              icon: Icon(Icons.contacts_outlined, color: Color(0xFF64748B), size: 24),
-              selectedIcon: Icon(Icons.contacts_rounded, color: Color(0xFF2563EB), size: 24),
+            NavigationDestination(
+              icon: Icon(Icons.contacts_outlined, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), size: 24),
+              selectedIcon: const Icon(Icons.contacts_rounded, color: Color(0xFF2563EB), size: 24),
               label: 'Danh bạ',
             ),
-            const NavigationDestination(
-              icon: Icon(Icons.assignment_outlined, color: Color(0xFF64748B), size: 24),
-              selectedIcon: Icon(Icons.assignment_rounded, color: Color(0xFF2563EB), size: 24),
+            NavigationDestination(
+              icon: Icon(Icons.assignment_outlined, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), size: 24),
+              selectedIcon: const Icon(Icons.assignment_rounded, color: Color(0xFF2563EB), size: 24),
               label: 'Ca làm việc',
             ),
             NavigationDestination(
-              icon: const Icon(Icons.person_outline_rounded, color: Color(0xFF64748B), size: 24),
+              icon: Icon(Icons.person_outline_rounded, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), size: 24),
               selectedIcon: const Icon(Icons.person_rounded, color: Color(0xFF2563EB), size: 24),
               label: RepositoryProvider.useLocalData ? 'Cá nhân' : 'Tài khoản',
             ),

@@ -154,12 +154,12 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: const Color(0xFFF8FAFC),
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(icon: const Icon(Icons.arrow_back_rounded, color: Color(0xFF0F172A)), tooltip: 'Quay lại', onPressed: () => Navigator.pop(context)),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

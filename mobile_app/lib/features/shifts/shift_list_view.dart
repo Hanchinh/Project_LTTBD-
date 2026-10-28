@@ -123,7 +123,7 @@ class _ShiftListViewState extends State<ShiftListView> {
     final activeShift = inProgress.isNotEmpty ? inProgress.first : null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [

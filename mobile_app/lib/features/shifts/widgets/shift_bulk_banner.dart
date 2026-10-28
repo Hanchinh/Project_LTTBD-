@@ -42,6 +42,7 @@ class ShiftBulkBanner extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
                 icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF166534)),
+                tooltip: 'Đóng thông báo',
                 onPressed: onDismiss,
               ),
             ],

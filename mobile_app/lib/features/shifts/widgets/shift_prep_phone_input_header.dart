@@ -80,6 +80,7 @@ class ShiftPrepPhoneInputHeader extends StatelessWidget {
                       suffixIcon: phoneController.text.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear, size: 18, color: Color(0xFF94A3B8)),
+                              tooltip: 'Xóa số điện thoại',
                               onPressed: onClearPhone,
                             )
                           : null,

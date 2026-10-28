@@ -91,7 +91,7 @@ class _AccountProfileViewState extends State<AccountProfileView> {
     const borderColor = Color(0xFFE2E8F0);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'Cá nhân',
@@ -103,7 +103,7 @@ class _AccountProfileViewState extends State<AccountProfileView> {
           ),
         ),
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         automaticallyImplyLeading: false,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),

@@ -134,7 +134,7 @@ class _DataShareSendSheetState extends State<DataShareSendSheet> {
                     const Icon(Icons.share_rounded, color: Color(0xFF0F172A), size: 22),
                     const SizedBox(width: 10),
                     Expanded(child: Text(widget.singleCustomerName != null ? 'Chia sẻ: ${widget.singleCustomerName}' : 'Gửi Dữ Liệu Điểm Giao', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis)),
-                    IconButton(icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)), onPressed: () => Navigator.pop(context)),
+                    IconButton(icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)), tooltip: 'Đóng', onPressed: () => Navigator.pop(context)),
                   ],
                 ),
               ),

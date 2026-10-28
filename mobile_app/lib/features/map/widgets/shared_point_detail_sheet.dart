@@ -81,6 +81,7 @@ class SharedPointDetailSheet extends StatelessWidget {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                   icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF64748B)),
+                  tooltip: 'Đóng',
                   onPressed: onClose,
                 ),
               ],

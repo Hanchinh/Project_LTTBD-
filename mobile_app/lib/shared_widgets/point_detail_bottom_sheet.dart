@@ -137,11 +137,15 @@ class _PointDetailBottomSheetState extends State<PointDetailBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final h = MediaQuery.sizeOf(context).height;
-    final curH = _isExpanded ? (h * 0.85).clamp(450.0, 750.0) : (h * 0.46).clamp(365.0, 480.0);
+    final media = MediaQuery.of(context);
+    final h = media.size.height;
+    final isShort = h < 480;
+    final curH = _isExpanded
+        ? (h * 0.85).clamp(isShort ? h * 0.85 : 450.0, 750.0)
+        : (h * 0.46).clamp(isShort ? h * 0.58 : 365.0, isShort ? h * 0.92 : 480.0);
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
+      duration: media.disableAnimations ? Duration.zero : const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
       height: curH,
       decoration: const BoxDecoration(

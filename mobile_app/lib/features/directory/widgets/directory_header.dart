@@ -110,6 +110,7 @@ class DirectoryHeader extends StatelessWidget {
                 suffixIcon: searchController.text.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
+                        tooltip: 'Xóa tìm kiếm',
                         onPressed: () {
                           searchController.clear();
                           onSearchChanged('');

@@ -86,6 +86,7 @@ class BulkPasteInputView extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                tooltip: 'Đóng',
                 onPressed: onClose,
               ),
             ],

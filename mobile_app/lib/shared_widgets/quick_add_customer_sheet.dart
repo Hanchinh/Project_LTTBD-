@@ -184,7 +184,7 @@ class _QuickAddCustomerSheetState extends State<QuickAddCustomerSheet> {
                   const Icon(Icons.person_add_rounded, color: Color(0xFF2563EB), size: 24),
                   const SizedBox(width: 8),
                   const Expanded(child: Text('Thêm nhanh khách hàng', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)))),
-                  IconButton(icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)), onPressed: () => Navigator.pop(context)),
+                  IconButton(icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)), tooltip: 'Đóng', onPressed: () => Navigator.pop(context)),
                 ],
               ),
               const Divider(height: 20, color: Color(0xFFE2E8F0)),

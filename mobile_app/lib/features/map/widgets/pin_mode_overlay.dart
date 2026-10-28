@@ -82,6 +82,7 @@ class PinModeOverlay extends StatelessWidget {
                             : (searchController.text.isNotEmpty
                                 ? IconButton(
                                     icon: const Icon(Icons.clear, size: 18),
+                                    tooltip: 'Xóa tìm kiếm',
                                     onPressed: () {
                                       searchController.clear();
                                       onSearchChanged('');

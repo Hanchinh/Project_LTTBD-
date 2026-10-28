@@ -136,7 +136,7 @@ class _PinLockScreenState extends State<PinLockScreen> {
         body: SafeArea(
           child: Column(
             children: [
-              Align(alignment: Alignment.centerLeft, child: widget.isCancelable ? IconButton(icon: const Icon(Icons.close_rounded, color: Colors.white70), onPressed: () => Navigator.of(context).pop(false)) : const SizedBox(height: 48)),
+              Align(alignment: Alignment.centerLeft, child: widget.isCancelable ? IconButton(icon: const Icon(Icons.close_rounded, color: Colors.white70), tooltip: 'Đóng', onPressed: () => Navigator.of(context).pop(false)) : const SizedBox(height: 48)),
               const Spacer(),
               Container(width: 72, height: 72, decoration: BoxDecoration(color: const Color(0xFF1E293B), shape: BoxShape.circle, border: Border.all(color: const Color(0xFF334155), width: 1.5)), child: const Icon(Icons.lock_outline_rounded, color: Color(0xFF60A5FA), size: 36)),
               const SizedBox(height: 18),
@@ -175,9 +175,9 @@ class _PinLockScreenState extends State<PinLockScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        SizedBox(width: 72, height: 72, child: (_enteredPin.length >= 4 && _enteredPin.length < 6) ? IconButton(key: const Key('pin_submit_btn'), onPressed: _verifyEnteredPin, icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 36)) : null),
+                        SizedBox(width: 72, height: 72, child: (_enteredPin.length >= 4 && _enteredPin.length < 6) ? IconButton(key: const Key('pin_submit_btn'), tooltip: 'Xác nhận mã PIN', onPressed: _verifyEnteredPin, icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 36)) : null),
                         _buildBtn('0'),
-                        SizedBox(width: 72, height: 72, child: IconButton(key: const Key('pin_delete_btn'), onPressed: _onDeletePressed, icon: const Icon(Icons.backspace_outlined, color: Colors.white70, size: 28))),
+                        SizedBox(width: 72, height: 72, child: IconButton(key: const Key('pin_delete_btn'), tooltip: 'Xóa số', onPressed: _onDeletePressed, icon: const Icon(Icons.backspace_outlined, color: Colors.white70, size: 28))),
                       ],
                     ),
                   ],

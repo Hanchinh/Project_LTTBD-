@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delivery_marker_mobile/core/theme/app_theme.dart';
 import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/home_shell_view.dart';
@@ -19,20 +20,9 @@ class DeliveryLocationMarkerApp extends StatelessWidget {
     return MaterialApp(
       title: 'Ghim Điểm Giao Hàng',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0F172A),
-          primary: const Color(0xFF0F172A),
-          secondary: const Color(0xFF2563EB),
-        ),
-        appBarTheme: const AppBarTheme(
-          centerTitle: false,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        ),
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
       home: const AuthSplashScreen(),
     );
   }

@@ -40,6 +40,7 @@ class OutOfAreaBanner extends StatelessWidget {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFF92400E)),
+                  tooltip: 'Đóng cảnh báo',
                   onPressed: onDismiss,
                 ),
               ],

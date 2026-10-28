@@ -262,7 +262,7 @@ class MainMapViewState extends State<MainMapView> {
                         const Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 18),
                         const SizedBox(width: 8),
                         Expanded(child: Text(_errorMessage!, style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 12))),
-                        IconButton(padding: EdgeInsets.zero, constraints: const BoxConstraints(), icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFB91C1C)), onPressed: () => setState(() => _errorMessage = null)),
+                        IconButton(padding: EdgeInsets.zero, constraints: const BoxConstraints(), icon: const Icon(Icons.close_rounded, size: 16, color: Color(0xFFB91C1C)), tooltip: 'Đóng thông báo', onPressed: () => setState(() => _errorMessage = null)),
                       ]),
                     ),
                   ),

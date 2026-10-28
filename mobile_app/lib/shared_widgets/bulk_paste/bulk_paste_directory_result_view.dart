@@ -138,6 +138,7 @@ class BulkPasteDirectoryResultView extends StatelessWidget {
               ),
               IconButton(
                 icon: const Icon(Icons.close_rounded),
+                tooltip: 'Đóng',
                 onPressed: onClose,
               ),
             ],
