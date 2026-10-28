@@ -196,6 +196,30 @@ Tất cả các màn hình, sheet và widget nghiệp vụ trong `mobile_app/lib
 
 ---
 
+## 20. Hoàn Thiện Tinh Chỉnh Giao Diện (Task UI-REFINEMENT-POLISH-FINAL-015)
+
+### 20.1. Các Hạng Mục Đã Xử Lý
+1. **Tối ưu RAM Thumbnail Ảnh (P2 - Performance):**
+   - Bổ sung `cacheWidth` và `cacheHeight` vào [authenticated_image.dart](mobile_app/lib/shared_widgets/authenticated_image.dart).
+   - Truyền `cacheWidth: 300` trong [photo_strip_item.dart](mobile_app/lib/features/photos/photo_strip_item.dart) và `cacheWidth: 150` trong [customer_list_item.dart](mobile_app/lib/features/directory/widgets/customer_list_item.dart).
+2. **Thích Ứng Tablet Màn Hình Rộng (P2 - Adaptivity):**
+   - Trong [home_shell_view.dart](mobile_app/lib/home_shell_view.dart): Tự động phát hiện màn hình rộng (`width >= 600dp`). Chuyển sang thanh điều hướng dọc `NavigationRail` ở cạnh trái kết hợp `VerticalDivider`, ẩn `bottomNavigationBar`.
+3. **Đồng Bộ Màu Bề Mặt Card (P2 - Theming):**
+   - Rà soát và loại bỏ các mã màu cứng (`Colors.white`) trong [point_detail_bottom_sheet.dart](mobile_app/lib/shared_widgets/point_detail_bottom_sheet.dart), [customer_list_item.dart](mobile_app/lib/features/directory/widgets/customer_list_item.dart), [customer_detail_edit_view.dart](mobile_app/lib/features/directory/customer_detail_edit_view.dart), [customer_detail_location_card.dart](mobile_app/lib/features/directory/widgets/customer_detail_location_card.dart), và [crosshair_bottom_panel.dart](mobile_app/lib/features/map/widgets/crosshair_bottom_panel.dart).
+   - Áp dụng các token chuẩn Material 3: `colorScheme.surface`, `onSurface`, `onSurfaceVariant`, `surfaceContainerHighest`.
+4. **Phản Hồi Rung Haptic (P3 - Delight):**
+   - Trong [crosshair_location_picker_view.dart](mobile_app/lib/features/map/crosshair_location_picker_view.dart): Bổ sung `HapticFeedback.selectionClick()` khi di chuyển tâm ngắm và `HapticFeedback.mediumImpact()` khi xác nhận ghim vị trí.
+5. **Typography & Material Elevation (P3):**
+   - Nâng cỡ chữ ghi chú trong [point_detail_bottom_sheet.dart](mobile_app/lib/shared_widgets/point_detail_bottom_sheet.dart) lên `fontSize: 14`.
+   - Chuyển bóng đổ tùy chỉnh sang `Material(elevation: 8)`.
+
+### 20.2. Bằng Chứng Kiểm Thử
+- `flutter analyze`: **No issues found!**
+- `flutter test`: **182/182 tests passed!** (100% test suites).
+- Giới hạn dòng: Tất cả các file trong `lib/` đều $\le 350$ dòng (dài nhất là `point_detail_bottom_sheet.dart` với 342 dòng).
+
+---
+
 ## 16. Thiết Lập Lược Đồ CSDL SQLite Cục Bộ (LOCAL-FIRST-02-SQLITE-SCHEMA)
 
 > **Nhánh:** `local-first`  
@@ -264,6 +288,30 @@ Tất cả các màn hình, sheet và widget nghiệp vụ trong `mobile_app/lib
 
 ---
 
+## 20. Hoàn Thiện Tinh Chỉnh Giao Diện (Task UI-REFINEMENT-POLISH-FINAL-015)
+
+### 20.1. Các Hạng Mục Đã Xử Lý
+1. **Tối ưu RAM Thumbnail Ảnh (P2 - Performance):**
+   - Bổ sung `cacheWidth` và `cacheHeight` vào [authenticated_image.dart](mobile_app/lib/shared_widgets/authenticated_image.dart).
+   - Truyền `cacheWidth: 300` trong [photo_strip_item.dart](mobile_app/lib/features/photos/photo_strip_item.dart) và `cacheWidth: 150` trong [customer_list_item.dart](mobile_app/lib/features/directory/widgets/customer_list_item.dart).
+2. **Thích Ứng Tablet Màn Hình Rộng (P2 - Adaptivity):**
+   - Trong [home_shell_view.dart](mobile_app/lib/home_shell_view.dart): Tự động phát hiện màn hình rộng (`width >= 600dp`). Chuyển sang thanh điều hướng dọc `NavigationRail` ở cạnh trái kết hợp `VerticalDivider`, ẩn `bottomNavigationBar`.
+3. **Đồng Bộ Màu Bề Mặt Card (P2 - Theming):**
+   - Rà soát và loại bỏ các mã màu cứng (`Colors.white`) trong [point_detail_bottom_sheet.dart](mobile_app/lib/shared_widgets/point_detail_bottom_sheet.dart), [customer_list_item.dart](mobile_app/lib/features/directory/widgets/customer_list_item.dart), [customer_detail_edit_view.dart](mobile_app/lib/features/directory/customer_detail_edit_view.dart), [customer_detail_location_card.dart](mobile_app/lib/features/directory/widgets/customer_detail_location_card.dart), và [crosshair_bottom_panel.dart](mobile_app/lib/features/map/widgets/crosshair_bottom_panel.dart).
+   - Áp dụng các token chuẩn Material 3: `colorScheme.surface`, `onSurface`, `onSurfaceVariant`, `surfaceContainerHighest`.
+4. **Phản Hồi Rung Haptic (P3 - Delight):**
+   - Trong [crosshair_location_picker_view.dart](mobile_app/lib/features/map/crosshair_location_picker_view.dart): Bổ sung `HapticFeedback.selectionClick()` khi di chuyển tâm ngắm và `HapticFeedback.mediumImpact()` khi xác nhận ghim vị trí.
+5. **Typography & Material Elevation (P3):**
+   - Nâng cỡ chữ ghi chú trong [point_detail_bottom_sheet.dart](mobile_app/lib/shared_widgets/point_detail_bottom_sheet.dart) lên `fontSize: 14`.
+   - Chuyển bóng đổ tùy chỉnh sang `Material(elevation: 8)`.
+
+### 20.2. Bằng Chứng Kiểm Thử
+- `flutter analyze`: **No issues found!**
+- `flutter test`: **182/182 tests passed!** (100% test suites).
+- Giới hạn dòng: Tất cả các file trong `lib/` đều $\le 350$ dòng (dài nhất là `point_detail_bottom_sheet.dart` với 342 dòng).
+
+---
+
 ## 17. Tiến Độ Local-First: Tầng Repository Cục Bộ Khách Hàng & Vị Trí (TASK: LOCAL-FIRST-03-LOCAL-REPOSITORY-CUSTOMER-LOCATION)
 
 ### 17.1. Bối Cảnh & Mục Tiêu Nghiệp Vụ
@@ -327,6 +375,30 @@ Tất cả các màn hình, sheet và widget nghiệp vụ trong `mobile_app/lib
   * Kết quả: **Thành công (Built build\app\outputs\flutter-apk\app-debug.apk in 154.3s)**.
 - **Trạng Thái Kiểm Thử Thiết Bị Thực Tế:**
   * **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
+
+---
+
+## 20. Hoàn Thiện Tinh Chỉnh Giao Diện (Task UI-REFINEMENT-POLISH-FINAL-015)
+
+### 20.1. Các Hạng Mục Đã Xử Lý
+1. **Tối ưu RAM Thumbnail Ảnh (P2 - Performance):**
+   - Bổ sung `cacheWidth` và `cacheHeight` vào [authenticated_image.dart](mobile_app/lib/shared_widgets/authenticated_image.dart).
+   - Truyền `cacheWidth: 300` trong [photo_strip_item.dart](mobile_app/lib/features/photos/photo_strip_item.dart) và `cacheWidth: 150` trong [customer_list_item.dart](mobile_app/lib/features/directory/widgets/customer_list_item.dart).
+2. **Thích Ứng Tablet Màn Hình Rộng (P2 - Adaptivity):**
+   - Trong [home_shell_view.dart](mobile_app/lib/home_shell_view.dart): Tự động phát hiện màn hình rộng (`width >= 600dp`). Chuyển sang thanh điều hướng dọc `NavigationRail` ở cạnh trái kết hợp `VerticalDivider`, ẩn `bottomNavigationBar`.
+3. **Đồng Bộ Màu Bề Mặt Card (P2 - Theming):**
+   - Rà soát và loại bỏ các mã màu cứng (`Colors.white`) trong [point_detail_bottom_sheet.dart](mobile_app/lib/shared_widgets/point_detail_bottom_sheet.dart), [customer_list_item.dart](mobile_app/lib/features/directory/widgets/customer_list_item.dart), [customer_detail_edit_view.dart](mobile_app/lib/features/directory/customer_detail_edit_view.dart), [customer_detail_location_card.dart](mobile_app/lib/features/directory/widgets/customer_detail_location_card.dart), và [crosshair_bottom_panel.dart](mobile_app/lib/features/map/widgets/crosshair_bottom_panel.dart).
+   - Áp dụng các token chuẩn Material 3: `colorScheme.surface`, `onSurface`, `onSurfaceVariant`, `surfaceContainerHighest`.
+4. **Phản Hồi Rung Haptic (P3 - Delight):**
+   - Trong [crosshair_location_picker_view.dart](mobile_app/lib/features/map/crosshair_location_picker_view.dart): Bổ sung `HapticFeedback.selectionClick()` khi di chuyển tâm ngắm và `HapticFeedback.mediumImpact()` khi xác nhận ghim vị trí.
+5. **Typography & Material Elevation (P3):**
+   - Nâng cỡ chữ ghi chú trong [point_detail_bottom_sheet.dart](mobile_app/lib/shared_widgets/point_detail_bottom_sheet.dart) lên `fontSize: 14`.
+   - Chuyển bóng đổ tùy chỉnh sang `Material(elevation: 8)`.
+
+### 20.2. Bằng Chứng Kiểm Thử
+- `flutter analyze`: **No issues found!**
+- `flutter test`: **182/182 tests passed!** (100% test suites).
+- Giới hạn dòng: Tất cả các file trong `lib/` đều $\le 350$ dòng (dài nhất là `point_detail_bottom_sheet.dart` với 342 dòng).
 
 ---
 
@@ -401,6 +473,30 @@ Tất cả các màn hình, sheet và widget nghiệp vụ trong `mobile_app/lib
 
 ---
 
+## 20. Hoàn Thiện Tinh Chỉnh Giao Diện (Task UI-REFINEMENT-POLISH-FINAL-015)
+
+### 20.1. Các Hạng Mục Đã Xử Lý
+1. **Tối ưu RAM Thumbnail Ảnh (P2 - Performance):**
+   - Bổ sung `cacheWidth` và `cacheHeight` vào [authenticated_image.dart](mobile_app/lib/shared_widgets/authenticated_image.dart).
+   - Truyền `cacheWidth: 300` trong [photo_strip_item.dart](mobile_app/lib/features/photos/photo_strip_item.dart) và `cacheWidth: 150` trong [customer_list_item.dart](mobile_app/lib/features/directory/widgets/customer_list_item.dart).
+2. **Thích Ứng Tablet Màn Hình Rộng (P2 - Adaptivity):**
+   - Trong [home_shell_view.dart](mobile_app/lib/home_shell_view.dart): Tự động phát hiện màn hình rộng (`width >= 600dp`). Chuyển sang thanh điều hướng dọc `NavigationRail` ở cạnh trái kết hợp `VerticalDivider`, ẩn `bottomNavigationBar`.
+3. **Đồng Bộ Màu Bề Mặt Card (P2 - Theming):**
+   - Rà soát và loại bỏ các mã màu cứng (`Colors.white`) trong [point_detail_bottom_sheet.dart](mobile_app/lib/shared_widgets/point_detail_bottom_sheet.dart), [customer_list_item.dart](mobile_app/lib/features/directory/widgets/customer_list_item.dart), [customer_detail_edit_view.dart](mobile_app/lib/features/directory/customer_detail_edit_view.dart), [customer_detail_location_card.dart](mobile_app/lib/features/directory/widgets/customer_detail_location_card.dart), và [crosshair_bottom_panel.dart](mobile_app/lib/features/map/widgets/crosshair_bottom_panel.dart).
+   - Áp dụng các token chuẩn Material 3: `colorScheme.surface`, `onSurface`, `onSurfaceVariant`, `surfaceContainerHighest`.
+4. **Phản Hồi Rung Haptic (P3 - Delight):**
+   - Trong [crosshair_location_picker_view.dart](mobile_app/lib/features/map/crosshair_location_picker_view.dart): Bổ sung `HapticFeedback.selectionClick()` khi di chuyển tâm ngắm và `HapticFeedback.mediumImpact()` khi xác nhận ghim vị trí.
+5. **Typography & Material Elevation (P3):**
+   - Nâng cỡ chữ ghi chú trong [point_detail_bottom_sheet.dart](mobile_app/lib/shared_widgets/point_detail_bottom_sheet.dart) lên `fontSize: 14`.
+   - Chuyển bóng đổ tùy chỉnh sang `Material(elevation: 8)`.
+
+### 20.2. Bằng Chứng Kiểm Thử
+- `flutter analyze`: **No issues found!**
+- `flutter test`: **182/182 tests passed!** (100% test suites).
+- Giới hạn dòng: Tất cả các file trong `lib/` đều $\le 350$ dòng (dài nhất là `point_detail_bottom_sheet.dart` với 342 dòng).
+
+---
+
 ## 19. TASK: LOCAL-FIRST-05-LOCAL-PHOTOS (Quản Lý Ảnh Cục Bộ & Thích Ứng Widget)
 
 ### 19.1. Khảo Sát & Phân Tích
@@ -467,39 +563,63 @@ Tất cả các màn hình, sheet và widget nghiệp vụ trong `mobile_app/lib
 - **Trạng Thái Kiểm Thử Thiết Bị Thực Tế:**
   * **ĐÃ TEST trên unit & widget test tự động / CHƯA thử trên điện thoại thật.**
 
+---
 
+## 20. Hoàn Thiện Tinh Chỉnh Giao Diện (Task UI-REFINEMENT-POLISH-FINAL-015)
 
+### 20.1. Các Hạng Mục Đã Xử Lý
+1. **Tối ưu RAM Thumbnail Ảnh (P2 - Performance):**
+   - Bổ sung `cacheWidth` và `cacheHeight` vào [authenticated_image.dart](mobile_app/lib/shared_widgets/authenticated_image.dart).
+   - Truyền `cacheWidth: 300` trong [photo_strip_item.dart](mobile_app/lib/features/photos/photo_strip_item.dart) và `cacheWidth: 150` trong [customer_list_item.dart](mobile_app/lib/features/directory/widgets/customer_list_item.dart).
+2. **Thích Ứng Tablet Màn Hình Rộng (P2 - Adaptivity):**
+   - Trong [home_shell_view.dart](mobile_app/lib/home_shell_view.dart): Tự động phát hiện màn hình rộng (`width >= 600dp`). Chuyển sang thanh điều hướng dọc `NavigationRail` ở cạnh trái kết hợp `VerticalDivider`, ẩn `bottomNavigationBar`.
+3. **Đồng Bộ Màu Bề Mặt Card (P2 - Theming):**
+   - Rà soát và loại bỏ các mã màu cứng (`Colors.white`) trong [point_detail_bottom_sheet.dart](mobile_app/lib/shared_widgets/point_detail_bottom_sheet.dart), [customer_list_item.dart](mobile_app/lib/features/directory/widgets/customer_list_item.dart), [customer_detail_edit_view.dart](mobile_app/lib/features/directory/customer_detail_edit_view.dart), [customer_detail_location_card.dart](mobile_app/lib/features/directory/widgets/customer_detail_location_card.dart), và [crosshair_bottom_panel.dart](mobile_app/lib/features/map/widgets/crosshair_bottom_panel.dart).
+   - Áp dụng các token chuẩn Material 3: `colorScheme.surface`, `onSurface`, `onSurfaceVariant`, `surfaceContainerHighest`.
+4. **Phản Hồi Rung Haptic (P3 - Delight):**
+   - Trong [crosshair_location_picker_view.dart](mobile_app/lib/features/map/crosshair_location_picker_view.dart): Bổ sung `HapticFeedback.selectionClick()` khi di chuyển tâm ngắm và `HapticFeedback.mediumImpact()` khi xác nhận ghim vị trí.
+5. **Typography & Material Elevation (P3):**
+   - Nâng cỡ chữ ghi chú trong [point_detail_bottom_sheet.dart](mobile_app/lib/shared_widgets/point_detail_bottom_sheet.dart) lên `fontSize: 14`.
+   - Chuyển bóng đổ tùy chỉnh sang `Material(elevation: 8)`.
 
-
-
-
-
-
-
+### 20.2. Bằng Chứng Kiểm Thử
+- `flutter analyze`: **No issues found!**
+- `flutter test`: **182/182 tests passed!** (100% test suites).
+- Giới hạn dòng: Tất cả các file trong `lib/` đều $\le 350$ dòng (dài nhất là `point_detail_bottom_sheet.dart` với 342 dòng).
 
 
 
 
 ---
 
-## 20. Ho�n Thi?n Tinh Ch?nh Giao Di?n (Task UI-REFINEMENT-POLISH-FINAL-015)
+## 20. Ho�n Thi?n Tinh Ch?nh Giao Di?n (Task UI-REFINEMENT-POLISH-FINAL-015)
 
-### 20.1. C�c H?ng M?c �� X? L�
+### 20.1. C�c H?ng M?c �� X? L�
 1. **T?i uu RAM Thumbnail ?nh (P2 - Performance):**
-   - B? sung cacheWidth v� cacheHeight v�o authenticated_image.dart.
-   - Truy?n cacheWidth: 300 trong photo_strip_item.dart v� cacheWidth: 150 trong customer_list_item.dart.
-2. **Th�ch ?ng Tablet M�n H�nh R?ng (P2 - Adaptivity):**
-   - Trong home_shell_view.dart: T? d?ng ph�t hi?n m�n h�nh r?ng (width >= 600dp). Chuy?n sang thanh di?u hu?ng d?c NavigationRail ? c?nh tr�i k?t h?p VerticalDivider, ?n bottomNavigationBar.
-3. **�?ng B? M�u B? M?t Card (P2 - Theming):**
-   - R� so�t v� lo?i b? c�c m� m�u c?ng (Colors.white) trong point_detail_bottom_sheet.dart, customer_list_item.dart, customer_detail_edit_view.dart, customer_detail_location_card.dart, v� crosshair_bottom_panel.dart.
-   - �p d?ng c�c token chu?n Material 3: colorScheme.surface, onSurface, onSurfaceVariant, surfaceContainerHighest.
+   - B? sung cacheWidth v� cacheHeight v�o authenticated_image.dart.
+   - Truy?n cacheWidth: 300 trong photo_strip_item.dart v� cacheWidth: 150 trong customer_list_item.dart.
+2. **Th�ch ?ng Tablet M�n H�nh R?ng (P2 - Adaptivity):**
+   - Trong home_shell_view.dart: T? d?ng ph�t hi?n m�n h�nh r?ng (width >= 600dp). Chuy?n sang thanh di?u hu?ng d?c NavigationRail ? c?nh tr�i k?t h?p VerticalDivider, ?n bottomNavigationBar.
+3. **�?ng B? M�u B? M?t Card (P2 - Theming):**
+   - R� so�t v� lo?i b? c�c m� m�u c?ng (Colors.white) trong point_detail_bottom_sheet.dart, customer_list_item.dart, customer_detail_edit_view.dart, customer_detail_location_card.dart, v� crosshair_bottom_panel.dart.
+   - �p d?ng c�c token chu?n Material 3: colorScheme.surface, onSurface, onSurfaceVariant, surfaceContainerHighest.
 4. **Ph?n H?i Rung Haptic (P3 - Delight):**
-   - Trong crosshair_location_picker_view.dart: B? sung HapticFeedback.selectionClick() khi di chuy?n t�m ng?m v� HapticFeedback.mediumImpact() khi x�c nh?n ghim v? tr�.
+   - Trong crosshair_location_picker_view.dart: B? sung HapticFeedback.selectionClick() khi di chuy?n t�m ng?m v� HapticFeedback.mediumImpact() khi x�c nh?n ghim v? tr�.
 5. **Typography & Material Elevation (P3):**
-   - N�ng c? ch? ghi ch� trong point_detail_bottom_sheet.dart l�n fontSize: 14.
-   - Chuy?n b�ng d? t�y ch?nh sang Material(elevation: 8).
+   - N�ng c? ch? ghi ch� trong point_detail_bottom_sheet.dart l�n fontSize: 14.
+   - Chuy?n b�ng d? t�y ch?nh sang Material(elevation: 8).
 
 ### 20.2. B?ng Ch?ng Ki?m Th?
 - flutter analyze: No issues found!
 - flutter test: 182/182 tests passed! (100% test suites).
-- Gi?i h?n d�ng: T?t c? c�c file trong lib/ d?u <= 350 d�ng (d�i nh?t l� point_detail_bottom_sheet.dart v?i 342 d�ng).
+- Gi?i h?n d�ng: T?t c? c�c file trong lib/ d?u <= 350 d�ng (d�i nh?t l� point_detail_bottom_sheet.dart v?i 342 d�ng).
+
+
+
+
+
+
+
+
+
+
