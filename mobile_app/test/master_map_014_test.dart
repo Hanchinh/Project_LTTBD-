@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
-import 'package:delivery_marker_mobile/views/main_map_view.dart';
+import 'package:delivery_marker_mobile/features/map/main_map_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

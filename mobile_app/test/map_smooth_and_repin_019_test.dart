@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:delivery_marker_mobile/services/map_tile_cache_service.dart';
-import 'package:delivery_marker_mobile/views/main_map_view.dart';
-import 'package:delivery_marker_mobile/widgets/point_detail_bottom_sheet.dart';
-import 'package:delivery_marker_mobile/views/crosshair_location_picker_view.dart';
+import 'package:delivery_marker_mobile/data/local/map_tile_cache_service.dart';
+import 'package:delivery_marker_mobile/features/map/main_map_view.dart';
+import 'package:delivery_marker_mobile/shared_widgets/point_detail_bottom_sheet.dart';
+import 'package:delivery_marker_mobile/features/map/crosshair_location_picker_view.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 
 void main() {

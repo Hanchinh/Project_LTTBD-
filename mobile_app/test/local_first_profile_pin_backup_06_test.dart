@@ -294,6 +294,11 @@ void main() {
     });
 
     testWidgets('9. WelcomeOnboardingView: Màn chào mừng lần đầu mở app cho phép nhập tên', (tester) async {
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
       bool startFinished = false;
       await tester.pumpWidget(
         MaterialApp(
@@ -311,9 +316,12 @@ void main() {
       await tester.enterText(find.byKey(const Key('welcome_display_name_input')), 'Trần Shipper');
       await tester.pump();
 
+      await tester.tap(find.byKey(const Key('welcome_start_btn')));
+      await tester.pump();
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('welcome_start_btn')));
-        await Future.delayed(const Duration(milliseconds: 500));
+        for (int i = 0; i < 30 && !startFinished; i++) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
       });
       await tester.pump();
 
@@ -357,9 +365,10 @@ void main() {
       await tester.tap(find.byKey(const Key('pin_keypad_0')));
       await tester.pump();
 
+      await tester.tap(find.byKey(const Key('pin_submit_btn')));
+      await tester.pump();
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('pin_submit_btn')));
-        await Future.delayed(const Duration(milliseconds: 300));
+        await Future.delayed(const Duration(milliseconds: 500));
       });
       await tester.pump();
 
@@ -373,9 +382,12 @@ void main() {
       await tester.tap(find.byKey(const Key('pin_keypad_4')));
       await tester.pump();
 
+      await tester.tap(find.byKey(const Key('pin_submit_btn')));
+      await tester.pump();
       await tester.runAsync(() async {
-        await tester.tap(find.byKey(const Key('pin_submit_btn')));
-        await Future.delayed(const Duration(milliseconds: 300));
+        for (int i = 0; i < 30 && !unlocked; i++) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
       });
       await tester.pump();
 

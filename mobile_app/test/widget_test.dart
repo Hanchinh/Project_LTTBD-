@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:delivery_marker_mobile/main.dart';
-import 'package:delivery_marker_mobile/views/login_view.dart';
-import 'package:delivery_marker_mobile/views/delivery_map_view.dart';
+import 'package:delivery_marker_mobile/features/server_mode/login_view.dart';
+import 'package:delivery_marker_mobile/features/server_mode/delivery_map_view.dart';
 import 'package:delivery_marker_mobile/models/order_model.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/services/api_service.dart';
+import 'package:delivery_marker_mobile/data/remote/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

@@ -1,14 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:delivery_marker_mobile/local/app_database.dart';
+import 'package:delivery_marker_mobile/data/local/app_database.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_customer_repository.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_location_repository.dart';
-import 'package:delivery_marker_mobile/repositories/remote/remote_customer_repository.dart';
-import 'package:delivery_marker_mobile/repositories/remote/remote_location_repository.dart';
-import 'package:delivery_marker_mobile/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/utils/phone_utils.dart';
+import 'package:delivery_marker_mobile/data/local/local_customer_repository.dart';
+import 'package:delivery_marker_mobile/data/local/local_location_repository.dart';
+import 'package:delivery_marker_mobile/data/remote/remote_customer_repository.dart';
+import 'package:delivery_marker_mobile/data/remote/remote_location_repository.dart';
+import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -1,4 +1,4 @@
-import 'customer_photo_model.dart';
+import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 
 class SavedLocationModel {
   final String? id;

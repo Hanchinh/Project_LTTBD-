@@ -6,17 +6,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:delivery_marker_mobile/local/app_database.dart';
+import 'package:delivery_marker_mobile/data/local/app_database.dart';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_customer_repository.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_location_repository.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_photo_repository.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_shift_repository.dart';
-import 'package:delivery_marker_mobile/repositories/remote/remote_photo_repository.dart';
-import 'package:delivery_marker_mobile/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/widgets/authenticated_image.dart';
-import 'package:delivery_marker_mobile/widgets/customer_photos_strip_widget.dart';
-import 'package:delivery_marker_mobile/widgets/fullscreen_image_viewer.dart';
+import 'package:delivery_marker_mobile/data/local/local_customer_repository.dart';
+import 'package:delivery_marker_mobile/data/local/local_location_repository.dart';
+import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
+import 'package:delivery_marker_mobile/data/local/local_shift_repository.dart';
+import 'package:delivery_marker_mobile/data/remote/remote_photo_repository.dart';
+import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/shared_widgets/authenticated_image.dart';
+import 'package:delivery_marker_mobile/features/photos/customer_photos_strip_widget.dart';
+import 'package:delivery_marker_mobile/features/photos/fullscreen_image_viewer.dart';
 
 Uint8List createValidJpeg({int width = 80, int height = 80}) {
   final image = img.Image(width: width, height: height);

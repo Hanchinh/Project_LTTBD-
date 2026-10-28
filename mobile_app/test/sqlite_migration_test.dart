@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:delivery_marker_mobile/services/offline_storage_service.dart';
+import 'package:delivery_marker_mobile/data/remote/offline_storage_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

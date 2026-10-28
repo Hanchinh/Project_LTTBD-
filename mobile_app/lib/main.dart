@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'repositories/local/local_photo_repository.dart';
-import 'repositories/repository_provider.dart';
-import 'services/api_service.dart';
-import 'views/home_shell_view.dart';
-import 'views/login_view.dart';
-import 'views/pin_lock_screen.dart';
-import 'views/welcome_onboarding_view.dart';
+import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
+import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/remote/api_service.dart';
+import 'package:delivery_marker_mobile/home_shell_view.dart';
+import 'package:delivery_marker_mobile/features/server_mode/login_view.dart';
+import 'package:delivery_marker_mobile/features/onboarding_lock/pin_lock_screen.dart';
+import 'package:delivery_marker_mobile/features/onboarding_lock/welcome_onboarding_view.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

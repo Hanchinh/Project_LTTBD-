@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'customer_photo_model.dart';
+import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 
 /// Mô hình lời mời chia sẻ dữ liệu giữa các shipper (TASK: DATA-SHARING-BETWEEN-SHIPPERS-023)
 class DataShareModel {

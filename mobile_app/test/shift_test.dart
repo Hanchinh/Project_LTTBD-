@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/services/api_service.dart';
+import 'package:delivery_marker_mobile/data/remote/api_service.dart';
 
 void main() {
   group('Shift & Delivery Point Models Unit Tests', () {

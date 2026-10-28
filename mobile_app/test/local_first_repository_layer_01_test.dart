@@ -4,21 +4,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/models/order_model.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
-import 'package:delivery_marker_mobile/services/api_service.dart';
-import 'package:delivery_marker_mobile/repositories/customer_repository.dart';
-import 'package:delivery_marker_mobile/repositories/location_repository.dart';
-import 'package:delivery_marker_mobile/repositories/photo_repository.dart';
-import 'package:delivery_marker_mobile/repositories/profile_repository.dart';
-import 'package:delivery_marker_mobile/repositories/shift_repository.dart';
-import 'package:delivery_marker_mobile/repositories/local/local_sharing_repository.dart';
-import 'package:delivery_marker_mobile/repositories/remote/remote_customer_repository.dart';
-import 'package:delivery_marker_mobile/repositories/remote/remote_location_repository.dart';
-import 'package:delivery_marker_mobile/repositories/remote/remote_photo_repository.dart';
-import 'package:delivery_marker_mobile/repositories/remote/remote_profile_repository.dart';
-import 'package:delivery_marker_mobile/repositories/remote/remote_sharing_repository.dart';
-import 'package:delivery_marker_mobile/repositories/remote/remote_shift_repository.dart';
-import 'package:delivery_marker_mobile/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/widgets/create_shift_dialog.dart';
+import 'package:delivery_marker_mobile/data/remote/api_service.dart';
+import 'package:delivery_marker_mobile/data/repositories/customer_repository.dart';
+import 'package:delivery_marker_mobile/data/repositories/location_repository.dart';
+import 'package:delivery_marker_mobile/data/repositories/photo_repository.dart';
+import 'package:delivery_marker_mobile/data/repositories/profile_repository.dart';
+import 'package:delivery_marker_mobile/data/repositories/shift_repository.dart';
+import 'package:delivery_marker_mobile/data/local/local_sharing_repository.dart';
+import 'package:delivery_marker_mobile/data/remote/remote_customer_repository.dart';
+import 'package:delivery_marker_mobile/data/remote/remote_location_repository.dart';
+import 'package:delivery_marker_mobile/data/remote/remote_photo_repository.dart';
+import 'package:delivery_marker_mobile/data/remote/remote_profile_repository.dart';
+import 'package:delivery_marker_mobile/data/remote/remote_sharing_repository.dart';
+import 'package:delivery_marker_mobile/data/remote/remote_shift_repository.dart';
+import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/features/shifts/widgets/create_shift_dialog.dart';
 
 /// Fake ShiftRepository để kiểm thử Dependency Injection
 class FakeShiftRepository implements ShiftRepository {
@@ -43,7 +43,8 @@ class FakeShiftRepository implements ShiftRepository {
   }
 
   @override
-  Future<ShiftModel> createShift({String? shiftDate, String? shiftName, String? notes}) async {
+  Future<ShiftModel> createShift(
+      {String? shiftDate, String? shiftName, String? notes}) async {
     createShiftCalled = true;
     lastCreatedName = shiftName;
     return ShiftModel(
@@ -58,22 +59,41 @@ class FakeShiftRepository implements ShiftRepository {
   }
 
   @override
-  Future<ShiftModel> getShiftDetail(String shiftId) async => throw UnimplementedError();
+  Future<ShiftModel> getShiftDetail(String shiftId) async =>
+      throw UnimplementedError();
 
   @override
-  Future<ShiftModel> updateShiftName(String shiftId, String shiftName) async => throw UnimplementedError();
+  Future<ShiftModel> updateShiftName(String shiftId, String shiftName) async =>
+      throw UnimplementedError();
 
   @override
-  Future<ShiftModel> updateShiftStatus(String shiftId, ShiftStatus status) async => throw UnimplementedError();
+  Future<ShiftModel> updateShiftStatus(
+          String shiftId, ShiftStatus status) async =>
+      throw UnimplementedError();
 
   @override
   Future<bool> deleteShift(String shiftId) async => true;
 
   @override
-  Future<Map<String, dynamic>> addPointToShift(String shiftId, {String? customerId, String? phoneNumber, bool createIfNotFound = false, String? fullName, String? addressText, String? orderId, int? sequenceNumber, String? deliveryNotes, String? areaId}) async => throw UnimplementedError();
+  Future<Map<String, dynamic>> addPointToShift(String shiftId,
+          {String? customerId,
+          String? phoneNumber,
+          bool createIfNotFound = false,
+          String? fullName,
+          String? addressText,
+          String? orderId,
+          int? sequenceNumber,
+          String? deliveryNotes,
+          String? areaId}) async =>
+      throw UnimplementedError();
 
   @override
-  Future<BulkAddPointsResult> addBulkPointsToShift({required String shiftId, String? rawText, List<String>? phones, String? areaId}) async => throw UnimplementedError();
+  Future<BulkAddPointsResult> addBulkPointsToShift(
+          {required String shiftId,
+          String? rawText,
+          List<String>? phones,
+          String? areaId}) async =>
+      throw UnimplementedError();
 
   @override
   Future<void> removePointFromShift(String shiftId, String pointId) async {}
@@ -82,10 +102,15 @@ class FakeShiftRepository implements ShiftRepository {
   Future<List<OrderModel>> getMyShiftOrders() async => [];
 
   @override
-  Future<Map<String, dynamic>> addOrderToShift({required String customerId, bool allowMultiple = false, String? idempotencyKey}) async => throw UnimplementedError();
+  Future<Map<String, dynamic>> addOrderToShift(
+          {required String customerId,
+          bool allowMultiple = false,
+          String? idempotencyKey}) async =>
+      throw UnimplementedError();
 
   @override
-  Future<void> verifyPointLocation(String shiftId, String pointId) async => throw UnsupportedError('verifyPointLocation is deprecated');
+  Future<void> verifyPointLocation(String shiftId, String pointId) async =>
+      throw UnsupportedError('verifyPointLocation is deprecated');
 }
 
 /// Fake CustomerRepository để kiểm thử
@@ -93,30 +118,60 @@ class FakeCustomerRepository implements CustomerRepository {
   bool getCustomersCalled = false;
 
   @override
-  Future<List<CustomerDirectoryModel>> getCustomers({String? query, String? status, bool? hasPhoto, int? limit, int? offset}) async {
+  Future<List<CustomerDirectoryModel>> getCustomers(
+      {String? query,
+      String? status,
+      bool? hasPhoto,
+      int? limit,
+      int? offset}) async {
     getCustomersCalled = true;
     return [];
   }
 
   @override
-  Future<CustomerDirectoryResponse> getCustomersResponse({String? query, String? status, bool? hasPhoto, int? limit, int? offset}) async {
+  Future<CustomerDirectoryResponse> getCustomersResponse(
+      {String? query,
+      String? status,
+      bool? hasPhoto,
+      int? limit,
+      int? offset}) async {
     return const CustomerDirectoryResponse();
   }
 
   @override
-  Future<CustomerDirectoryModel> getCustomerDetail(String customerId) async => throw UnimplementedError();
+  Future<CustomerDirectoryModel> getCustomerDetail(String customerId) async =>
+      throw UnimplementedError();
 
   @override
-  Future<CustomerDirectoryModel> createCustomer({required String phoneNumber, String? fullName, String? addressText, String? areaId, double? latitude, double? longitude, double? gpsAccuracy, String? identificationNotes, String? imageBase64}) async => throw UnimplementedError();
+  Future<CustomerDirectoryModel> createCustomer(
+          {required String phoneNumber,
+          String? fullName,
+          String? addressText,
+          String? areaId,
+          double? latitude,
+          double? longitude,
+          double? gpsAccuracy,
+          String? identificationNotes,
+          String? imageBase64}) async =>
+      throw UnimplementedError();
 
   @override
-  Future<BulkCreateCustomersResult> createBulkCustomers({String? rawText, List<String>? phones, String? areaId}) async => throw UnimplementedError();
+  Future<BulkCreateCustomersResult> createBulkCustomers(
+          {String? rawText, List<String>? phones, String? areaId}) async =>
+      throw UnimplementedError();
 
   @override
-  Future<Map<String, dynamic>> updateCustomer({required String customerId, required String fullName, required String phoneNumber, String? addressText}) async => throw UnimplementedError();
+  Future<Map<String, dynamic>> updateCustomer(
+          {required String customerId,
+          required String fullName,
+          required String phoneNumber,
+          String? addressText}) async =>
+      throw UnimplementedError();
 
   @override
-  Future<Map<String, dynamic>?> lookupCustomerLocationByPhone(String phoneNumber) async => null;
+  Future<Map<String, dynamic>?> lookupCustomerLocationByPhone(
+          String phoneNumber) async =>
+      null;
 
   @override
   Future<bool> deleteCustomer(String customerId) async => true;
@@ -135,7 +190,9 @@ void main() {
       RepositoryProvider.reset();
     });
 
-    test('1. RepositoryProvider mặc định khởi tạo LocalRepository trên nhánh local-first và Remote khi useLocalData=false', () {
+    test(
+        '1. RepositoryProvider mặc định khởi tạo LocalRepository trên nhánh local-first và Remote khi useLocalData=false',
+        () {
       // Mặc định nhánh local-first: Local
       expect(RepositoryProvider.customer, isA<CustomerRepository>());
       expect(RepositoryProvider.location, isA<LocationRepository>());
@@ -154,7 +211,8 @@ void main() {
       expect(RepositoryProvider.profile, isA<RemoteProfileRepository>());
     });
 
-    test('2. RepositoryProvider hỗ trợ override bằng FakeRepository và reset', () {
+    test('2. RepositoryProvider hỗ trợ override bằng FakeRepository và reset',
+        () {
       final fakeShift = FakeShiftRepository();
       final fakeCustomer = FakeCustomerRepository();
 
@@ -172,7 +230,9 @@ void main() {
       expect(RepositoryProvider.customer, isA<CustomerRepository>());
     });
 
-    testWidgets('3. Màn hình/Widget dùng đúng FakeShiftRepository được tiêm vào', (tester) async {
+    testWidgets(
+        '3. Màn hình/Widget dùng đúng FakeShiftRepository được tiêm vào',
+        (tester) async {
       final fakeShift = FakeShiftRepository();
       RepositoryProvider.overrideRepositories(shift: fakeShift);
 
@@ -191,7 +251,8 @@ void main() {
       expect(fakeShift.getShiftsCalled, isTrue);
 
       // Nhấn nút tạo ca
-      final createButton = find.widgetWithText(ElevatedButton, 'TẠO CA VÀ MỞ BẢN ĐỒ');
+      final createButton =
+          find.widgetWithText(ElevatedButton, 'TẠO CA VÀ MỞ BẢN ĐỒ');
       expect(createButton, findsOneWidget);
 
       await tester.tap(createButton);
@@ -202,7 +263,9 @@ void main() {
       expect(fakeShift.lastCreatedName, isNotEmpty);
     });
 
-    test('4. RemoteProfileRepository và RemotePhotoRepository ủy quyền đúng sang ApiService', () async {
+    test(
+        '4. RemoteProfileRepository và RemotePhotoRepository ủy quyền đúng sang ApiService',
+        () async {
       await ApiService.saveToken('test_repo_token_9999');
       expect(await ApiService.getToken(), 'test_repo_token_9999');
 

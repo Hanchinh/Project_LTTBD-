@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:delivery_marker_mobile/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/views/data_sharing_view.dart';
-import 'package:delivery_marker_mobile/views/account_profile_view.dart';
-import 'package:delivery_marker_mobile/views/main_map_view.dart';
+import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/features/server_mode/data_sharing_view.dart';
+import 'package:delivery_marker_mobile/features/profile/account_profile_view.dart';
+import 'package:delivery_marker_mobile/features/map/main_map_view.dart';
 import 'package:delivery_marker_mobile/models/data_share_model.dart';
 
 void main() {

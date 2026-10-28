@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:delivery_marker_mobile/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/views/account_profile_view.dart';
-import 'package:delivery_marker_mobile/views/change_password_view.dart';
-import 'package:delivery_marker_mobile/views/login_view.dart';
-import 'package:delivery_marker_mobile/views/home_shell_view.dart';
-import 'package:delivery_marker_mobile/services/api_service.dart';
+import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/features/profile/account_profile_view.dart';
+import 'package:delivery_marker_mobile/features/server_mode/change_password_view.dart';
+import 'package:delivery_marker_mobile/features/server_mode/login_view.dart';
+import 'package:delivery_marker_mobile/home_shell_view.dart';
+import 'package:delivery_marker_mobile/data/remote/api_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

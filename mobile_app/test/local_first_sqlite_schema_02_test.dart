@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:delivery_marker_mobile/local/app_database.dart';
-import 'package:delivery_marker_mobile/utils/phone_utils.dart';
-import 'package:delivery_marker_mobile/utils/vietnamese_utils.dart';
+import 'package:delivery_marker_mobile/data/local/app_database.dart';
+import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
+import 'package:delivery_marker_mobile/core/utils/vietnamese_utils.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

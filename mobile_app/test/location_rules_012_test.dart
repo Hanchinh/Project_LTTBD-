@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:delivery_marker_mobile/views/crosshair_location_picker_view.dart';
+import 'package:delivery_marker_mobile/features/map/crosshair_location_picker_view.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 

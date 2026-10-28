@@ -1,4 +1,4 @@
-import 'location_model.dart';
+import 'package:delivery_marker_mobile/models/location_model.dart';
 
 class OrderModel {
   final String orderId;

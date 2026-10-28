@@ -548,7 +548,50 @@ Khi kích hoạt `RepositoryProvider.useLocalData = true`:
 
 ---
 
-## 10. Triển Khai Chia Sẻ Dữ Liệu Ngang Hàng Bằng File & Mã QR (TASK: LOCAL-FIRST-07-SHARE-BY-FILE-AND-QR)
+## 11. Tái Cấu Trúc Toàn Diện & Phân Lập Chế Độ Máy Chủ (TASK: LOCAL-FIRST-08-REFACTOR-AND-CLEANUP)
+
+### 11.1. Mục Tiêu & Kết Quả Tái Cấu Trúc
+
+1. **Chuẩn Hóa Kích Thước Tệp & Hàm Build:**
+   - Đạt tiêu chuẩn cấu trúc: không có màn hình hoạt động nào vượt quá 500 dòng (ngoại lệ duy nhất là các tệp SQL schema / queries lớn hoặc DTO serialization).
+   - Không còn phương thức `build()` nào vượt quá 150 dòng; tất cả logic dựng giao diện phức tạp đã được chia nhỏ thành các `StatelessWidget` độc lập.
+   - Toàn bộ 222 bài kiểm thử tự động tiếp tục duy trì trạng thái **PASS 100%**, `flutter analyze` báo cáo **0 cảnh báo / 0 lỗi**.
+   - Chi tiết phân tích số dòng mã trước và sau xem tại [docs/CODE_STRUCTURE.md](file:///d:/flutter%20create%20delivery_marker_app/docs/CODE_STRUCTURE.md).
+
+2. **Cấu Trúc Thư Mục Feature-First:**
+   - `lib/core/`: Các cấu hình chung, nút bấm `AppButtons`, và bộ tiện ích mật mã/chuẩn hóa.
+   - `lib/data/`:
+     - `local/`: SQLite CSDL cục bộ, sao lưu phục hồi, cache tile bản đồ và các repository cục bộ.
+     - `remote/`: Trình HTTP `ApiClient`, 7 module API chuyên biệt (`auth_api`, `customer_api`, `location_api`, `photo_api`, `shift_api`, `sharing_api`, `geocoding_api`), facade `ApiService`, các repository từ xa và dịch vụ đệm `OfflineStorageService`.
+     - `repositories/`: Các interfaces trừu tượng và DI Provider.
+   - `lib/models/`: Mô hình dữ liệu thực thể DTOs.
+   - `lib/features/`: Các mô-đun nghiệp vụ độc lập (`map/`, `directory/`, `shifts/`, `photos/`, `sharing/`, `profile/`, `onboarding_lock/`, `server_mode/`).
+   - `lib/shared_widgets/`: Các widget dùng chung giữa các phân hệ.
+
+---
+
+### 11.2. Hướng Dẫn Tái Kích Hoạt Chế Độ Kết Nối Máy Chủ (Re-enabling Server Mode)
+
+Toàn bộ mã nguồn phục vụ kết nối hệ thống máy chủ trung tâm (`backend/`) được **bảo toàn nguyên vẹn 100%**, không bị xóa bỏ, và được cô lập tại:
+- Giao diện người dùng Server Mode: `lib/features/server_mode/` ([login_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/features/server_mode/login_view.dart), [change_password_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/features/server_mode/change_password_view.dart), [data_sharing_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/features/server_mode/data_sharing_view.dart), [delivery_map_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/features/server_mode/delivery_map_view.dart), [order_list_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/features/server_mode/order_list_view.dart), [order_detail_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/features/server_mode/order_detail_view.dart), [save_location_view.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/features/server_mode/save_location_view.dart)).
+- Tầng giao tiếp từ xa Server Mode: `lib/data/remote/` ([api_client.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/data/remote/api_client.dart), [api_service.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/data/remote/api_service.dart), các `*_api.dart`, `remote_*_repository.dart`, [offline_storage_service.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/data/remote/offline_storage_service.dart)).
+
+Để chuyển đổi ứng dụng chạy sang chế độ Server Mode:
+
+1. **Chuyển cờ RepositoryProvider sang Remote:**
+   Trong [lib/data/repositories/repository_provider.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/data/repositories/repository_provider.dart):
+   ```dart
+   // Chuyển useLocalData thành false để kích hoạt các Remote*Repository
+   static bool useLocalData = false;
+   ```
+   Hoặc cấu hình qua biến môi trường `--dart-define=LOCAL_DATA=false`.
+
+2. **Kích hoạt màn hình Đăng nhập máy chủ:**
+   Trong [lib/main.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/main.dart), tại lớp `AuthSplashScreen`, chuyển hướng người dùng chưa đăng nhập về màn hình [LoginView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/features/server_mode/login_view.dart) thay vì vào thẳng [WelcomeOnboardingView](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/features/onboarding_lock/welcome_onboarding_view.dart).
+
+3. **Cấu hình địa chỉ máy chủ Backend:**
+   Sử dụng [ApiClient.setCustomBaseUrl()](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/data/remote/api_client.dart) hoặc màn hình cấu hình máy chủ trong [profile_server_config_dialog.dart](file:///d:/flutter%20create%20delivery_marker_app/mobile_app/lib/features/profile/widgets/profile_server_config_dialog.dart) để trỏ ứng dụng tới IP máy chủ backend nội bộ hoặc trên đám mây.
+
 
 ### 10.1. Mô Hình Chia Sẻ Ngang Hàng (P2P Data Sharing Model)
 1. **Quyền Riêng Tư & Cảnh Báo Không Thể Thu Hồi (Irrevocable Disclosure):**

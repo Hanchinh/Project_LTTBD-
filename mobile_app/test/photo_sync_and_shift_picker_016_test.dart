@@ -3,9 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
-import 'package:delivery_marker_mobile/widgets/customer_photos_strip_widget.dart';
-import 'package:delivery_marker_mobile/views/shift_preparation_view.dart';
-import 'package:delivery_marker_mobile/views/main_map_view.dart';
+import 'package:delivery_marker_mobile/features/photos/customer_photos_strip_widget.dart';
+import 'package:delivery_marker_mobile/features/shifts/shift_preparation_view.dart';
+import 'package:delivery_marker_mobile/features/map/main_map_view.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
