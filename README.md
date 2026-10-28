@@ -37,22 +37,30 @@ Trong thực tế giao hàng tại Việt Nam, địa chỉ trên bưu phẩm th
 
 ## 📂 Cấu Trúc Mã Nguồn (`mobile_app/lib/`)
 
+Mã nguồn được tổ chức theo kiến trúc **Feature-First kết hợp Repository Pattern**, loại bỏ hoàn toàn mã nguồn thừa của máy chủ, chia nhỏ các tệp dài thành các mô-đun < 500 dòng và bổ sung chú thích tiếng Việt chi tiết hỗ trợ sinh viên bảo vệ đồ án:
+
 ```text
 mobile_app/lib/
-├── core/                  # Tiện ích dùng chung, hằng số, cấu hình bản đồ, chuẩn hóa dữ liệu
-├── data/
-│   ├── local/             # SQLite database (app_database.dart), migrations, Local Repositories
-│   └── remote/            # API client dự phòng (cho phiên bản máy chủ tại tag v1.0-full)
-├── features/              # Các phân hệ tính năng độc lập
-│   ├── main_map/          # Bản đồ chính, hiển thị marker, cụm ghim, lọc điểm
-│   ├── shifts/            # Quản lý ca giao hàng, chuẩn bị ca, bản đồ ca
-│   ├── customers/         # Danh bạ khách hàng, chi tiết khách, dán SĐT hàng loạt
-│   ├── photos/            # Quản lý ảnh cổng nhà, thư viện ảnh, xem ảnh phóng to
-│   ├── profile/           # Thông tin cá nhân, cài đặt khóa PIN, sao lưu & khôi phục dữ liệu
-│   ├── sharing/           # Xuất/nhập file .dshare, quét & tạo mã QR chia sẻ
-│   └── server_mode/       # Giao diện kết nối máy chủ (dành cho bản máy chủ)
-├── models/                # Data models (Customer, Location, Shift, ShiftItem, Photo, ...)
-├── shared_widgets/        # Các widget tái sử dụng (CrosshairPicker, SearchBar, Sheets, ...)
+├── core/                  # Nền tảng dùng chung
+│   ├── constants/         # Hằng số bản đồ, màu sắc, cấu hình
+│   ├── services/          # GeocodingService (tìm kiếm địa chỉ OSM Nominatim độc lập)
+│   ├── theme/             # Giao diện, AppButtons
+│   └── utils/             # Chuẩn hóa SĐT, băm PIN, điều hướng Google Maps, UUID
+├── data/                  # Tầng dữ liệu Local-First
+│   ├── local/             # SQLite database (app_database.dart và các ops tách nhỏ),
+│   │                      # BackupService (sao lưu zip, mã hóa AES), Local Repositories
+│   └── repositories/      # Interface trừu tượng & RepositoryProvider thuần Local
+├── features/              # Các phân hệ tính năng độc lập (Feature Modules)
+│   ├── directory/         # Danh bạ khách hàng, chi tiết khách & mốc đã ghim
+│   ├── map/               # Bản đồ chính (MainMapView), ghim tâm ngắm (Crosshair), gom cụm
+│   ├── onboarding_lock/   # Màn hình chào mừng và màn hình mở khóa mã PIN
+│   ├── photos/            # Dải ảnh thực tế cổng nhà, xem ảnh phóng to
+│   ├── profile/           # Cá nhân, thống kê, khóa PIN, sao lưu & khôi phục dữ liệu
+│   ├── sharing/           # Chia sẻ P2P qua file gói .dshare và mã QR ngoại tuyến
+│   └── shifts/            # Quản lý ca giao hàng, chuẩn bị ca, bản đồ lộ trình ca
+├── models/                # Thực thể dữ liệu DTOs (Customer, Location, Shift, Photo, ...)
+├── shared_widgets/        # Các widget tái sử dụng (Thêm nhanh khách, Dán SĐT hàng loạt, ...)
+├── home_shell_view.dart   # Thanh điều hướng 3 tab chính (Bản đồ - Ca - Danh bạ/Cá nhân)
 └── main.dart              # Khởi tạo ứng dụng Local-First
 ```
 

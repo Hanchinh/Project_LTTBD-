@@ -72,7 +72,8 @@ mobile_app/.widget_preview/
 *.zip
 *.sql
 backups/
-backup_*
+/backup_*
+*.dbackup
 
 # Preserved/Untracked local folders from server branches (when switching branches)
 admin_web/

@@ -5,7 +5,6 @@ import 'package:delivery_marker_mobile/features/shifts/widgets/create_shift_dial
 import 'package:delivery_marker_mobile/shared_widgets/bulk_paste_phone_sheet.dart';
 import 'package:delivery_marker_mobile/features/shifts/shift_preparation_view.dart';
 import 'package:delivery_marker_mobile/features/shifts/shift_map_view.dart';
-import 'package:delivery_marker_mobile/features/server_mode/login_view.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_card.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_list_row.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
@@ -17,7 +16,7 @@ class ShiftListView extends StatefulWidget {
   const ShiftListView({
     super.key,
     this.onSelectShiftForMap,
-    this.showAppBarLogout = true,
+    this.showAppBarLogout = false,
   });
 
   @override
@@ -260,47 +259,7 @@ class _ShiftListViewState extends State<ShiftListView> {
     }
   }
 
-  Future<void> _handleLogout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Đăng xuất',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF0F172A)),
-        ),
-        content: const Text(
-          'Bác tài có chắc muốn đăng xuất khỏi ứng dụng?',
-          style: TextStyle(fontSize: 14, color: Color(0xFF334155)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFEF4444),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('ĐĂNG XUẤT', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      await RepositoryProvider.profile.logout();
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginView()),
-        (route) => false,
-      );
-    }
-  }
+  Future<void> _handleLogout() async {}
 
   @override
   Widget build(BuildContext context) {

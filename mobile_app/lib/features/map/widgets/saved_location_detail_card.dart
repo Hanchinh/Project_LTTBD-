@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
-import 'package:delivery_marker_mobile/data/remote/api_service.dart';
+import 'package:delivery_marker_mobile/core/utils/map_navigation_helper.dart';
 import 'package:delivery_marker_mobile/shared_widgets/point_detail_bottom_sheet.dart';
 
 class SavedLocationDetailCard extends StatelessWidget {
@@ -36,7 +36,7 @@ class SavedLocationDetailCard extends StatelessWidget {
         legacyImageUrl: location.imageUrl,
         onCall: onCall,
         onDirections: () {
-          ApiService.openExternalNavigation(location.latitude, location.longitude);
+          MapNavigationHelper.openExternalNavigation(location.latitude, location.longitude);
         },
         onRepin: onRepin,
         onPhotosUpdated: (updatedPhotos) {

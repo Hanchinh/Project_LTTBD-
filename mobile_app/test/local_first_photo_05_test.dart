@@ -12,7 +12,6 @@ import 'package:delivery_marker_mobile/data/local/local_customer_repository.dart
 import 'package:delivery_marker_mobile/data/local/local_location_repository.dart';
 import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
 import 'package:delivery_marker_mobile/data/local/local_shift_repository.dart';
-import 'package:delivery_marker_mobile/data/remote/remote_photo_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/shared_widgets/authenticated_image.dart';
 import 'package:delivery_marker_mobile/features/photos/customer_photos_strip_widget.dart';
@@ -64,19 +63,11 @@ void main() {
   });
 
   group('TASK: LOCAL-FIRST-05-LOCAL-PHOTOS Tests', () {
-    test('1. RepositoryProvider toggle useLocalData chuyển đổi chính xác PhotoRepository', () {
-      expect(RepositoryProvider.useLocalData, isTrue);
-      expect(RepositoryProvider.photo, isA<LocalPhotoRepository>());
-
-      RepositoryProvider.useLocalData = false;
-      expect(RepositoryProvider.useLocalData, isFalse);
-      expect(RepositoryProvider.photo, isA<RemotePhotoRepository>());
-
-      RepositoryProvider.useLocalData = true;
+    test('1. RepositoryProvider mặc định useLocalData=true và trả về LocalPhotoRepository', () {
+      RepositoryProvider.reset();
       expect(RepositoryProvider.useLocalData, isTrue);
       expect(RepositoryProvider.photo, isA<LocalPhotoRepository>());
     });
-
     test('2. Thêm ảnh hợp lệ (JPEG, PNG) - nén cạnh dài <= 1600px, tạo thumbnail ~300px, ghi CSDL và lưu file UUID', () async {
       final cust = await customerRepo.createCustomer(phoneNumber: '0901111222', fullName: 'Anh Nam');
       final custId = cust.id;

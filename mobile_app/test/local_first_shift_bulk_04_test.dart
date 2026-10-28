@@ -6,7 +6,6 @@ import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/local/local_customer_repository.dart';
 import 'package:delivery_marker_mobile/data/local/local_location_repository.dart';
 import 'package:delivery_marker_mobile/data/local/local_shift_repository.dart';
-import 'package:delivery_marker_mobile/data/remote/remote_shift_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
 
 void main() {
@@ -35,19 +34,11 @@ void main() {
   });
 
   group('TASK: LOCAL-FIRST-04-LOCAL-SHIFTS-AND-BULK Tests', () {
-    test('1. RepositoryProvider toggle useLocalData chuyển đổi chính xác ShiftRepository sang LocalShiftRepository', () {
-      expect(RepositoryProvider.useLocalData, isTrue);
-      expect(RepositoryProvider.shift, isA<LocalShiftRepository>());
-
-      RepositoryProvider.useLocalData = false;
-      expect(RepositoryProvider.useLocalData, isFalse);
-      expect(RepositoryProvider.shift, isA<RemoteShiftRepository>());
-
+    test('1. RepositoryProvider mặc định useLocalData=true và trả về LocalShiftRepository', () {
       RepositoryProvider.reset();
       expect(RepositoryProvider.useLocalData, isTrue);
       expect(RepositoryProvider.shift, isA<LocalShiftRepository>());
     });
-
     test('2. Tạo ca có tên (trim, max 100 ký tự) và tạo ca không tên tự gợi ý "Ca sáng/chiều/tối dd/MM"', () async {
       final longName = '   ${'A' * 120}   ';
       final shift1 = await shiftRepo.createShift(

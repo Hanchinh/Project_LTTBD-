@@ -6,9 +6,10 @@ import 'package:delivery_marker_mobile/features/shifts/shift_map_view.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_bulk_banner.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_point_card.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_prep_filter_bar.dart';
+import 'package:delivery_marker_mobile/features/shifts/widgets/shift_prep_phone_input_header.dart';
+import 'package:delivery_marker_mobile/features/shifts/widgets/shift_prep_bottom_action_bar.dart';
 import 'package:delivery_marker_mobile/shared_widgets/quick_add_customer_sheet.dart';
 import 'package:delivery_marker_mobile/shared_widgets/bulk_paste_phone_sheet.dart';
-import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 
 class ShiftPreparationView extends StatefulWidget {
   final ShiftModel shift;
@@ -426,117 +427,13 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
       body: Column(
         children: [
           // 1. Cụm nhập số điện thoại khách hàng (Nhập hàng loạt & Nhập nhanh từng số)
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.white,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // NÚT LỚN "NHẬP HÀNG LOẠT SĐT" (>= 56px) (TASK: PHOTO-SYNC-SHIFT-PICKER-BULK-016 Mục C)
-                SizedBox(
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    key: const Key('btn_bulk_paste_phones'),
-                    onPressed: _openBulkPasteSheet,
-                    style: AppButtons.primaryLarge(minHeight: 56, borderRadius: 14),
-                    icon: const Icon(Icons.paste_rounded, size: 22),
-                    label: const Text(
-                      'NHẬP HÀNG LOẠT SĐT',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                // Phân cách hoặc nhãn nhập lẻ từng số
-                Row(
-                  children: [
-                    const Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Text(
-                        'HOẶC THÊM TỪNG SỐ',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade500),
-                      ),
-                    ),
-                    const Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
-                  ],
-                ),
-
-                const SizedBox(height: 10),
-
-                // Ô nhập một số để thêm nhanh từng số
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 48,
-                        child: TextField(
-                          controller: _phoneController,
-                          focusNode: _phoneFocusNode,
-                          keyboardType: TextInputType.phone,
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                          decoration: InputDecoration(
-                            hintText: 'Nhập số điện thoại (VD: 0901234567)',
-                            hintStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.normal, color: Color(0xFF94A3B8)),
-                            prefixIcon: const Icon(Icons.phone_android_rounded, size: 20, color: Color(0xFF64748B)),
-                            suffixIcon: _phoneController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear, size: 18, color: Color(0xFF94A3B8)),
-                                    onPressed: () => setState(() => _phoneController.clear()),
-                                  )
-                                : null,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                            filled: true,
-                            fillColor: const Color(0xFFF8FAFC),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-                            ),
-                          ),
-                          onSubmitted: (_) => _lookupAndAddCustomer(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        key: const Key('btn_add_single_phone'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F172A),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                        ),
-                        icon: _isAddingPoint
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
-                            : const Icon(Icons.person_add_rounded, size: 20),
-                        label: Text(
-                          _isAddingPoint ? '...' : 'Thêm',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                        ),
-                        onPressed: _isAddingPoint ? null : _lookupAndAddCustomer,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          ShiftPrepPhoneInputHeader(
+            phoneController: _phoneController,
+            phoneFocusNode: _phoneFocusNode,
+            isAddingPoint: _isAddingPoint,
+            onOpenBulkPaste: _openBulkPasteSheet,
+            onAddSinglePhone: _lookupAndAddCustomer,
+            onClearPhone: () => setState(() => _phoneController.clear()),
           ),
 
           // Banner kết quả nhập hàng loạt vừa xong (nếu có)
@@ -616,75 +513,10 @@ class _ShiftPreparationViewState extends State<ShiftPreparationView> {
           ),
 
           // 4. Thanh hành động đáy: Bắt đầu ca & Nút XEM BẢN ĐỒ CA LÀM NÀY
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Color(0xFFE2E8F0), width: 1)),
-            ),
-            child: SafeArea(
-              child: Row(
-                children: [
-                  // Nút trạng thái ca
-                  if (_currentShift.status == ShiftStatus.preparing)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: SizedBox(
-                        height: 48,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF0F172A),
-                            side: const BorderSide(color: Color(0xFFCBD5E1)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                          ),
-                          onPressed: () => _updateShiftStatus(ShiftStatus.inProgress),
-                          child: const Text(
-                            'Bắt đầu ca',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    )
-                  else if (_currentShift.status == ShiftStatus.inProgress)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 10),
-                      child: SizedBox(
-                        height: 48,
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF15803D),
-                            side: const BorderSide(color: Color(0xFF86EFAC)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                          ),
-                          onPressed: () => _updateShiftStatus(ShiftStatus.completed),
-                          child: const Text(
-                            'Hoàn thành',
-                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  // Nút chính: XEM BẢN ĐỒ CA LÀM NÀY
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        style: AppButtons.primary(minHeight: 48, borderRadius: 12),
-                        icon: const Icon(Icons.map_rounded, size: 20),
-                        label: const Text(
-                          'Xem bản đồ ca làm này',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                        ),
-                        onPressed: _openShiftMap,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          ShiftPrepBottomActionBar(
+            status: _currentShift.status,
+            onStatusChanged: _updateShiftStatus,
+            onOpenMap: _openShiftMap,
           ),
         ],
       ),

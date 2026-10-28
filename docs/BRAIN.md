@@ -10,11 +10,12 @@
 ---
 
 ## 2. Kiến Trúc Mã Nguồn (`mobile_app/lib/`)
-- `core/`: Hằng số (`app_constants.dart`), cấu hình tile bản đồ (`map_config.dart`), tiện ích chuẩn hóa SĐT, tính khoảng cách, xử lý lỗi.
-- `data/local/`: Cơ sở dữ liệu SQLite (`app_database.dart`), bộ quản lý migration, và các Local Repositories (`customer`, `location`, `shift`, `photo`, `profile`, `sharing`).
-- `data/remote/`: API client và Remote Repositories lưu trữ dự phòng (phục vụ bản máy chủ tại tag `v1.0-full`).
-- `features/`: Các module tính năng độc lập (main_map, shifts, customers, photos, profile, sharing, server_mode).
-- `shared_widgets/`: Các widget dùng chung (bản đồ, thanh tìm kiếm, bottom sheet, ảnh đại diện).
+- `core/`: Nền tảng dùng chung (chủ đề `theme/`, tiện ích `utils/`, dịch vụ bản đồ `services/geocoding_service.dart`).
+- `data/local/`: Cơ sở dữ liệu SQLite (`app_database.dart` kèm schema/migrations/ops tách nhỏ), các Local Repositories (`customer`, `location`, `shift`, `photo`, `profile`, `sharing`), dịch vụ sao lưu (`backup_service.dart`) và quản lý bộ nhớ.
+- `data/repositories/`: Các Interface trừu tượng và `RepositoryProvider` cấu hình thuần Local-First.
+- `features/`: Các module tính năng độc lập (`map`, `shifts`, `directory`, `photos`, `profile`, `sharing`, `onboarding_pin`). (Mã nguồn máy chủ cũ `server_mode` và `data/remote` đã được xóa sạch trên nhánh này; bản đầy đủ lưu tại tag `v1.0-full`).
+- `models/`: Các lớp mô hình dữ liệu (Customer, Location, Shift, Photo, LocalShare, v.v.).
+- `shared_widgets/`: Các widget dùng chung (bottom sheet thêm nhanh, dán số điện thoại hàng loạt, chi tiết điểm).
 
 ---
 

@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/local_share_models.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
+import 'package:delivery_marker_mobile/features/sharing/widgets/share_point_item_card.dart';
+import 'package:delivery_marker_mobile/features/sharing/widgets/share_import_options_card.dart';
+import 'package:delivery_marker_mobile/features/sharing/widgets/share_password_dialog.dart';
 
 /// Màn hình xem trước và xác nhận tiếp nhận dữ liệu chia sẻ (Preview trước khi ghi CSDL)
 class DataShareImportPreviewSheet extends StatefulWidget {
@@ -134,62 +137,8 @@ class _DataShareImportPreviewSheetState extends State<DataShareImportPreviewShee
     }
   }
 
-  Future<String?> _promptPasswordDialog({bool isRetry = false}) async {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.lock_rounded, color: Color(0xFF0F172A), size: 24),
-            const SizedBox(width: 8),
-            Text(
-              isRetry ? 'Mật khẩu sai, thử lại' : 'Nhập mật khẩu mở gói',
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isRetry
-                  ? 'Mật khẩu bạn vừa nhập không đúng. Vui lòng kiểm tra lại với người gửi.'
-                  : 'Gói chia sẻ này được mã hóa bảo vệ bằng mật khẩu.',
-              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('input_share_password'),
-              controller: controller,
-              obscureText: true,
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Nhập mật khẩu...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, null),
-            child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton(
-            key: const Key('btn_confirm_share_password'),
-            style: AppButtons.primary(minHeight: 44),
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('MỞ KHÓA'),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<String?> _promptPasswordDialog({bool isRetry = false}) =>
+      SharePasswordDialog.show(context, isRetry: isRetry);
 
   Future<void> _handleConfirmImport() async {
     if (_preview == null) return;
@@ -453,82 +402,13 @@ class _DataShareImportPreviewSheetState extends State<DataShareImportPreviewShee
 
                 const SizedBox(height: 16),
 
-                // 2. Chế độ nhập (Chỉ thêm mới / Thay vị trí cũ)
-                const Text(
-                  'Quy tắc xử lý trùng lặp:',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: RadioGroup<ShareImportMode>(
-                    groupValue: _importMode,
-                    onChanged: (val) {
-                      if (val != null) setState(() => _importMode = val);
-                    },
-                    child: const Column(
-                      children: [
-                        RadioListTile<ShareImportMode>(
-                          key: Key('mode_add_only'),
-                          dense: true,
-                          value: ShareImportMode.addOnly,
-                          title: Text('Chỉ thêm điểm mới (khuyên dùng)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          subtitle: Text('Giữ nguyên các vị trí cũ đã lưu trong máy', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                        ),
-                        Divider(height: 1, indent: 16, endIndent: 16),
-                        RadioListTile<ShareImportMode>(
-                          key: Key('mode_replace_existing'),
-                          dense: true,
-                          value: ShareImportMode.replaceExisting,
-                          title: Text('Thay vị trí cũ bằng vị trí nhận được', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          subtitle: Text('Tọa độ cũ được chuyển an toàn vào lịch sử', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // 3. Tùy chọn nhập thành ca mới
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Column(
-                    children: [
-                      SwitchListTile(
-                        key: const Key('switch_create_shift'),
-                        dense: true,
-                        title: const Text('Nhập thành một ca làm việc mới', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                        subtitle: const Text('Tạo ngay ca giao hàng gồm các điểm này', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                        value: _createShift,
-                        activeThumbColor: const Color(0xFF0F172A),
-                        onChanged: (val) => setState(() => _createShift = val),
-                      ),
-                      if (_createShift) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
-                          child: TextField(
-                            key: const Key('input_shift_name'),
-                            controller: _shiftNameController,
-                            style: const TextStyle(fontSize: 14),
-                            decoration: InputDecoration(
-                              labelText: 'Tên ca làm việc',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                // 2 & 3. Tùy chọn xử lý trùng lặp và tạo ca mới
+                ShareImportOptionsCard(
+                  importMode: _importMode,
+                  onImportModeChanged: (val) => setState(() => _importMode = val),
+                  createShift: _createShift,
+                  onCreateShiftChanged: (val) => setState(() => _createShift = val),
+                  shiftNameController: _shiftNameController,
                 ),
 
                 const SizedBox(height: 16),
@@ -573,7 +453,13 @@ class _DataShareImportPreviewSheetState extends State<DataShareImportPreviewShee
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (ctx, idx) {
                     final item = p.classifiedPoints[idx];
-                    return _buildPointItemCard(item, idx);
+                    return SharePointItemCard(
+                      item: item,
+                      index: idx,
+                      onSelectionChanged: (val) {
+                        if (val != null) setState(() => item.isSelected = val);
+                      },
+                    );
                   },
                 ),
               ],
@@ -638,108 +524,6 @@ class _DataShareImportPreviewSheetState extends State<DataShareImportPreviewShee
       child: Text(
         label,
         style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: textColor),
-      ),
-    );
-  }
-
-  Widget _buildPointItemCard(ClassifiedSharePoint item, int index) {
-    final pt = item.point;
-    final isInvalid = item.classification == SharePointClassification.invalid;
-
-    Color badgeBg;
-    Color badgeColor;
-    String badgeText;
-
-    switch (item.classification) {
-      case SharePointClassification.newCustomer:
-        badgeBg = const Color(0xFFDCFCE7);
-        badgeColor = const Color(0xFF15803D);
-        badgeText = 'MỚI';
-        break;
-      case SharePointClassification.existingWithoutLocation:
-        badgeBg = const Color(0xFFFEF3C7);
-        badgeColor = const Color(0xFFB45309);
-        badgeText = 'CHƯA CÓ VỊ TRÍ';
-        break;
-      case SharePointClassification.existingWithLocation:
-        badgeBg = const Color(0xFFDBEAFE);
-        badgeColor = const Color(0xFF1D4ED8);
-        badgeText = 'TRÙNG (${item.formattedDistance})';
-        break;
-      case SharePointClassification.invalid:
-        badgeBg = const Color(0xFFFEE2E2);
-        badgeColor = const Color(0xFFB91C1C);
-        badgeText = 'LỖI';
-        break;
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isInvalid ? const Color(0xFFFDF2F2) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isInvalid ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0),
-        ),
-      ),
-      child: CheckboxListTile(
-        key: ValueKey('preview_point_$index'),
-        dense: true,
-        controlAffinity: ListTileControlAffinity.leading,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        value: item.isSelected,
-        onChanged: isInvalid
-            ? null
-            : (val) {
-                if (val != null) setState(() => item.isSelected = val);
-              },
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                pt.fullName?.isNotEmpty == true ? pt.fullName! : pt.phoneNumber,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: badgeBg,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                badgeText,
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: badgeColor),
-              ),
-            ),
-          ],
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 2),
-            Text(
-              pt.phoneNumber,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF2563EB), fontWeight: FontWeight.w600),
-            ),
-            if (pt.addressText != null && pt.addressText!.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(
-                pt.addressText!,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-            if (isInvalid) ...[
-              const SizedBox(height: 2),
-              Text(
-                'Lỗi: ${item.invalidReason}',
-                style: const TextStyle(fontSize: 12, color: Color(0xFFDC2626), fontWeight: FontWeight.w600),
-              ),
-            ],
-          ],
-        ),
       ),
     );
   }

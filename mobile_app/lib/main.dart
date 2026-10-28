@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/data/remote/api_service.dart';
 import 'package:delivery_marker_mobile/home_shell_view.dart';
-import 'package:delivery_marker_mobile/features/server_mode/login_view.dart';
 import 'package:delivery_marker_mobile/features/onboarding_lock/pin_lock_screen.dart';
 import 'package:delivery_marker_mobile/features/onboarding_lock/welcome_onboarding_view.dart';
 
@@ -12,6 +10,7 @@ void main() {
   runApp(const DeliveryLocationMarkerApp());
 }
 
+/// Ứng dụng Quản lý & Ghim Điểm Giao Hàng (Kiến trúc Local-First, không cần máy chủ)
 class DeliveryLocationMarkerApp extends StatelessWidget {
   const DeliveryLocationMarkerApp({super.key});
 
@@ -39,6 +38,11 @@ class DeliveryLocationMarkerApp extends StatelessWidget {
   }
 }
 
+/// Màn hình Splash khởi động ứng dụng:
+/// 1. Tự động dọn dẹp các ảnh đã xóa mềm quá 30 ngày.
+/// 2. Điều hướng sang WelcomeOnboardingView nếu người dùng mở app lần đầu.
+/// 3. Khóa bằng PinLockScreen nếu đã cài mã PIN.
+/// 4. Mở trực tiếp HomeShellView.
 class AuthSplashScreen extends StatefulWidget {
   const AuthSplashScreen({super.key});
 
@@ -54,8 +58,7 @@ class _AuthSplashScreenState extends State<AuthSplashScreen> {
   }
 
   Future<void> _checkAuthState() async {
-    final isLocalMode = RepositoryProvider.useLocalData;
-    if (isLocalMode) {
+    try {
       final photoRepo = RepositoryProvider.photo;
       if (photoRepo is LocalPhotoRepository) {
         photoRepo.purgeDeletedPhotosOlderThan().catchError((_) => 0);
@@ -96,21 +99,11 @@ class _AuthSplashScreenState extends State<AuthSplashScreen> {
         context,
         MaterialPageRoute(builder: (context) => const HomeShellView()),
       );
-      return;
-    }
-
-    final token = await ApiService.getToken();
-    if (!mounted) return;
-
-    if (token != null && token.isNotEmpty) {
+    } catch (_) {
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const HomeShellView()),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginView()),
       );
     }
   }

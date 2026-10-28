@@ -1,15 +1,16 @@
-import 'package:delivery_marker_mobile/data/local/app_database.dart';
-import 'package:delivery_marker_mobile/models/customer_model.dart';
-import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
-import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/vietnamese_utils.dart';
-import 'package:delivery_marker_mobile/data/repositories/customer_repository.dart';
+import 'package:delivery_marker_mobile/data/local/app_database.dart';
+import 'package:delivery_marker_mobile/data/local/customer_bulk_helpers.dart';
+import 'package:delivery_marker_mobile/data/local/customer_query_helpers.dart';
 import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
+import 'package:delivery_marker_mobile/data/repositories/customer_repository.dart';
+import 'package:delivery_marker_mobile/models/customer_model.dart';
+import 'package:delivery_marker_mobile/models/shift_model.dart';
 
-/// Triển khai CustomerRepository cục bộ bằng SQLite (Local-First)
-/// Toàn bộ dữ liệu khách hàng được lưu trữ và truy vấn trực tiếp trên thiết bị
+/// Triển khai CustomerRepository cục bộ bằng SQLite (Local-First).
+/// Toàn bộ dữ liệu khách hàng được lưu trữ và truy vấn trực tiếp trên thiết bị.
 class LocalCustomerRepository implements CustomerRepository {
   final AppDatabase _appDb;
   final LocalPhotoRepository _photoRepo;
@@ -46,149 +47,18 @@ class LocalCustomerRepository implements CustomerRepository {
     bool? hasPhoto,
     int? limit,
     int? offset,
-  }) async {
-    final db = await _appDb.database;
-
-    // 1. Lọc khách hàng chưa xóa mềm
-    List<Map<String, dynamic>> customerRows;
-    final cleanQuery = query != null ? normalizeSearchQuery(query) : '';
-
-    if (cleanQuery.isNotEmpty) {
-      customerRows = await _appDb.searchCustomers(query!, limit: 10000, offset: 0);
-    } else {
-      customerRows = await db.query(
-        'customers',
-        where: 'deleted_at IS NULL',
-        orderBy: 'updated_at DESC, created_at DESC',
+  }) =>
+      CustomerQueryHelpers.queryCustomersResponse(
+        appDb: _appDb,
+        photoRepo: _photoRepo,
+        query: query,
+        status: status,
+        hasPhoto: hasPhoto,
+        limit: limit,
+        offset: offset,
+        defaultAreaId: defaultAreaId,
+        defaultAreaName: defaultAreaName,
       );
-    }
-
-    // 2. Lấy toàn bộ vị trí đã lưu và điểm ghim tạm trong ca đang mở để xác định locationState
-    final savedLocRows = await db.query('saved_locations');
-    final savedLocMap = <String, Map<String, dynamic>>{};
-    for (final r in savedLocRows) {
-      savedLocMap[r['customer_id'] as String] = r;
-    }
-
-    // Lấy các điểm giao TEMPORARY trong ca PREPARING hoặc IN_PROGRESS
-    final activeTempPoints = await db.rawQuery('''
-      SELECT sdp.customer_id, sdp.latitude, sdp.longitude, sdp.identification_notes, sdp.gps_accuracy
-      FROM shift_delivery_points sdp
-      JOIN shifts s ON s.id = sdp.shift_id
-      WHERE sdp.location_status = 'TEMPORARY'
-        AND s.status IN ('PREPARING', 'IN_PROGRESS')
-      ORDER BY sdp.updated_at DESC
-    ''');
-    final tempPointMap = <String, Map<String, dynamic>>{};
-    for (final r in activeTempPoints) {
-      final custId = r['customer_id'] as String;
-      tempPointMap.putIfAbsent(custId, () => r);
-    }
-
-    // 3. Xây dựng danh sách CustomerDirectoryModel và tính toán Counts
-    final allModels = <CustomerDirectoryModel>[];
-    int verifiedCount = 0;
-    int temporaryCount = 0;
-    int noLocationCount = 0;
-
-    for (final c in customerRows) {
-      final custId = c['id'] as String;
-      final savedLoc = savedLocMap[custId];
-      final tempPoint = tempPointMap[custId];
-
-      LocationStatus locState = LocationStatus.noLocation;
-      double? lat;
-      double? lng;
-      String? notes;
-      String? savedLocId;
-
-      if (savedLoc != null && savedLoc['latitude'] != null && savedLoc['longitude'] != null) {
-        locState = LocationStatus.verified;
-        lat = (savedLoc['latitude'] as num).toDouble();
-        lng = (savedLoc['longitude'] as num).toDouble();
-        notes = savedLoc['identification_notes'] as String?;
-        savedLocId = savedLoc['id'] as String?;
-        verifiedCount++;
-      } else if (tempPoint != null && tempPoint['latitude'] != null && tempPoint['longitude'] != null) {
-        locState = LocationStatus.temporary;
-        lat = (tempPoint['latitude'] as num).toDouble();
-        lng = (tempPoint['longitude'] as num).toDouble();
-        notes = tempPoint['identification_notes'] as String?;
-        temporaryCount++;
-      } else {
-        locState = LocationStatus.noLocation;
-        noLocationCount++;
-      }
-
-      allModels.add(CustomerDirectoryModel(
-        id: custId,
-        customerCode: (c['customer_code'] as String?) ?? 'CUST',
-        fullName: (c['full_name'] as String?) ?? '',
-        phoneNumber: (c['phone_number'] as String?) ?? '',
-        addressText: (c['address_text'] as String?) ?? '',
-        areaId: defaultAreaId,
-        areaName: defaultAreaName,
-        locationStatus: locState,
-        locationState: locState,
-        hasLocation: locState != LocationStatus.noLocation,
-        latitude: lat,
-        longitude: lng,
-        identificationNotes: notes,
-        savedLocationId: savedLocId,
-        createdAt: DateTime.tryParse(c['created_at']?.toString() ?? ''),
-        updatedAt: DateTime.tryParse(c['updated_at']?.toString() ?? ''),
-      ));
-    }
-
-    // 4. Lọc theo tab status nếu có yêu cầu
-    List<CustomerDirectoryModel> filtered = allModels;
-    if (status != null && status.toUpperCase() != 'ALL') {
-      final targetStatus = LocationStatus.fromString(status);
-      filtered = allModels.where((m) => m.locationState == targetStatus).toList();
-    }
-
-    final totalCountForTab = filtered.length;
-    final effOffset = offset ?? 0;
-    final effLimit = limit ?? 30;
-
-    final pagedItems = filtered.skip(effOffset).take(effLimit).toList();
-
-    // 5. Nạp photoCount và tối đa 3 ảnh thumbnail cho danh sách khách hàng hiển thị
-    final customerIds = pagedItems.map((c) => c.id).toList();
-    final photoSummaries = await _photoRepo.getBatchPhotoSummaries(customerIds);
-
-    final enrichedItems = pagedItems.map((c) {
-      final summary = photoSummaries[c.id];
-      if (summary != null) {
-        final count = summary['photoCount'] as int;
-        final photos = summary['photos'] as List<CustomerPhotoModel>;
-        final firstThumb = summary['firstThumbnailUrl'] as String?;
-        return c.copyWith(
-          photoCount: count,
-          photos: photos,
-          firstThumbnailUrl: firstThumb,
-          imageUrl: firstThumb ?? c.imageUrl,
-        );
-      }
-      return c;
-    }).toList();
-
-    return CustomerDirectoryResponse(
-      items: enrichedItems,
-      counts: CustomerTabCounts(
-        total: allModels.length,
-        verified: verifiedCount,
-        temporary: temporaryCount,
-        noLocation: noLocationCount,
-      ),
-      pagination: CustomerPagination(
-        total: totalCountForTab,
-        limit: effLimit,
-        offset: effOffset,
-        hasMore: effOffset + pagedItems.length < totalCountForTab,
-      ),
-    );
-  }
 
   @override
   Future<CustomerDirectoryModel> getCustomerDetail(String customerId) async {
@@ -230,10 +100,8 @@ class LocalCustomerRepository implements CustomerRepository {
       }
     }
 
-    final photoSummary = await _photoRepo.getCustomerPhotoSummary(customerId);
-    final count = photoSummary['photoCount'] as int;
-    final photos = photoSummary['photos'] as List<CustomerPhotoModel>;
-    final firstThumb = photoSummary['firstThumbnailUrl'] as String?;
+    // Nạp danh sách ảnh
+    final photos = await _photoRepo.getCustomerPhotos(customerId);
 
     return CustomerDirectoryModel(
       id: customerId,
@@ -249,13 +117,13 @@ class LocalCustomerRepository implements CustomerRepository {
       latitude: lat,
       longitude: lng,
       identificationNotes: notes,
-      imageUrl: firstThumb,
-      firstThumbnailUrl: firstThumb,
-      photoCount: count,
-      photos: photos,
       savedLocationId: savedLocId,
       createdAt: DateTime.tryParse(customer['created_at']?.toString() ?? ''),
       updatedAt: DateTime.tryParse(customer['updated_at']?.toString() ?? ''),
+      photoCount: photos.length,
+      photos: photos,
+      firstThumbnailUrl: photos.isNotEmpty ? photos.first.imageUrl : null,
+      imageUrl: photos.isNotEmpty ? photos.first.imageUrl : null,
     );
   }
 
@@ -277,7 +145,7 @@ class LocalCustomerRepository implements CustomerRepository {
     }
 
     return await _appDb.transaction<CustomerDirectoryModel>((txn) async {
-      // 1. Kiểm tra SĐT đã tồn tại chưa
+      // 1. Kiểm tra xem số điện thoại đã tồn tại trong CSDL chưa
       final existingRows = await txn.query(
         'customers',
         where: 'phone_number = ? AND deleted_at IS NULL',
@@ -289,7 +157,6 @@ class LocalCustomerRepository implements CustomerRepository {
         final existing = existingRows.first;
         final custId = existing['id'] as String;
 
-        // Lấy vị trí đã lưu nếu có
         final locRows = await txn.query(
           'saved_locations',
           where: 'customer_id = ?',
@@ -395,133 +262,41 @@ class LocalCustomerRepository implements CustomerRepository {
     });
   }
 
+  /// Tiện ích tạo khách hàng nhanh
+  Future<CustomerDirectoryModel> createCustomerQuick({
+    required String phoneNumber,
+    String? fullName,
+    String? addressText,
+    String? areaId,
+    double? latitude,
+    double? longitude,
+    double? gpsAccuracy,
+    String? identificationNotes,
+  }) =>
+      createCustomer(
+        phoneNumber: phoneNumber,
+        fullName: fullName,
+        addressText: addressText,
+        areaId: areaId,
+        latitude: latitude,
+        longitude: longitude,
+        gpsAccuracy: gpsAccuracy,
+        identificationNotes: identificationNotes,
+      );
+
   @override
   Future<BulkCreateCustomersResult> createBulkCustomers({
     String? rawText,
     List<String>? phones,
     String? areaId,
-  }) async {
-    final parsed = parseAndNormalizeBulkPhones(rawText: rawText, phones: phones);
-
-    if (parsed.items.isEmpty) {
-      throw ArgumentError('Không tìm thấy số điện thoại nào trong dữ liệu gửi lên');
-    }
-
-    if (parsed.uniquePhones.length > 200) {
-      throw ArgumentError(
-        'Vượt quá giới hạn tối đa 200 số điện thoại cho mỗi lần thêm hàng loạt (nhận được ${parsed.uniquePhones.length} số)',
+  }) =>
+      CustomerBulkHelpers.executeBulkCreate(
+        appDb: _appDb,
+        rawText: rawText,
+        phones: phones,
+        areaId: areaId,
+        defaultAreaId: defaultAreaId,
       );
-    }
-
-    return await _appDb.transaction<BulkCreateCustomersResult>((txn) async {
-      final created = <BulkCustomerItem>[];
-      final alreadyExists = <BulkCustomerItem>[];
-      final rejected = <RejectedPhoneItem>[];
-
-      // Đưa các số sai định dạng vào rejected
-      for (final item in parsed.items) {
-        if (!item.isValid) {
-          rejected.add(RejectedPhoneItem(
-            phone: item.original,
-            reason: 'INVALID_FORMAT',
-            message: item.reason ?? 'Số điện thoại không đúng định dạng (cần 10 chữ số hợp lệ)',
-          ));
-        }
-      }
-
-      final now = AppDatabase.currentIsoUtc();
-
-      for (final phone in parsed.uniquePhones) {
-        final existingRows = await txn.query(
-          'customers',
-          where: 'phone_number = ? AND deleted_at IS NULL',
-          whereArgs: [phone],
-          limit: 1,
-        );
-
-        if (existingRows.isNotEmpty) {
-          final row = existingRows.first;
-          final custId = row['id'] as String;
-
-          // Kiểm tra vị trí để gán locationState
-          final locRows = await txn.query(
-            'saved_locations',
-            where: 'customer_id = ?',
-            whereArgs: [custId],
-            limit: 1,
-          );
-
-          LocationStatus locState = locRows.isNotEmpty ? LocationStatus.verified : LocationStatus.noLocation;
-
-          alreadyExists.add(BulkCustomerItem(
-            id: custId,
-            customerCode: (row['customer_code'] as String?) ?? 'CUST',
-            phoneNumber: phone,
-            fullName: (row['full_name'] as String?) ?? '',
-            addressText: (row['address_text'] as String?) ?? '',
-            areaId: defaultAreaId,
-            locationState: locState,
-          ));
-        } else {
-          final newId = UuidUtils.generate();
-          final displayName = 'Khách $phone';
-          const displayAddress = 'Chưa cập nhật địa chỉ';
-          final custCode = 'CUST-${phone.substring(phone.length - 4)}';
-          final searchText = buildCustomerSearchText(
-            fullName: displayName,
-            phoneNumber: phone,
-            addressText: displayAddress,
-          );
-
-          await txn.insert('customers', {
-            'id': newId,
-            'customer_code': custCode,
-            'full_name': displayName,
-            'phone_number': phone,
-            'address_text': displayAddress,
-            'notes': null,
-            'search_text': searchText,
-            'created_at': now,
-            'updated_at': now,
-            'deleted_at': null,
-          });
-
-          created.add(BulkCustomerItem(
-            id: newId,
-            customerCode: custCode,
-            phoneNumber: phone,
-            fullName: displayName,
-            addressText: displayAddress,
-            areaId: defaultAreaId,
-            locationState: LocationStatus.noLocation,
-          ));
-        }
-      }
-
-      // Ghi nhật ký activity_log cho cả lô
-      await _appDb.logActivity(
-        executor: txn,
-        action: 'BULK_CREATE_CUSTOMERS',
-        entity: 'CUSTOMERS',
-        details: {
-          'total': parsed.items.length,
-          'created': created.length,
-          'alreadyExists': alreadyExists.length,
-          'rejected': rejected.length,
-        },
-      );
-
-      return BulkCreateCustomersResult(
-        created: created,
-        alreadyExists: alreadyExists,
-        rejected: rejected,
-        total: parsed.items.length,
-        createdCount: created.length,
-        alreadyExistsCount: alreadyExists.length,
-        rejectedCount: rejected.length,
-      );
-    });
-  }
 
   @override
   Future<Map<String, dynamic>> updateCustomer({

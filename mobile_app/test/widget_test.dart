@@ -2,13 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:delivery_marker_mobile/main.dart';
-import 'package:delivery_marker_mobile/features/server_mode/login_view.dart';
-import 'package:delivery_marker_mobile/features/server_mode/delivery_map_view.dart';
 import 'package:delivery_marker_mobile/models/order_model.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/data/remote/api_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   setUpAll(() {
@@ -19,32 +15,14 @@ void main() {
   group('Delivery Location Marker App Unit & Widget Tests', () {
     testWidgets('App root initializes with AuthSplashScreen', (WidgetTester tester) async {
       await tester.pumpWidget(const DeliveryLocationMarkerApp());
-
-      // Verify presence of system splash title and loader
-      expect(find.text('HỆ THỐNG ĐỊNH VỊ GIAO HÀNG'), findsOneWidget);
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      expect(find.byIcon(Icons.location_on_rounded), findsOneWidget);
-    });
-
-    testWidgets('LoginView renders input fields and validates empty inputs', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: LoginView(),
-        ),
-      );
-
-      // Verify title & fields
-      expect(find.text('Định Vị Giao Hàng'), findsOneWidget);
-      expect(find.text('ĐĂNG NHẬP'), findsOneWidget);
-      expect(find.byType(TextFormField), findsNWidgets(2));
-
-      // Tap submit with empty inputs
-      await tester.tap(find.text('ĐĂNG NHẬP'));
       await tester.pump();
 
-      // Expect validation error messages
-      expect(find.text('Vui lòng nhập số điện thoại'), findsOneWidget);
-      expect(find.text('Vui lòng nhập mật khẩu'), findsOneWidget);
+      // Kiểm tra thành phần trên màn hình Splash
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byIcon(Icons.location_on_rounded), findsOneWidget);
+
+      // Đợi hoàn tất các timer bất đồng bộ
+      await tester.pump(const Duration(milliseconds: 500));
     });
 
     test('OrderModel deserializes correctly with customer and location data', () {
@@ -99,21 +77,6 @@ void main() {
       expect(deserialized.identificationNotes, 'Gần cây xăng');
     });
 
-    testWidgets('DeliveryMapView initializes with map, header card, and action buttons', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: DeliveryMapView(),
-        ),
-      );
-      await tester.pump();
-
-      // Verify presence of header title, FABs, and bottom sheet summary
-      expect(find.text('Bản Đồ Giao Hàng'), findsOneWidget);
-      expect(find.byIcon(Icons.zoom_out_map), findsOneWidget);
-      expect(find.byType(FloatingActionButton), findsWidgets);
-      expect(find.textContaining('Danh Sách Đơn Trong Ca'), findsOneWidget);
-    });
-
     test('Order filtering correctly separates verified location vs unlocated orders', () {
       final orderWithLoc = OrderModel(
         orderId: 'o-1',
@@ -122,15 +85,15 @@ void main() {
         areaName: 'Thủ Đức',
         customerId: 'c-1',
         customerName: 'Anh Minh',
-        customerPhone: '0901234567',
-        customerAddress: '123 Đỗ Xuân Hợp',
+        customerPhone: '0901000001',
+        customerAddress: '123 Đặng Văn Bi',
         hasSavedLocation: true,
         savedLocation: SavedLocationModel(
           customerId: 'c-1',
-          latitude: 10.83,
+          latitude: 10.85,
           longitude: 106.77,
-          gpsAccuracy: 3.2,
-          identificationNotes: 'Cổng màu trắng',
+          gpsAccuracy: 3.5,
+          identificationNotes: 'Nhà có cửa cuốn màu xám',
         ),
       );
 
@@ -141,10 +104,9 @@ void main() {
         areaName: 'Thủ Đức',
         customerId: 'c-2',
         customerName: 'Chị Lan',
-        customerPhone: '0909876543',
-        customerAddress: '456 Lê Văn Việt',
+        customerPhone: '0902000002',
+        customerAddress: '456 Võ Văn Ngân',
         hasSavedLocation: false,
-        savedLocation: null,
       );
 
       final orders = [orderWithLoc, orderWithoutLoc];
@@ -155,21 +117,6 @@ void main() {
       expect(located.first.orderCode, 'ORD-01');
       expect(unlocated.length, 1);
       expect(unlocated.first.orderCode, 'ORD-02');
-    });
-
-    testWidgets('DeliveryMapView displays phone search bar and TÌM KHÁCH button (FEATURE-ORDER-ENTRY-001)', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: DeliveryMapView(),
-        ),
-      );
-      await tester.pump();
-
-      // Verify phone search field and action button
-      expect(find.byType(TextField), findsOneWidget);
-      expect(find.text('Nhập SĐT khách hàng...'), findsOneWidget);
-      expect(find.text('TÌM KHÁCH'), findsOneWidget);
-      expect(find.byIcon(Icons.search), findsOneWidget);
     });
 
     test('Vietnamese Phone Normalization logic cleans formats correctly', () {
@@ -262,23 +209,6 @@ void main() {
       final point3 = ShiftDeliveryPointModel.fromJson(jsonWithoutPhoto);
       expect(point3.photoUrl, isNull);
       expect(point3.photoUrl != null && point3.photoUrl!.isNotEmpty, isFalse);
-    });
-
-    test('BUG-MAP-PHOTO-008: ApiService.getPhotoAuthInfo formats token in query param and headers for Web/Mobile', () async {
-      SharedPreferences.setMockInitialValues({});
-      await ApiService.saveToken('test_jwt_token_12345');
-      await ApiService.setCustomBaseUrl('http://localhost:3000/api/v1');
-
-      final authInfo = await ApiService.getPhotoAuthInfo(
-        '/api/v1/photos/customer_house.jpg',
-        cacheVersion: 9999,
-      );
-
-      expect(authInfo['token'], 'test_jwt_token_12345');
-      final url = authInfo['url']!;
-      expect(url, startsWith('http://localhost:3000/api/v1/photos/customer_house.jpg'));
-      expect(url, contains('v=9999'));
-      expect(url, contains('token=test_jwt_token_12345'));
     });
   });
 }

@@ -5,8 +5,6 @@ import 'package:delivery_marker_mobile/models/location_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/local/local_customer_repository.dart';
 import 'package:delivery_marker_mobile/data/local/local_location_repository.dart';
-import 'package:delivery_marker_mobile/data/remote/remote_customer_repository.dart';
-import 'package:delivery_marker_mobile/data/remote/remote_location_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
 
@@ -34,23 +32,12 @@ void main() {
   });
 
   group('TASK: LOCAL-FIRST-03-LOCAL-REPOSITORY-CUSTOMER-LOCATION Tests', () {
-    test('1. RepositoryProvider toggle useLocalData chuyển đổi chính xác giữa Remote và Local', () {
-      // Mặc định nhánh local-first: true -> Local
+    test('1. RepositoryProvider mặc định useLocalData=true và trả về LocalCustomerRepository', () {
+      RepositoryProvider.reset();
       expect(RepositoryProvider.useLocalData, isTrue);
       expect(RepositoryProvider.customer, isA<LocalCustomerRepository>());
       expect(RepositoryProvider.location, isA<LocalLocationRepository>());
-
-      // Chuyển sang Remote: useLocalData = false -> Remote
-      RepositoryProvider.useLocalData = false;
-      expect(RepositoryProvider.useLocalData, isFalse);
-      expect(RepositoryProvider.customer, isA<RemoteCustomerRepository>());
-      expect(RepositoryProvider.location, isA<RemoteLocationRepository>());
-
-      // Reset
-      RepositoryProvider.reset();
-      expect(RepositoryProvider.useLocalData, isTrue);
     });
-
     test('2. Tạo khách chỉ cần SĐT, tự đặt tên/địa chỉ mặc định, và KHÔNG tạo trùng khi SĐT đã có', () async {
       // 1. Tạo mới chỉ với SĐT chưa chuẩn hóa
       final cust1 = await customerRepo.createCustomer(

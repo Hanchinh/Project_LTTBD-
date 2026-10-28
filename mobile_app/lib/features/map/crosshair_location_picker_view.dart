@@ -5,7 +5,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/data/remote/api_service.dart';
+import 'package:delivery_marker_mobile/core/services/geocoding_service.dart';
+import 'package:delivery_marker_mobile/models/address_search_result.dart';
 import 'package:delivery_marker_mobile/data/local/map_tile_cache_service.dart';
 import 'package:delivery_marker_mobile/core/constants/map_config.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/fixed_crosshair_target.dart';
@@ -93,7 +94,7 @@ class _CrosshairLocationPickerViewState extends State<CrosshairLocationPickerVie
 
     _debounceTimer = Timer(const Duration(milliseconds: 350), () async {
       try {
-        final results = await ApiService.searchAddress(trimmed);
+        final results = await GeocodingService.searchAddress(trimmed);
         if (!mounted) return;
         setState(() {
           _searchResults = results;

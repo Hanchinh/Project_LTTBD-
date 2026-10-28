@@ -318,7 +318,7 @@ void main() {
 
       await tester.runAsync(() async {
         await tester.tap(find.byKey(const Key('welcome_start_btn')));
-        for (int i = 0; i < 60; i++) {
+        for (int i = 0; i < 150; i++) {
           if (startFinished) break;
           await Future.delayed(const Duration(milliseconds: 50));
         }

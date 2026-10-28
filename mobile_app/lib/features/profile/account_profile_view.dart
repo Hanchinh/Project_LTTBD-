@@ -1,22 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/user_model.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/data/remote/api_service.dart';
 import 'package:delivery_marker_mobile/data/local/backup_service.dart';
 import 'package:delivery_marker_mobile/data/local/app_storage_service.dart';
-import 'package:delivery_marker_mobile/core/constants/map_config.dart';
-import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 import 'package:delivery_marker_mobile/features/profile/widgets/backup_restore_bottom_sheet.dart';
-import 'package:delivery_marker_mobile/features/server_mode/change_password_view.dart';
-import 'package:delivery_marker_mobile/features/server_mode/data_sharing_view.dart';
-import 'package:delivery_marker_mobile/features/server_mode/login_view.dart';
 import 'package:delivery_marker_mobile/features/profile/widgets/profile_dialogs.dart';
-import 'package:delivery_marker_mobile/features/profile/widgets/profile_server_config_dialog.dart';
 import 'package:delivery_marker_mobile/features/profile/widgets/profile_stats_section.dart';
 import 'package:delivery_marker_mobile/features/profile/widgets/profile_local_actions_section.dart';
 import 'package:delivery_marker_mobile/features/profile/widgets/profile_header_card.dart';
+import 'package:delivery_marker_mobile/features/profile/widgets/profile_storage_section.dart';
+import 'package:delivery_marker_mobile/features/profile/widgets/profile_about_section.dart';
 
-/// Màn hình Cá nhân (Local-First) & Hồ sơ tài khoản (Remote)
+/// Màn hình quản lý thông tin Cá nhân & Thiết lập Local-First
 class AccountProfileView extends StatefulWidget {
   const AccountProfileView({super.key});
 
@@ -26,16 +21,11 @@ class AccountProfileView extends StatefulWidget {
 
 class _AccountProfileViewState extends State<AccountProfileView> {
   UserModel? _user;
-  List<Map<String, dynamic>> _areas = [];
-  Map<String, int> _stats = {
-    'savedLocationsCount': 0,
-    'createdShiftsCount': 0,
-    'uploadedPhotosCount': 0,
-  };
-  String _currentBaseUrl = '';
-  bool _isLoading = true;
-  bool _shouldShowBackupReminder = false;
+  Map<String, int> _myStats = {'savedLocationsCount': 0, 'createdShiftsCount': 0, 'uploadedPhotosCount': 0};
   AppStorageStats? _storageStats;
+  bool _isLoading = true;
+  bool _isClearingCache = false;
+  bool _shouldShowBackupReminder = false;
 
   @override
   void initState() {
@@ -46,186 +36,67 @@ class _AccountProfileViewState extends State<AccountProfileView> {
   Future<void> _loadProfileData() async {
     setState(() => _isLoading = true);
     try {
-      final user = await RepositoryProvider.profile.getCurrentUser();
-      final stats = await RepositoryProvider.profile.getMyStats();
+      final user = await RepositoryProvider.localProfile.getCurrentUser();
+      final stats = await RepositoryProvider.localProfile.getMyStats();
+      final storage = await AppStorageService().getStorageStats();
+      final backupReminder = await BackupService().shouldShowBackupReminder();
 
-      if (RepositoryProvider.useLocalData) {
-        final reminder = await BackupService(appDb: RepositoryProvider.localProfile.appDb).shouldShowBackupReminder();
-        final storageStats = await AppStorageService(appDb: RepositoryProvider.localProfile.appDb).getStorageStats();
-        if (mounted) {
-          setState(() {
-            _user = user;
-            _stats = stats;
-            _shouldShowBackupReminder = reminder;
-            _storageStats = storageStats;
-            _isLoading = false;
-          });
-        }
-      } else {
-        final areas = await RepositoryProvider.profile.getMyAreas();
-        final baseUrl = await ApiService.getBaseUrl();
-        if (mounted) {
-          setState(() {
-            _user = user;
-            _areas = areas;
-            _stats = stats;
-            _currentBaseUrl = baseUrl;
-            _isLoading = false;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _user = user;
+          _myStats = stats;
+          _storageStats = storage;
+          _shouldShowBackupReminder = backupReminder;
+          _isLoading = false;
+        });
       }
     } catch (_) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-
-
   Future<void> _handleClearCache() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.cleaning_services_rounded, color: Color(0xFF2563EB), size: 24),
-            SizedBox(width: 10),
-            Text('Dọn bộ nhớ đệm', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-          ],
-        ),
-        content: const Text(
-          'Thao tác này sẽ xóa các mảnh bản đồ tạm và tệp xuất chia sẻ tạm thời để giải phóng bộ nhớ. Dữ liệu khách hàng, vị trí đã lưu và ảnh nhà sẽ được giữ nguyên an toàn.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF475569)),
-        ),
-        actions: [
-          OutlinedButton(
-            onPressed: () => Navigator.pop(dialogCtx, false),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            key: const Key('confirm_clear_cache_btn'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(dialogCtx, true),
-            child: const Text('Dọn dẹp'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      final storageService = AppStorageService(appDb: RepositoryProvider.localProfile.appDb);
-      final freed = await storageService.clearCache();
-      final updated = await storageService.getStorageStats();
+    setState(() => _isClearingCache = true);
+    try {
+      final freed = await AppStorageService().clearCache();
+      final updatedStorage = await AppStorageService().getStorageStats();
       if (mounted) {
-        setState(() => _storageStats = updated);
+        setState(() {
+          _storageStats = updatedStorage;
+          _isClearingCache = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Đã dọn dẹp ${AppStorageService.formatBytes(freed)} bộ nhớ đệm.'),
-            backgroundColor: const Color(0xFF10B981),
-            duration: const Duration(seconds: 2),
+            backgroundColor: const Color(0xFF16A34A),
           ),
         );
       }
+    } catch (_) {
+      if (mounted) setState(() => _isClearingCache = false);
     }
   }
 
   Future<void> _showEditDisplayNameDialog() async {
-    final result = await ProfileEditNameDialog.show(
-      context: context,
-      currentName: _user?.fullName ?? '',
-    );
-
-    if (result != null && mounted) {
-      await RepositoryProvider.localProfile.updateDisplayName(result);
-      await _loadProfileData();
+    final currentName = _user?.fullName ?? '';
+    final newName = await ProfileEditNameDialog.show(context: context, currentName: currentName);
+    if (newName != null && newName.isNotEmpty && newName != currentName) {
+      await RepositoryProvider.localProfile.updateDisplayName(newName);
+      _loadProfileData();
     }
   }
-
-  Future<void> _showServerConfigDialog() async {
-    await ProfileServerConfigDialog.show(
-      context: context,
-      currentBaseUrl: _currentBaseUrl,
-      onUrlUpdated: (newUrl) {
-        if (mounted) setState(() => _currentBaseUrl = newUrl);
-      },
-    );
-  }
-
-  Future<void> _handleLogout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (dialogCtx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.logout_rounded, color: Color(0xFFDC2626), size: 24),
-              SizedBox(width: 10),
-              Text(
-                'Xác nhận đăng xuất',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
-          content: const Text(
-            'Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng không? Phiên làm việc hiện tại sẽ kết thúc.',
-            style: TextStyle(fontSize: 14, color: Color(0xFF475569)),
-          ),
-          actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          actions: [
-            OutlinedButton(
-              key: const Key('cancel_logout_btn'),
-              style: AppButtons.secondary(minHeight: 48, borderRadius: 10),
-              onPressed: () => Navigator.of(dialogCtx).pop(false),
-              child: const Text('Hủy'),
-            ),
-            ElevatedButton(
-              key: const Key('confirm_logout_btn'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFDC2626),
-                foregroundColor: Colors.white,
-                minimumSize: const Size(48, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              onPressed: () => Navigator.of(dialogCtx).pop(true),
-              child: const Text('Đăng xuất'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirm == true) {
-      await RepositoryProvider.profile.logout();
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginView()),
-        (route) => false,
-      );
-    }
-  }
-
-
 
   @override
   Widget build(BuildContext context) {
-    const bgCard = Colors.white;
     const borderColor = Color(0xFFE2E8F0);
-    final isLocal = RepositoryProvider.useLocalData;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: Text(
-          isLocal ? 'Cá nhân' : 'Tài khoản',
-          key: const Key('profile_app_bar_title'),
-          style: const TextStyle(
+        title: const Text(
+          'Cá nhân',
+          key: Key('profile_app_bar_title'),
+          style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 18,
             color: Color(0xFF0F172A),
@@ -252,8 +123,8 @@ class _AccountProfileViewState extends State<AccountProfileView> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 children: [
-                  // THÔNG BÁO NHẮC SAO LƯU (> 14 ngày chưa sao lưu)
-                  if (isLocal && _shouldShowBackupReminder) ...[
+                  // Nhắc nhở sao lưu nếu > 14 ngày
+                  if (_shouldShowBackupReminder) ...[
                     Container(
                       key: const Key('backup_reminder_card'),
                       margin: const EdgeInsets.only(bottom: 16),
@@ -283,400 +154,38 @@ class _AccountProfileViewState extends State<AccountProfileView> {
                     ),
                   ],
 
-                  // 1. ĐẦU TRANG: Avatar, Tên
+                  // 1. Thông tin cá nhân & Đổi tên
                   ProfileHeaderCard(
                     user: _user,
-                    isLocal: isLocal,
+                    isLocal: true,
                     onEditName: _showEditDisplayNameDialog,
                   ),
 
                   const SizedBox(height: 20),
 
-                  // 2. KHU VỰC PHỤ TRÁCH (CHỈ HIỂN THỊ KHI REMOTE)
-                  if (!isLocal) ...[
-                    Container(
-                      key: const Key('profile_areas_card'),
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: bgCard,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.map_rounded, color: Color(0xFF0F172A), size: 20),
-                              SizedBox(width: 8),
-                              Text(
-                                'Khu vực phụ trách',
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          if (_areas.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 4),
-                              child: Text(
-                                'Chưa được phân công khu vực nào',
-                                style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
-                              ),
-                            )
-                          else
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: _areas.map((area) {
-                                final name = area['name'] ?? 'Khu vực';
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEFF6FF),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFBFDBFE)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.place_rounded, size: 14, color: Color(0xFF2563EB)),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        name,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: Color(0xFF1D4ED8),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-
-                  // 3. THỐNG KÊ CỦA TÔI
-                  ProfileStatsSection(stats: _stats),
+                  // 2. Thống kê của tôi
+                  ProfileStatsSection(stats: _myStats),
 
                   const SizedBox(height: 20),
 
-                  // 4. MỤC BẢO MẬT & SAO LƯU (LOCAL-FIRST)
-                  if (isLocal) ...[
-                    ProfileLocalActionsSection(
-                      onDataReload: _loadProfileData,
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+                  // 3. Bảo mật PIN, Sao lưu & Chia sẻ dữ liệu
+                  ProfileLocalActionsSection(onDataReload: _loadProfileData),
 
-                  // 5. CÀI ĐẶT TÀI KHOẢN KHI REMOTE
-                  if (!isLocal) ...[
-                    Material(
-                      color: bgCard,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: borderColor),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        children: [
-                          ListTile(
-                            key: const Key('profile_change_password_item'),
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.lock_reset_rounded, color: Color(0xFF0F172A), size: 22),
-                            ),
-                            title: const Text(
-                              'Đổi mật khẩu',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                            ),
-                            subtitle: const Text(
-                              'Cập nhật mật khẩu đăng nhập tài khoản',
-                              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                            ),
-                            trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordView())),
-                          ),
-                          const Divider(height: 1, indent: 64, endIndent: 16, color: borderColor),
-                          ListTile(
-                            key: const Key('profile_data_sharing_item'),
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.share_location_rounded, color: Color(0xFF2563EB), size: 22),
-                            ),
-                            title: const Text(
-                              'Chia sẻ dữ liệu',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                            ),
-                            subtitle: const Text(
-                              'Chia sẻ vị trí & ca làm việc với shipper khác',
-                              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                            ),
-                            trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
-                            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DataSharingView())),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+                  const SizedBox(height: 20),
 
-                  // 5B. DUNG LƯỢNG ỨNG DỤNG & DỌN BỘ NHỚ ĐỆM (LOCAL-FIRST)
-                  if (isLocal) ...[
-                    Material(
-                      color: bgCard,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: borderColor),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Icon(Icons.storage_rounded, color: Color(0xFF0F172A), size: 20),
-                                ),
-                                const SizedBox(width: 12),
-                                const Expanded(
-                                  child: Text(
-                                    'Dung lượng lưu trữ',
-                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
-                                  ),
-                                ),
-                                if (_storageStats != null)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF1F5F9),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      _storageStats!.totalSizeFormatted,
-                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          const Divider(height: 1, color: borderColor),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Row(
-                                      children: [
-                                        Icon(Icons.inventory_2_outlined, size: 16, color: Color(0xFF64748B)),
-                                        SizedBox(width: 8),
-                                        Text('Cơ sở dữ liệu:', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
-                                      ],
-                                    ),
-                                    Text(
-                                      _storageStats?.databaseSizeFormatted ?? '...',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Row(
-                                      children: [
-                                        Icon(Icons.photo_library_outlined, size: 16, color: Color(0xFF64748B)),
-                                        SizedBox(width: 8),
-                                        Text('Ảnh nhà khách hàng:', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
-                                      ],
-                                    ),
-                                    Text(
-                                      _storageStats?.photosSizeFormatted ?? '...',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Row(
-                                      children: [
-                                        Icon(Icons.cached_rounded, size: 16, color: Color(0xFF64748B)),
-                                        SizedBox(width: 8),
-                                        Text('Bộ nhớ đệm (Tile & Tệp tạm):', style: TextStyle(fontSize: 13, color: Color(0xFF475569))),
-                                      ],
-                                    ),
-                                    Text(
-                                      _storageStats?.cacheSizeFormatted ?? '...',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Divider(height: 1, color: borderColor),
-                          SizedBox(
-                            width: double.infinity,
-                            child: TextButton.icon(
-                              key: const Key('clear_cache_btn'),
-                              onPressed: _handleClearCache,
-                              icon: const Icon(Icons.cleaning_services_outlined, size: 18, color: Color(0xFF2563EB)),
-                              label: const Text(
-                                'Dọn bộ nhớ đệm',
-                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF2563EB)),
-                              ),
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-
-                  // 6. THÔNG TIN HỆ THỐNG / PHIÊN BẢN
-                  Material(
-                    color: bgCard,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: const BorderSide(color: borderColor),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: [
-                        if (!isLocal) ...[
-                          ListTile(
-                            key: const Key('profile_server_config_item'),
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Icon(Icons.dns_rounded, color: Color(0xFF0F172A), size: 22),
-                            ),
-                            title: const Text(
-                              'Địa chỉ máy chủ',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                            ),
-                            subtitle: Text(
-                              _currentBaseUrl.isEmpty ? 'Đang tải...' : _currentBaseUrl,
-                              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
-                            onTap: _showServerConfigDialog,
-                          ),
-                          const Divider(height: 1, indent: 64, endIndent: 16, color: borderColor),
-                        ],
-                        ListTile(
-                          leading: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.info_outline_rounded, color: Color(0xFF0F172A), size: 22),
-                          ),
-                          title: const Text(
-                            'Phiên bản ứng dụng',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                          ),
-                          trailing: Text(
-                            isLocal ? 'v1.0.0 (Local-First)' : 'v1.0.0 (Build 1)',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                        const Divider(height: 1, indent: 64, endIndent: 16, color: borderColor),
-                        ListTile(
-                          key: const Key('profile_map_attribution_item'),
-                          leading: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(Icons.map_outlined, color: Color(0xFF0F172A), size: 22),
-                          ),
-                          title: const Text(
-                            'Nguồn bản đồ & Bản quyền',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
-                          ),
-                          subtitle: const Text(
-                            MapConfig.defaultAttribution,
-                            style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                          ),
-                        ),
-                      ],
-                    ),
+                  // 4. Dung lượng lưu trữ & Dọn cache
+                  ProfileStorageSection(
+                    storageStats: _storageStats,
+                    isClearingCache: _isClearingCache,
+                    onClearCache: _handleClearCache,
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
 
-                  // 7. NÚT ĐĂNG XUẤT (CHỈ HIỂN THỊ KHI REMOTE)
-                  if (!isLocal) ...[
-                    SizedBox(
-                      height: 50,
-                      child: OutlinedButton(
-                        key: const Key('profile_logout_btn'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFDC2626),
-                          backgroundColor: Colors.white,
-                          side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.5),
-                          minimumSize: const Size(48, 50),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          textStyle: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        onPressed: _handleLogout,
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.logout_rounded, size: 20),
-                            SizedBox(width: 8),
-                            Text('ĐĂNG XUẤT'),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
+                  // 5. Phiên bản & Bản quyền bản đồ
+                  const ProfileAboutSection(),
+
+                  const SizedBox(height: 24),
                 ],
               ),
             ),

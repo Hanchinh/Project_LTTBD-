@@ -4,19 +4,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/models/order_model.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
-import 'package:delivery_marker_mobile/data/remote/api_service.dart';
 import 'package:delivery_marker_mobile/data/repositories/customer_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/location_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/photo_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/profile_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/shift_repository.dart';
 import 'package:delivery_marker_mobile/data/local/local_sharing_repository.dart';
-import 'package:delivery_marker_mobile/data/remote/remote_customer_repository.dart';
-import 'package:delivery_marker_mobile/data/remote/remote_location_repository.dart';
-import 'package:delivery_marker_mobile/data/remote/remote_photo_repository.dart';
-import 'package:delivery_marker_mobile/data/remote/remote_profile_repository.dart';
-import 'package:delivery_marker_mobile/data/remote/remote_sharing_repository.dart';
-import 'package:delivery_marker_mobile/data/remote/remote_shift_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/create_shift_dialog.dart';
 
@@ -201,15 +194,7 @@ void main() {
       expect(RepositoryProvider.sharing, isA<LocalSharingRepository>());
       expect(RepositoryProvider.profile, isA<ProfileRepository>());
 
-      // Chuyển sang Remote:
-      RepositoryProvider.useLocalData = false;
-      expect(RepositoryProvider.customer, isA<RemoteCustomerRepository>());
-      expect(RepositoryProvider.location, isA<RemoteLocationRepository>());
-      expect(RepositoryProvider.photo, isA<RemotePhotoRepository>());
-      expect(RepositoryProvider.shift, isA<RemoteShiftRepository>());
-      expect(RepositoryProvider.sharing, isA<RemoteSharingRepository>());
-      expect(RepositoryProvider.profile, isA<RemoteProfileRepository>());
-    });
+          });
 
     test('2. RepositoryProvider hỗ trợ override bằng FakeRepository và reset',
         () {
@@ -261,26 +246,6 @@ void main() {
       // Kiểm tra widget đã gọi createShift() trên FakeShiftRepository
       expect(fakeShift.createShiftCalled, isTrue);
       expect(fakeShift.lastCreatedName, isNotEmpty);
-    });
-
-    test(
-        '4. RemoteProfileRepository và RemotePhotoRepository ủy quyền đúng sang ApiService',
-        () async {
-      await ApiService.saveToken('test_repo_token_9999');
-      expect(await ApiService.getToken(), 'test_repo_token_9999');
-
-      // Test RemoteProfileRepository.logout ủy quyền sang ApiService.logout
-      final profileRepo = RemoteProfileRepository();
-      await profileRepo.logout();
-      expect(await ApiService.getToken(), isNull);
-
-      // Test RemotePhotoRepository.getPhotoAuthInfo ủy quyền sang ApiService.getPhotoAuthInfo
-      await ApiService.saveToken('test_auth_token_456');
-      await ApiService.setCustomBaseUrl('http://127.0.0.1:3000/api/v1');
-      final photoRepo = RemotePhotoRepository();
-      final authInfo = await photoRepo.getPhotoAuthInfo('test-photo-xyz.jpg');
-      expect(authInfo['url'], contains('test-photo-xyz.jpg'));
-      expect(authInfo['token'], 'test_auth_token_456');
     });
   });
 }

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/data/remote/api_service.dart';
 import 'package:delivery_marker_mobile/shared_widgets/quick_add_customer_sheet.dart';
 
 void main() {
@@ -166,38 +164,6 @@ void main() {
 
       // Xuất hiện SnackBar
       expect(find.text('Vui lòng nhập số điện thoại'), findsOneWidget);
-    });
-  });
-
-  group('TASK: QUICK-ADD-013B - Preferred Area Validation Tests', () {
-    test('ApiService.clearPreferredAreaId xóa preferred_customer_area_id trong SharedPreferences', () async {
-      SharedPreferences.setMockInitialValues({
-        'preferred_customer_area_id': 'area-test-to-delete',
-      });
-
-      expect(await ApiService.getPreferredAreaId(), 'area-test-to-delete');
-
-      await ApiService.clearPreferredAreaId();
-
-      expect(await ApiService.getPreferredAreaId(), isNull);
-    });
-
-    testWidgets('Khi preferred_customer_area_id không còn trong getMyAreas(), tự động xóa trong SharedPreferences', (tester) async {
-      SharedPreferences.setMockInitialValues({
-        'preferred_customer_area_id': 'area-obsolete-999',
-      });
-
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: QuickAddCustomerSheet(),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Khi getMyAreas() trả về rỗng (hoặc không chứa area-obsolete-999), preferred bị xóa
-      expect(await ApiService.getPreferredAreaId(), isNull);
     });
   });
 }
