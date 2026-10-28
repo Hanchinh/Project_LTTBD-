@@ -41,8 +41,11 @@ class ProfileHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bgCard = Colors.white;
-    const borderColor = Color(0xFFE2E8F0);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final bgCard = colorScheme.surface;
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
 
     return Container(
       key: const Key('profile_header_card'),
@@ -56,7 +59,7 @@ class ProfileHeaderCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 32,
-            backgroundColor: const Color(0xFF0F172A),
+            backgroundColor: isDark ? const Color(0xFF2563EB) : const Color(0xFF0F172A),
             child: Text(
               _getInitials(user?.fullName ?? 'U'),
               key: const Key('user_avatar_initials'),
@@ -79,10 +82,10 @@ class ProfileHeaderCard extends StatelessWidget {
                       child: Text(
                         user?.fullName ?? 'Người dùng',
                         key: const Key('user_full_name'),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
+                          color: colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -105,9 +108,9 @@ class ProfileHeaderCard extends StatelessWidget {
                   Text(
                     _formatPhoneNumber(user?.phoneNumber ?? ''),
                     key: const Key('user_phone_number'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: Color(0xFF64748B),
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -116,16 +119,16 @@ class ProfileHeaderCard extends StatelessWidget {
                     key: const Key('user_role_badge'),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
+                      border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                     ),
                     child: Text(
                       _getRoleLabel(user?.role),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF334155),
+                        color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF334155),
                       ),
                     ),
                   ),

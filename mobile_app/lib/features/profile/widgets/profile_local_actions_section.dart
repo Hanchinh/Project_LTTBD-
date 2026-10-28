@@ -15,8 +15,12 @@ class ProfileLocalActionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bgCard = Colors.white;
-    const borderColor = Color(0xFFE2E8F0);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final bgCard = colorScheme.surface;
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
     return Column(
       children: [
@@ -25,7 +29,7 @@ class ProfileLocalActionsSection extends StatelessWidget {
           color: bgCard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: borderColor),
+            side: BorderSide(color: borderColor),
           ),
           clipBehavior: Clip.antiAlias,
           child: Column(
@@ -35,40 +39,40 @@ class ProfileLocalActionsSection extends StatelessWidget {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
+                    color: isDark ? const Color(0xFF2563EB).withValues(alpha: 0.15) : const Color(0xFFEFF6FF),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.shield_outlined, color: Color(0xFF2563EB), size: 22),
                 ),
-                title: const Text(
+                title: Text(
                   'Bảo mật & Mã PIN khóa app',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                 ),
-                subtitle: const Text(
+                subtitle: Text(
                   'Đặt/đổi mã PIN hoặc cấu hình thời gian tự động khóa',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 12, color: subtextColor),
                 ),
                 trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
                 onTap: () => PinSettingsBottomSheet.show(context),
               ),
-              const Divider(height: 1, indent: 64, endIndent: 16, color: borderColor),
+              Divider(height: 1, indent: 64, endIndent: 16, color: borderColor),
               ListTile(
                 key: const Key('profile_backup_item'),
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0FDF4),
+                    color: isDark ? const Color(0xFF16A34A).withValues(alpha: 0.15) : const Color(0xFFF0FDF4),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.backup_outlined, color: Color(0xFF16A34A), size: 22),
                 ),
-                title: const Text(
+                title: Text(
                   'Sao lưu & Khôi phục dữ liệu',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
                 ),
-                subtitle: const Text(
+                subtitle: Text(
                   'Xuất file zip sao lưu hoặc phục hồi dữ liệu',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 12, color: subtextColor),
                 ),
                 trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
                 onTap: () => BackupRestoreBottomSheet.show(context, onRestored: onDataReload),
@@ -83,31 +87,31 @@ class ProfileLocalActionsSection extends StatelessWidget {
           color: bgCard,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: const BorderSide(color: borderColor),
+            side: BorderSide(color: borderColor),
           ),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.share_location_rounded, color: Color(0xFF2563EB), size: 20),
-                    SizedBox(width: 8),
+                    const Icon(Icons.share_location_rounded, color: Color(0xFF2563EB), size: 20),
+                    const SizedBox(width: 8),
                     Text(
                       'Chia sẻ dữ liệu',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF0F172A),
+                        color: colorScheme.onSurface,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'Gửi và nhận điểm trực tiếp giữa các shipper qua tệp .dshare hoặc quét mã QR',
-                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                  style: TextStyle(fontSize: 13, color: subtextColor),
                 ),
                 const SizedBox(height: 14),
                 Row(

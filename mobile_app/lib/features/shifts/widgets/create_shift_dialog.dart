@@ -87,6 +87,10 @@ class _CreateShiftBottomSheetState extends State<CreateShiftBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final maxHeight = MediaQuery.of(context).size.height * 0.85;
 
@@ -94,10 +98,10 @@ class _CreateShiftBottomSheetState extends State<CreateShiftBottomSheet> {
       constraints: BoxConstraints(maxHeight: maxHeight),
       child: Container(
         padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: const [
             BoxShadow(color: Colors.black26, blurRadius: 16, offset: Offset(0, -4)),
           ],
         ),
@@ -109,121 +113,122 @@ class _CreateShiftBottomSheetState extends State<CreateShiftBottomSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-            // Thanh gạt vuốt đóng
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFCBD5E1),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-
-            // Tiêu đề
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(12),
+                // Thanh gạt vuốt đóng
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                  child: const Icon(Icons.add_task_rounded, color: Color(0xFF2563EB), size: 24),
                 ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Tạo ca làm việc mới',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
-                        ),
+
+                // Tiêu đề
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF2563EB).withValues(alpha: 0.15) : const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      Text(
-                        'Đặt tên ca để quản lý hoặc để trống để tạo mã tự động',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      child: const Icon(Icons.add_task_rounded, color: Color(0xFF2563EB), size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tạo ca làm việc mới',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          Text(
+                            'Đặt tên ca để quản lý hoặc để trống để tạo mã tự động',
+                            style: TextStyle(fontSize: 12, color: subtextColor),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+
+                // Ô nhập tên ca duy nhất, tự động focus
+                TextField(
+                  controller: _nameController,
+                  autofocus: true,
+                  maxLength: 100,
+                  textCapitalization: TextCapitalization.sentences,
+                  style: TextStyle(fontSize: 15, color: colorScheme.onSurface),
+                  decoration: InputDecoration(
+                    labelText: 'Tên ca làm việc (tùy chọn)',
+                    hintText: 'Ví dụ: Ca sáng 25/10',
+                    counterText: '',
+                    prefixIcon: Icon(Icons.edit_note_rounded, color: subtextColor),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Thông báo lỗi nếu có
+                if (_errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      _errorMessage!,
+                      style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+
+                // Nút "TẠO CA" kích thước lớn >= 56px
+                SizedBox(
+                  height: 56,
+                  child: ElevatedButton.icon(
+                    onPressed: _isCreating ? null : _handleCreate,
+                    style: AppButtons.primaryLarge(minHeight: 56, borderRadius: 16),
+                    icon: _isCreating
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                          )
+                        : const Icon(Icons.check_circle_outline_rounded, size: 22),
+                    label: Text(
+                      _isCreating ? 'ĐANG TẠO CA...' : 'TẠO CA VÀ MỞ BẢN ĐỒ',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-
-            // Ô nhập tên ca duy nhất, tự động focus
-            TextField(
-              controller: _nameController,
-              autofocus: true,
-              maxLength: 100,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(
-                labelText: 'Tên ca làm việc (tùy chọn)',
-                hintText: 'Ví dụ: Ca sáng 25/10',
-                counterText: '',
-                prefixIcon: const Icon(Icons.edit_note_rounded, color: Color(0xFF64748B)),
-                filled: true,
-                fillColor: const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFF2563EB), width: 2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Thông báo lỗi nếu có
-            if (_errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Color(0xFFDC2626), fontSize: 13, fontWeight: FontWeight.w500),
-                ),
-              ),
-
-            // Nút "TẠO CA" kích thước lớn >= 56px
-            SizedBox(
-              height: 56,
-              child: ElevatedButton.icon(
-                onPressed: _isCreating ? null : _handleCreate,
-                style: AppButtons.primaryLarge(minHeight: 56, borderRadius: 16),
-                icon: _isCreating
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
-                      )
-                    : const Icon(Icons.check_circle_outline_rounded, size: 22),
-                label: Text(
-                  _isCreating ? 'ĐANG TẠO CA...' : 'TẠO CA VÀ MỞ BẢN ĐỒ',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
-    ),
-  ),
-);
+    );
   }
 }

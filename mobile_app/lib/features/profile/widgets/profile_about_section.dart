@@ -7,14 +7,20 @@ class ProfileAboutSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bgCard = Colors.white;
-    const borderColor = Color(0xFFE2E8F0);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final bgCard = colorScheme.surface;
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final iconBg = isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
+    final iconColor = colorScheme.onSurface;
 
     return Material(
       color: bgCard,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: borderColor),
+        side: BorderSide(color: borderColor),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -23,42 +29,42 @@ class ProfileAboutSection extends StatelessWidget {
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: iconBg,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.info_outline_rounded, color: Color(0xFF0F172A), size: 22),
+              child: Icon(Icons.info_outline_rounded, color: iconColor, size: 22),
             ),
-            title: const Text(
+            title: Text(
               'Phiên bản ứng dụng',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
             ),
-            trailing: const Text(
+            trailing: Text(
               'v1.0.0 (Local-First)',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF64748B),
+                color: subtextColor,
               ),
             ),
           ),
-          const Divider(height: 1, indent: 64, endIndent: 16, color: borderColor),
+          Divider(height: 1, indent: 64, endIndent: 16, color: borderColor),
           ListTile(
             key: const Key('profile_map_attribution_item'),
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: iconBg,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.map_outlined, color: Color(0xFF0F172A), size: 22),
+              child: Icon(Icons.map_outlined, color: iconColor, size: 22),
             ),
-            title: const Text(
+            title: Text(
               'Nguồn bản đồ & Bản quyền',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
             ),
-            subtitle: const Text(
+            subtitle: Text(
               MapConfig.defaultAttribution,
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              style: TextStyle(fontSize: 13, color: subtextColor),
             ),
           ),
         ],
@@ -66,4 +72,3 @@ class ProfileAboutSection extends StatelessWidget {
     );
   }
 }
-

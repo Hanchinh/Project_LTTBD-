@@ -119,11 +119,16 @@ class _ShiftListViewState extends State<ShiftListView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     final inProgress = _shifts.where((s) => s.status == ShiftStatus.inProgress).toList();
     final activeShift = inProgress.isNotEmpty ? inProgress.first : null;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -132,7 +137,14 @@ class _ShiftListViewState extends State<ShiftListView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Ca làm việc', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  Text(
+                    'Ca làm việc',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
                   ElevatedButton.icon(
                     style: AppButtons.primary(minHeight: 48, borderRadius: 10),
                     icon: const Icon(Icons.add_rounded, size: 20),
@@ -154,7 +166,7 @@ class _ShiftListViewState extends State<ShiftListView> {
                               children: [
                                 const Icon(Icons.error_outline_rounded, size: 48, color: Color(0xFFEF4444)),
                                 const SizedBox(height: 12),
-                                Text('Lỗi: $_errorMessage', style: const TextStyle(fontSize: 14, color: Color(0xFF334155)), textAlign: TextAlign.center),
+                                Text('Lỗi: $_errorMessage', style: TextStyle(fontSize: 14, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)), textAlign: TextAlign.center),
                                 const SizedBox(height: 16),
                                 OutlinedButton.icon(
                                   style: OutlinedButton.styleFrom(foregroundColor: const Color(0xFF2563EB), side: const BorderSide(color: Color(0xFF2563EB)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
@@ -173,11 +185,18 @@ class _ShiftListViewState extends State<ShiftListView> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Container(padding: const EdgeInsets.all(16), decoration: const BoxDecoration(color: Color(0xFFE2E8F0), shape: BoxShape.circle), child: const Icon(Icons.assignment_outlined, size: 44, color: Color(0xFF94A3B8))),
+                                    Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.assignment_outlined, size: 44, color: Color(0xFF94A3B8)),
+                                    ),
                                     const SizedBox(height: 16),
-                                    const Text('Chưa có ca làm việc nào', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                                    Text('Chưa có ca làm việc nào', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
                                     const SizedBox(height: 6),
-                                    const Text('Bác tài bấm "Tạo ca mới" ở trên để bắt đầu sắp xếp danh sách giao.', style: TextStyle(fontSize: 13, color: Color(0xFF64748B)), textAlign: TextAlign.center),
+                                    Text('Bác tài bấm "Tạo ca mới" ở trên để bắt đầu sắp xếp danh sách giao.', style: TextStyle(fontSize: 13, color: subtextColor), textAlign: TextAlign.center),
                                     const SizedBox(height: 16),
                                     ElevatedButton.icon(style: AppButtons.primary(minHeight: 48, borderRadius: 10), icon: const Icon(Icons.add, size: 18), label: const Text('Tạo ca'), onPressed: _openCreateShiftDialog),
                                   ],
@@ -207,7 +226,7 @@ class _ShiftListViewState extends State<ShiftListView> {
                                       onOpenMap: () => _openShiftMap(activeShift),
                                     ),
                                   ],
-                                  Text('DANH SÁCH CA (${_shifts.length})', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B), letterSpacing: 0.5)),
+                                  Text('DANH SÁCH CA (${_shifts.length})', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: subtextColor, letterSpacing: 0.5)),
                                   const SizedBox(height: 10),
                                   ListView.separated(
                                     shrinkWrap: true,

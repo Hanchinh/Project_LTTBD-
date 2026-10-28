@@ -39,6 +39,7 @@ class ProfileEditNameDialog {
 
 class ProfileAboutDialog {
   static void show(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -50,23 +51,27 @@ class ProfileAboutDialog {
             Text('Về ứng dụng', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               'Delivery Location Marker',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+              ),
             ),
-            SizedBox(height: 4),
-            Text('Phiên bản: 1.0.0 (Local-First Edition)', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-            SizedBox(height: 12),
+            const SizedBox(height: 4),
+            Text('Phiên bản: 1.0.0 (Local-First Edition)', style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+            const SizedBox(height: 12),
             Text(
               'Ứng dụng hỗ trợ ghi nhận vị trí giao hàng, số điện thoại, ảnh cửa nhà và quản lý ca làm việc ngoại tuyến an toàn trên thiết bị.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4),
+              style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155), height: 1.4),
             ),
-            SizedBox(height: 8),
-            Text(
+            const SizedBox(height: 8),
+            const Text(
               'Toàn bộ dữ liệu của bạn được lưu an toàn trong SQLite cục bộ, không gửi lên máy chủ khi không có sự đồng ý của bạn.',
               style: TextStyle(fontSize: 12, color: Color(0xFF10B981), fontWeight: FontWeight.w500),
             ),

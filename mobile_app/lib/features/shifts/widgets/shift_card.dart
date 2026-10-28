@@ -20,6 +20,11 @@ class ShiftInProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     final summary = shift.summary;
     final total = summary.totalPoints;
     final verified = summary.verifiedCount;
@@ -28,12 +33,15 @@ class ShiftInProgressCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFDBEAFE), width: 1.5),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2563EB).withValues(alpha: 0.4) : const Color(0xFFDBEAFE),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2563EB).withValues(alpha: 0.06),
+            color: const Color(0xFF2563EB).withValues(alpha: isDark ? 0.12 : 0.06),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -54,16 +62,16 @@ class ShiftInProgressCard extends StatelessWidget {
                     children: [
                       Text(
                         shift.displayTitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
+                          color: colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         shift.shiftCode,
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        style: TextStyle(fontSize: 12, color: subtextColor),
                       ),
                     ],
                   ),
@@ -73,10 +81,10 @@ class ShiftInProgressCard extends StatelessWidget {
                   children: [
                     Text(
                       '${ShiftModel.formatVnDate(DateTime.tryParse(shift.shiftDate) ?? shift.createdAt ?? DateTime.now())} · $total điểm',
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: subtextColor),
                     ),
                     PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF64748B), size: 20),
+                      icon: Icon(Icons.more_vert_rounded, color: subtextColor, size: 20),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                       onSelected: (value) {
@@ -87,13 +95,13 @@ class ShiftInProgressCard extends StatelessWidget {
                         }
                       },
                       itemBuilder: (ctx) => [
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'rename',
                           child: Row(
                             children: [
-                              Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF334155)),
-                              SizedBox(width: 8),
-                              Text('Đổi tên ca', style: TextStyle(fontSize: 14)),
+                              Icon(Icons.edit_note_rounded, size: 18, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
+                              const SizedBox(width: 8),
+                              const Text('Đổi tên ca', style: TextStyle(fontSize: 14)),
                             ],
                           ),
                         ),
@@ -121,7 +129,7 @@ class ShiftInProgressCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: progress,
                 minHeight: 6,
-                backgroundColor: const Color(0xFFE2E8F0),
+                backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                 valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF10B981)),
               ),
             ),
@@ -130,7 +138,7 @@ class ShiftInProgressCard extends StatelessWidget {
             // Hàng 3: Dòng tóm tắt
             Text(
               '${summary.verifiedCount} Đã xác minh · ${summary.temporaryCount} Tạm · ${summary.noLocationCount} Chưa có',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF64748B)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: subtextColor),
             ),
             const SizedBox(height: 14),
 

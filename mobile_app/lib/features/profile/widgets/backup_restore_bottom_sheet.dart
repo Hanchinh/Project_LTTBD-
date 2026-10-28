@@ -96,27 +96,34 @@ class _BackupRestoreBottomSheetState extends State<BackupRestoreBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final cardBg = isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC);
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+
     return Container(
       padding: EdgeInsets.only(top: 20, left: 20, right: 20, bottom: MediaQuery.of(context).viewInsets.bottom + 24),
       constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.85),
-      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      decoration: BoxDecoration(color: colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(20))),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 16),
-            const Row(children: [Icon(Icons.backup_rounded, color: Color(0xFF2563EB), size: 24), SizedBox(width: 10), Text('Sao Lưu & Khôi Phục Dữ Liệu', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)))]),
+            Row(children: [const Icon(Icons.backup_rounded, color: Color(0xFF2563EB), size: 24), const SizedBox(width: 10), Text('Sao Lưu & Khôi Phục Dữ Liệu', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface))]),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+              decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: borderColor)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(children: [Icon(Icons.cloud_upload_outlined, color: Color(0xFF2563EB), size: 20), SizedBox(width: 8), Text('1. Tạo bản sao lưu (.zip)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)))]),
+                  Row(children: [const Icon(Icons.cloud_upload_outlined, color: Color(0xFF2563EB), size: 20), const SizedBox(width: 8), Text('1. Tạo bản sao lưu (.zip)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: colorScheme.onSurface))]),
                   const SizedBox(height: 8),
-                  const Text('Đóng gói toàn bộ CSDL và ảnh mặt tiền thành 1 tệp .zip duy nhất để gửi qua Zalo, Drive hoặc lưu vào máy.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4)),
+                  Text('Đóng gói toàn bộ CSDL và ảnh mặt tiền thành 1 tệp .zip duy nhất để gửi qua Zalo, Drive hoặc lưu vào máy.', style: TextStyle(fontSize: 12, color: subtextColor, height: 1.4)),
                   const SizedBox(height: 12),
                   SwitchListTile(title: const Text('Bao gồm ảnh mặt tiền nhà', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)), subtitle: const Text('Bật để lưu giữ toàn bộ hình ảnh khách hàng', style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8))), value: _includePhotos, onChanged: (val) => setState(() => _includePhotos = val), dense: true, contentPadding: EdgeInsets.zero),
                   const SizedBox(height: 12),
@@ -133,13 +140,13 @@ class _BackupRestoreBottomSheetState extends State<BackupRestoreBottomSheet> {
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+              decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: borderColor)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(children: [Icon(Icons.settings_backup_restore_rounded, color: Color(0xFF16A34A), size: 20), SizedBox(width: 8), Text('2. Khôi phục từ file sao lưu', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)))]),
+                  Row(children: [const Icon(Icons.settings_backup_restore_rounded, color: Color(0xFF16A34A), size: 20), const SizedBox(width: 8), Text('2. Khôi phục từ file sao lưu', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: colorScheme.onSurface))]),
                   const SizedBox(height: 8),
-                  const Text('Chọn tệp .zip đã sao lưu trước đó để phục hồi lại dữ liệu.', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  Text('Chọn tệp .zip đã sao lưu trước đó để phục hồi lại dữ liệu.', style: TextStyle(fontSize: 12, color: subtextColor)),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     key: const Key('btn_pick_backup_file'),
@@ -152,11 +159,11 @@ class _BackupRestoreBottomSheetState extends State<BackupRestoreBottomSheet> {
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFCBD5E1))),
+                      decoration: BoxDecoration(color: colorScheme.surface, borderRadius: BorderRadius.circular(10), border: Border.all(color: borderColor)),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Xem trước dữ liệu bản sao lưu:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                          Text('Xem trước dữ liệu bản sao lưu:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: colorScheme.onSurface)),
                           const SizedBox(height: 8),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -171,7 +178,7 @@ class _BackupRestoreBottomSheetState extends State<BackupRestoreBottomSheet> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    const Text('Chọn phương thức khôi phục:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+                    Text('Chọn phương thức khôi phục:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                     const SizedBox(height: 4),
                     _buildRestoreTile('Gộp vào dữ liệu hiện có (Khuyên dùng)', 'Khách trùng SĐT được giữ nguyên, chỉ thêm vị trí/ảnh mới.', RestoreMode.merge),
                     _buildRestoreTile('Thay toàn bộ dữ liệu', 'Xóa dữ liệu hiện tại và thay bằng file sao lưu (có tự động sao lưu an toàn).', RestoreMode.fullReplace, isDanger: true),
@@ -188,7 +195,7 @@ class _BackupRestoreBottomSheetState extends State<BackupRestoreBottomSheet> {
             ),
             if (_isProcessing) ...[
               const SizedBox(height: 20),
-              Center(child: Column(children: [const CircularProgressIndicator(), const SizedBox(height: 10), Text(_statusMessage ?? 'Đang xử lý...', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)))])),
+              Center(child: Column(children: [const CircularProgressIndicator(), const SizedBox(height: 10), Text(_statusMessage ?? 'Đang xử lý...', style: TextStyle(fontSize: 13, color: subtextColor))])),
             ],
           ],
         ),
@@ -196,16 +203,23 @@ class _BackupRestoreBottomSheetState extends State<BackupRestoreBottomSheet> {
     );
   }
 
-  Widget _buildStatItem(String label, int val) => Column(
-    children: [
-      Text(val.toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF2563EB))),
-      const SizedBox(height: 2),
-      Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-    ],
-  );
+  Widget _buildStatItem(String label, int val) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(
+      children: [
+        Text(val.toString(), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF2563EB))),
+        const SizedBox(height: 2),
+        Text(label, style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
+      ],
+    );
+  }
 
   Widget _buildRestoreTile(String title, String subtitle, RestoreMode mode, {bool isDanger = false}) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final sel = _selectedRestoreMode == mode;
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+
     return InkWell(
       key: Key('restore_mode_${mode.name}'),
       onTap: () => setState(() => _selectedRestoreMode = mode),
@@ -214,15 +228,15 @@ class _BackupRestoreBottomSheetState extends State<BackupRestoreBottomSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: sel ? (isDanger ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4)) : const Color(0xFFF8FAFC),
+          color: sel ? (isDanger ? (isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.3) : const Color(0xFFFEF2F2)) : (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFF0FDF4))) : (isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC)),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: sel ? (isDanger ? const Color(0xFFDC2626) : const Color(0xFF16A34A)) : const Color(0xFFE2E8F0), width: sel ? 1.5 : 1.0),
+          border: Border.all(color: sel ? (isDanger ? const Color(0xFFDC2626) : const Color(0xFF16A34A)) : borderColor, width: sel ? 1.5 : 1.0),
         ),
         child: Row(
           children: [
             Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: sel ? (isDanger ? const Color(0xFFDC2626) : const Color(0xFF16A34A)) : const Color(0xFF94A3B8), size: 20),
             const SizedBox(width: 10),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500, color: isDanger && sel ? const Color(0xFFDC2626) : const Color(0xFF0F172A))), const SizedBox(height: 2), Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))])),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500, color: isDanger && sel ? const Color(0xFFDC2626) : theme.colorScheme.onSurface)), const SizedBox(height: 2), Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)))])),
           ],
         ),
       ),

@@ -15,24 +15,30 @@ class ShiftListRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     Color chipBg;
     Color chipText;
     switch (shift.status) {
       case ShiftStatus.preparing:
-        chipBg = const Color(0xFFFEF3C7);
-        chipText = const Color(0xFFD97706);
+        chipBg = isDark ? const Color(0xFF78350F).withValues(alpha: 0.4) : const Color(0xFFFEF3C7);
+        chipText = isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706);
         break;
       case ShiftStatus.inProgress:
-        chipBg = const Color(0xFFDBEAFE);
-        chipText = const Color(0xFF1D4ED8);
+        chipBg = isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.4) : const Color(0xFFDBEAFE);
+        chipText = isDark ? const Color(0xFF60A5FA) : const Color(0xFF1D4ED8);
         break;
       case ShiftStatus.completed:
-        chipBg = const Color(0xFFDCFCE7);
-        chipText = const Color(0xFF15803D);
+        chipBg = isDark ? const Color(0xFF064E3B).withValues(alpha: 0.4) : const Color(0xFFDCFCE7);
+        chipText = isDark ? const Color(0xFF4ADE80) : const Color(0xFF15803D);
         break;
       case ShiftStatus.cancelled:
-        chipBg = const Color(0xFFFEE2E2);
-        chipText = const Color(0xFFB91C1C);
+        chipBg = isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : const Color(0xFFFEE2E2);
+        chipText = isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C);
         break;
     }
 
@@ -44,9 +50,9 @@ class ShiftListRow extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: borderColor),
       ),
       child: Material(
         color: Colors.transparent,
@@ -66,10 +72,10 @@ class ShiftListRow extends StatelessWidget {
                           Flexible(
                             child: Text(
                               shift.displayTitle,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF0F172A),
+                                color: colorScheme.onSurface,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -78,7 +84,7 @@ class ShiftListRow extends StatelessWidget {
                           const SizedBox(width: 6),
                           Text(
                             shift.shiftCode,
-                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            style: TextStyle(fontSize: 12, color: subtextColor),
                           ),
                           const SizedBox(width: 8),
                           Container(
@@ -101,7 +107,7 @@ class ShiftListRow extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         subText,
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                        style: TextStyle(fontSize: 13, color: subtextColor),
                       ),
                     ],
                   ),

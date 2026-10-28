@@ -88,22 +88,25 @@ class _AccountProfileViewState extends State<AccountProfileView> {
 
   @override
   Widget build(BuildContext context) {
-    const borderColor = Color(0xFFE2E8F0);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Cá nhân',
-          key: Key('profile_app_bar_title'),
+          key: const Key('profile_app_bar_title'),
           style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 18,
-            color: Color(0xFF0F172A),
+            color: colorScheme.onSurface,
           ),
         ),
         elevation: 0,
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+        backgroundColor: theme.appBarTheme.backgroundColor,
         automaticallyImplyLeading: false,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
@@ -111,15 +114,15 @@ class _AccountProfileViewState extends State<AccountProfileView> {
         ),
       ),
       body: _isLoading
-          ? const Center(
+          ? Center(
               child: CircularProgressIndicator(
                 strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0F172A)),
+                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
               ),
             )
           : RefreshIndicator(
               onRefresh: _loadProfileData,
-              color: const Color(0xFF0F172A),
+              color: colorScheme.primary,
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 children: [
@@ -130,24 +133,24 @@ class _AccountProfileViewState extends State<AccountProfileView> {
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFFBEB),
+                        color: isDark ? const Color(0xFF451A03).withValues(alpha: 0.5) : const Color(0xFFFFFBEB),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFFFDE68A)),
+                        border: Border.all(color: isDark ? const Color(0xFF92400E) : const Color(0xFFFDE68A)),
                       ),
                       child: Row(
                         children: [
                           const Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 24),
                           const SizedBox(width: 10),
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'Bạn chưa sao lưu dữ liệu hơn 14 ngày. Hãy sao lưu định kỳ để bảo vệ ảnh và vị trí.',
-                              style: TextStyle(fontSize: 12, color: Color(0xFF92400E), height: 1.3),
+                              style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E), height: 1.3),
                             ),
                           ),
                           TextButton(
                             key: const Key('btn_backup_now'),
                             onPressed: () => BackupRestoreBottomSheet.show(context, onRestored: _loadProfileData),
-                            child: const Text('Sao lưu ngay', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFFB45309))),
+                            child: Text('Sao lưu ngay', style: TextStyle(fontWeight: FontWeight.w700, color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309))),
                           ),
                         ],
                       ),

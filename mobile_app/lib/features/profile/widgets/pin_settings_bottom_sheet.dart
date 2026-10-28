@@ -123,24 +123,29 @@ class _PinSettingsBottomSheetState extends State<PinSettingsBottomSheet> {
     }
   }
 
-  Future<void> _handleTimeoutChanged(int? newSeconds) async {
-    if (newSeconds == null) return;
-    await RepositoryProvider.localProfile.setPinTimeoutSeconds(newSeconds);
-    setState(() => _timeoutSeconds = newSeconds);
+  Future<void> _handleTimeoutChanged(int seconds) async {
+    await RepositoryProvider.localProfile.setPinTimeoutSeconds(seconds);
+    setState(() => _timeoutSeconds = seconds);
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+
     return Container(
       padding: EdgeInsets.only(top: 20, left: 20, right: 20, bottom: MediaQuery.of(context).viewInsets.bottom + 24),
-      decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      decoration: BoxDecoration(color: colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(20))),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)))),
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1), borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 16),
-          const Row(children: [Icon(Icons.shield_outlined, color: Color(0xFF2563EB), size: 24), SizedBox(width: 10), Text('Bảo Mật & Mã PIN Khóa App', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)))]),
+          Row(children: [const Icon(Icons.shield_outlined, color: Color(0xFF2563EB), size: 24), const SizedBox(width: 10), Text('Bảo Mật & Mã PIN Khóa App', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: colorScheme.onSurface))]),
           const SizedBox(height: 16),
           if (_isLoading)
             const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()))
@@ -148,9 +153,9 @@ class _PinSettingsBottomSheetState extends State<PinSettingsBottomSheet> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _hasPin ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+                color: _hasPin ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.3) : const Color(0xFFF0FDF4)) : (isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC)),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _hasPin ? const Color(0xFFBBF7D0) : const Color(0xFFE2E8F0)),
+                border: Border.all(color: _hasPin ? (isDark ? const Color(0xFF059669) : const Color(0xFFBBF7D0)) : borderColor),
               ),
               child: Row(
                 children: [
@@ -160,9 +165,9 @@ class _PinSettingsBottomSheetState extends State<PinSettingsBottomSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_hasPin ? 'Mã PIN đang BẬT' : 'Chưa thiết lập mã PIN', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _hasPin ? const Color(0xFF166534) : const Color(0xFF334155))),
+                        Text(_hasPin ? 'Mã PIN đang BẬT' : 'Chưa thiết lập mã PIN', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: _hasPin ? (isDark ? const Color(0xFF4ADE80) : const Color(0xFF166534)) : colorScheme.onSurface)),
                         const SizedBox(height: 2),
-                        Text(_hasPin ? 'Khóa ứng dụng khi mở hoặc rời app.' : 'Mã PIN 4-6 số bảo vệ dữ liệu cục bộ.', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        Text(_hasPin ? 'Khóa ứng dụng khi mở hoặc rời app.' : 'Mã PIN 4-6 số bảo vệ dữ liệu cục bộ.', style: TextStyle(fontSize: 12, color: subtextColor)),
                       ],
                     ),
                   ),
@@ -187,7 +192,7 @@ class _PinSettingsBottomSheetState extends State<PinSettingsBottomSheet> {
                 ],
               ),
               const SizedBox(height: 20),
-              const Text('Thời gian tự động khóa khi rời app:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+              Text('Thời gian tự động khóa khi rời app:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
               const SizedBox(height: 8),
               _buildTimeoutTile('Ngay lập tức', 'Khóa ứng dụng ngay khi chuyển sang ứng dụng khác', 0),
               _buildTimeoutTile('Sau 1 phút (Khuyên dùng)', 'Cho phép quay lại app nhanh chóng trong vòng 60 giây', 60),
@@ -200,7 +205,11 @@ class _PinSettingsBottomSheetState extends State<PinSettingsBottomSheet> {
   }
 
   Widget _buildTimeoutTile(String title, String subtitle, int value) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final sel = _timeoutSeconds == value;
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+
     return InkWell(
       key: Key('pin_timeout_$value'),
       onTap: () => _handleTimeoutChanged(value),
@@ -209,15 +218,15 @@ class _PinSettingsBottomSheetState extends State<PinSettingsBottomSheet> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: sel ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC),
+          color: sel ? (isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.3) : const Color(0xFFEFF6FF)) : (isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC)),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: sel ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0), width: sel ? 1.5 : 1.0),
+          border: Border.all(color: sel ? const Color(0xFF2563EB) : borderColor, width: sel ? 1.5 : 1.0),
         ),
         child: Row(
           children: [
             Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: sel ? const Color(0xFF2563EB) : const Color(0xFF94A3B8), size: 20),
             const SizedBox(width: 10),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500, color: const Color(0xFF0F172A))), const SizedBox(height: 2), Text(subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)))])),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: TextStyle(fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500, color: theme.colorScheme.onSurface)), const SizedBox(height: 2), Text(subtitle, style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)))])),
           ],
         ),
       ),

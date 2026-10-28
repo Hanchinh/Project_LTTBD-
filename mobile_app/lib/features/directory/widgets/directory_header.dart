@@ -20,6 +20,12 @@ class DirectoryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor = theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0));
+    final iconColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     return Column(
       children: [
         // Header: "Danh bạ" kèm huy hiệu tổng + nút "+ Thêm số"
@@ -30,28 +36,28 @@ class DirectoryHeader extends StatelessWidget {
             physics: const BouncingScrollPhysics(),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Danh bạ',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                    border: Border.all(color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
                   ),
                   child: Text(
                     '$totalCount',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF475569),
+                      color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF475569),
                     ),
                   ),
                 ),
@@ -95,21 +101,21 @@ class DirectoryHeader extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: colorScheme.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: borderColor),
             ),
             child: TextField(
               controller: searchController,
               onChanged: onSearchChanged,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+              style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
               decoration: InputDecoration(
                 hintText: 'Tìm số điện thoại, tên, địa chỉ...',
-                hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
-                prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                hintStyle: TextStyle(fontSize: 14, color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                prefixIcon: Icon(Icons.search_rounded, color: iconColor, size: 20),
                 suffixIcon: searchController.text.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF64748B)),
+                        icon: Icon(Icons.close_rounded, size: 18, color: iconColor),
                         tooltip: 'Xóa tìm kiếm',
                         onPressed: () {
                           searchController.clear();

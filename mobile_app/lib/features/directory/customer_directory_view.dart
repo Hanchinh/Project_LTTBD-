@@ -98,6 +98,9 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
   }
 
   Future<void> _handleAddCustomerToShift(CustomerDirectoryModel customer) async {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     try {
       final shifts = await RepositoryProvider.shift.getShifts();
       final candidates = shifts.where((s) => s.status == ShiftStatus.preparing || s.status == ShiftStatus.inProgress).toList();
@@ -108,11 +111,11 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
           context: context,
           builder: (ctx) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Chưa có ca làm việc', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Color(0xFF0F172A))),
-            content: const Text('Chưa có ca làm việc nào đang chuẩn bị hoặc thực hiện. Bác tài có muốn tạo ca mới không?', style: TextStyle(fontSize: 14, color: Color(0xFF334155), height: 1.4)),
+            title: Text('Chưa có ca làm việc', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: theme.colorScheme.onSurface)),
+            content: Text('Chưa có ca làm việc nào đang chuẩn bị hoặc thực hiện. Bác tài có muốn tạo ca mới không?', style: TextStyle(fontSize: 14, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155), height: 1.4)),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('HỦY', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold))),
-              ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0F172A), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), onPressed: () => Navigator.pop(ctx, true), child: const Text('TẠO CA MỚI', style: TextStyle(fontWeight: FontWeight.bold))),
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('HỦY', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), fontWeight: FontWeight.bold))),
+              ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2563EB), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))), onPressed: () => Navigator.pop(ctx, true), child: const Text('TẠO CA MỚI', style: TextStyle(fontWeight: FontWeight.bold))),
             ],
           ),
         );
@@ -136,19 +139,19 @@ class _CustomerDirectoryViewState extends State<CustomerDirectoryView> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Padding(padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8), child: Text('Chọn ca làm việc để thêm điểm', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)))),
-                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                  Padding(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), child: Text('Chọn ca làm việc để thêm điểm', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface))),
+                  Divider(height: 1, color: theme.dividerTheme.color ?? const Color(0xFFE2E8F0)),
                   Flexible(
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: candidates.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFF1F5F9)),
+                      separatorBuilder: (_, __) => Divider(height: 1, indent: 16, endIndent: 16, color: theme.dividerTheme.color ?? const Color(0xFFF1F5F9)),
                       itemBuilder: (c, idx) {
                         final s = candidates[idx];
                         return ListTile(
                           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                          title: Text(s.displayTitle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Color(0xFF0F172A))),
-                          subtitle: Text('${s.shiftDate} · ${s.status.displayName} · ${s.summary.totalPoints} điểm', style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                          title: Text(s.displayTitle, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: theme.colorScheme.onSurface)),
+                          subtitle: Text('${s.shiftDate} · ${s.status.displayName} · ${s.summary.totalPoints} điểm', style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
                           onTap: () => Navigator.pop(ctx, s),
                         );
                       },

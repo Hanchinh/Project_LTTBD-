@@ -10,35 +10,30 @@ class ProfileStatsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bgCard = Colors.white;
-    const borderColor = Color(0xFFE2E8F0);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       key: const Key('profile_stats_card'),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.bar_chart_rounded, color: Color(0xFF0F172A), size: 20),
-              SizedBox(width: 8),
+              Icon(Icons.bar_chart_rounded, color: colorScheme.onSurface, size: 20),
+              const SizedBox(width: 8),
               Text(
                 'Thống kê của tôi',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF0F172A),
+                  color: colorScheme.onSurface,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -46,8 +41,9 @@ class ProfileStatsSection extends StatelessWidget {
                   label: 'Vị trí đã lưu',
                   count: stats['savedLocationsCount'] ?? 0,
                   icon: Icons.place_rounded,
-                  color: const Color(0xFF2563EB),
-                  bgColor: const Color(0xFFEFF6FF),
+                  color: isDark ? const Color(0xFF60A5FA) : const Color(0xFF2563EB),
+                  isDark: isDark,
+                  surfaceColor: colorScheme.surface,
                 ),
               ),
               const SizedBox(width: 10),
@@ -56,8 +52,9 @@ class ProfileStatsSection extends StatelessWidget {
                   label: 'Ca đã tạo',
                   count: stats['createdShiftsCount'] ?? 0,
                   icon: Icons.assignment_rounded,
-                  color: const Color(0xFF16A34A),
-                  bgColor: const Color(0xFFF0FDF4),
+                  color: isDark ? const Color(0xFF4ADE80) : const Color(0xFF16A34A),
+                  isDark: isDark,
+                  surfaceColor: colorScheme.surface,
                 ),
               ),
               const SizedBox(width: 10),
@@ -66,8 +63,9 @@ class ProfileStatsSection extends StatelessWidget {
                   label: 'Ảnh đã tải',
                   count: stats['uploadedPhotosCount'] ?? 0,
                   icon: Icons.photo_library_rounded,
-                  color: const Color(0xFFD97706),
-                  bgColor: const Color(0xFFFFFBEB),
+                  color: isDark ? const Color(0xFFFBBF24) : const Color(0xFFD97706),
+                  isDark: isDark,
+                  surfaceColor: colorScheme.surface,
                 ),
               ),
             ],
@@ -82,14 +80,17 @@ class ProfileStatsSection extends StatelessWidget {
     required int count,
     required IconData icon,
     required Color color,
-    required Color bgColor,
+    required bool isDark,
+    required Color surfaceColor,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: isDark ? surfaceColor : color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        border: Border.all(
+          color: isDark ? color.withValues(alpha: 0.3) : color.withValues(alpha: 0.2),
+        ),
       ),
       child: Column(
         children: [
@@ -107,10 +108,10 @@ class ProfileStatsSection extends StatelessWidget {
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF475569),
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
             ),
           ),
         ],

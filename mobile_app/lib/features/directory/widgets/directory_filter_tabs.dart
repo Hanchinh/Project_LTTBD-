@@ -15,12 +15,27 @@ class DirectoryFilterTabs extends StatelessWidget {
   });
 
   Widget _buildTab({
+    required BuildContext context,
     required String key,
     required String label,
     required int count,
     Color? dotColor,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final isSelected = selectedFilter == key;
+
+    final bgColor = isSelected
+        ? (isDark ? const Color(0xFF2563EB) : const Color(0xFF0F172A))
+        : colorScheme.surface;
+    final borderColor = isSelected
+        ? (isDark ? const Color(0xFF3B82F6) : const Color(0xFF0F172A))
+        : (theme.dividerTheme.color ?? (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)));
+    final textColor = isSelected
+        ? Colors.white
+        : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF475569));
+
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: InkWell(
@@ -33,11 +48,9 @@ class DirectoryFilterTabs extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF0F172A) : Colors.white,
+            color: bgColor,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
-            ),
+            border: Border.all(color: borderColor),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -55,7 +68,7 @@ class DirectoryFilterTabs extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? Colors.white : const Color(0xFF475569),
+                  color: textColor,
                 ),
               ),
             ],
@@ -74,23 +87,27 @@ class DirectoryFilterTabs extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
           _buildTab(
+            context: context,
             key: 'ALL',
             label: 'Tất cả',
             count: tabCounts.total,
           ),
           _buildTab(
+            context: context,
             key: 'VERIFIED',
             label: 'Đã xác minh',
             count: tabCounts.verified,
             dotColor: const Color(0xFF10B981),
           ),
           _buildTab(
+            context: context,
             key: 'TEMPORARY',
             label: 'Vị trí tạm',
             count: tabCounts.temporary,
             dotColor: const Color(0xFFF59E0B),
           ),
           _buildTab(
+            context: context,
             key: 'NO_LOCATION',
             label: 'Chưa có vị trí',
             count: tabCounts.noLocation,

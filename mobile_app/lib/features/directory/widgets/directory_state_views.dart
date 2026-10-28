@@ -6,6 +6,9 @@ class DirectoryEmptyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -14,21 +17,21 @@ class DirectoryEmptyView extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: Color(0xFFE2E8F0),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.person_off_outlined, size: 44, color: Color(0xFF94A3B8)),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Chưa có khách nào',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: theme.colorScheme.onSurface),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Bác tài có thể bấm "+ Thêm số" ở trên để lưu khách mới.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
               textAlign: TextAlign.center,
             ),
           ],
@@ -50,6 +53,8 @@ class DirectoryErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -60,7 +65,7 @@ class DirectoryErrorView extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               'Lỗi: $errorMessage',
-              style: const TextStyle(fontSize: 14, color: Color(0xFF334155)),
+              style: TextStyle(fontSize: 14, color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
@@ -76,4 +81,3 @@ class DirectoryErrorView extends StatelessWidget {
     );
   }
 }
-

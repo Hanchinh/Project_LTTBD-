@@ -162,7 +162,7 @@ class _HomeShellViewState extends State<HomeShellView> with WidgetsBindingObserv
                   labelType: NavigationRailLabelType.all,
                   destinations: [
                     NavigationRailDestination(
-                      icon: Icon(Icons.map_outlined, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), size: 24),
+                      icon: Icon(Icons.map_rounded, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), size: 24),
                       selectedIcon: const Icon(Icons.map_rounded, color: Color(0xFF2563EB), size: 24),
                       label: const Text('Bản đồ'),
                     ),
@@ -211,7 +211,7 @@ class _HomeShellViewState extends State<HomeShellView> with WidgetsBindingObserv
                 labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
                 destinations: [
                   NavigationDestination(
-                    icon: Icon(Icons.map_outlined, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), size: 24),
+                    icon: Icon(Icons.map_rounded, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B), size: 24),
                     selectedIcon: const Icon(Icons.map_rounded, color: Color(0xFF2563EB), size: 24),
                     label: 'Bản đồ',
                   ),
