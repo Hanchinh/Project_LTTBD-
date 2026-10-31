@@ -3,3 +3,4 @@ Quản lý dữ liệu danh bạ khách hàng, tìm kiếm và thêm hàng loạ
 
 - `customer_repository.dart`: Repository thao tác khách hàng (thêm, sửa, xóa, gắn vị trí).
 - `customer_queries.dart`: Câu truy vấn SQLite danh bạ, tìm kiếm tiếng Việt và bulk insert.
+

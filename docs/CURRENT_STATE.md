@@ -6,10 +6,11 @@
 
 ## 0. Trạng Thái Bản Nộp (Submission Status - App-Only)
 
-- **Nhánh thực thi:** `submit-app-only` (phiên bản ứng dụng di động Flutter Local-First độc lập).
-- **Kiểm thử tự động:** `231/231` unit & widget tests passed (`flutter test` exit code 0).
+- **Nhánh thực thi:** `testrutgoncode` (Hoàn thành đợt tái cấu trúc & tinh gọn: `TASK: SLIM-AND-RESTRUCTURE-011`).
+- **Kiểm thử tự động:** `178/178` unit & widget tests passed (`flutter test` exit code 0, 100% passed).
 - **Phân tích tĩnh:** `No issues found!` (`flutter analyze` exit code 0).
-- **Kích thước APK Release:** 76.5 MB (`app-release.apk` fat APK chứa 4 kiến trúc CPU: armeabi-v7a, arm64-v8a, x86_64; ~23 MB per ABI split; đã tối ưu R8 ProGuard).
+- **Kích thước APK Release:** 76.4 MB (`app-release.apk` tại `mobile_app/build/app/outputs/flutter-apk/app-release.apk`, độ dài 80,069,461 bytes).
+- **Cấu trúc mã nguồn tinh gọn:** Giảm từ 130 tệp `.dart` xuống còn 114 tệp; tầng dữ liệu phân chia rõ ràng theo miền (`data/{customers, locations, shifts, photos, backup, sharing, profile, database}`); các widget dùng chung quy về `core/widgets/`; toàn bộ tệp > 100 dòng đều có chú thích tiếng Việt ở dòng 1; không có bất kỳ tệp nào vượt quá 400 dòng mã (tệp dài nhất là 381 dòng).
 - **Tính năng hoàn chỉnh:** Bản đồ chính gom cụm marker; Ghim vị trí bằng tâm chữ thập; Danh bạ khách hàng tìm kiếm không dấu & dán hàng loạt SĐT; Quản lý ca giao hàng & tối ưu điểm; Quản lý nhiều ảnh cổng nhà (nén 1600px); Khóa PIN PBKDF2/SHA-256; Sao lưu & khôi phục ZIP có mật khẩu AES-GCM; Chia sẻ điểm offline qua file `.dshare` và mã QR P2P.
 - **Danh mục [CHƯA THỬ TRÊN ĐIỆN THOẠI THẬT]:**
   1. Thao tác cảm ứng đa điểm kéo/zoom bản đồ mượt mà trên màn hình nhỏ.

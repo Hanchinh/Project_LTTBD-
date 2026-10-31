@@ -10,12 +10,23 @@
 ---
 
 ## 2. Kiến Trúc Mã Nguồn (`mobile_app/lib/`)
-- `core/`: Nền tảng dùng chung (chủ đề `theme/`, tiện ích `utils/`, dịch vụ bản đồ `services/geocoding_service.dart`).
-- `data/local/`: Cơ sở dữ liệu SQLite (`app_database.dart` kèm schema/migrations/ops tách nhỏ), các Local Repositories (`customer`, `location`, `shift`, `photo`, `profile`, `sharing`), dịch vụ sao lưu (`backup_service.dart`) và quản lý bộ nhớ.
-- `data/repositories/`: Các Interface trừu tượng và `RepositoryProvider` cấu hình thuần Local-First.
-- `features/`: Các module tính năng độc lập (`map`, `shifts`, `directory`, `photos`, `profile`, `sharing`, `onboarding_pin`). (Mã nguồn máy chủ cũ `server_mode` và `data/remote` đã được xóa sạch trên nhánh này; bản đầy đủ lưu tại tag `v1.0-full`).
-- `models/`: Các lớp mô hình dữ liệu (Customer, Location, Shift, Photo, LocalShare, v.v.).
-- `shared_widgets/`: Các widget dùng chung (bottom sheet thêm nhanh, dán số điện thoại hàng loạt, chi tiết điểm).
+- `main.dart`: Điểm khởi chạy ứng dụng Flutter.
+- `app/`: Khung ứng dụng chính (`app.dart`), điều hướng 4 tab (`home_shell_view.dart`), màn khởi động (`auth_splash_view.dart`), và chủ đề (`theme/app_theme.dart`, `theme/app_buttons.dart`).
+- `core/`: Nền tảng dùng chung không phụ thuộc nghiệp vụ:
+  - `services/`: Dịch vụ bản đồ (`map_navigation_service.dart`, `map_tile_cache_service.dart`).
+  - `utils/`: Tiện ích SĐT, mã hóa một chiều PIN, mã hóa AES-GCM gói chia sẻ, chuỗi tiếng Việt.
+  - `widgets/`: Các widget dùng chung (`point_detail_bottom_sheet`, `quick_add_customer_sheet`, `bulk_paste_phone_sheet`, `authenticated_image`).
+- `data/`: Tầng dữ liệu phân chia theo từng miền nghiệp vụ (Domain-Driven):
+  - `repository_provider.dart`: Cung cấp Singleton các repository truy cập toàn cục.
+  - `database/`: Quản lý SQLite WAL (`app_database.dart`), schema DDL và database migrations.
+  - `customers/`, `locations/`, `shifts/`, `photos/`, `backup/`, `sharing/`, `profile/`: Mỗi miền một repository và câu truy vấn tương ứng.
+- `features/`: Các module tính năng giao diện độc lập (`map`, `directory`, `shifts`, `photos`, `profile`, `sharing`, `onboarding_lock`).
+- `models/`: Các lớp mô hình dữ liệu (Customer, Location, Shift, Photo, LocalShare, UserProfile).
+
+
+
+
+
 
 ---
 

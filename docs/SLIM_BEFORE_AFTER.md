@@ -6,13 +6,13 @@ Nhánh: `testrutgoncode`
 
 | Chỉ số | GĐ0 (Mốc ban đầu) | GĐ1 (Gỡ server code) | GĐ2 (Gọn tầng data) | GĐ3 (Gộp widget) | GĐ4 (Sắp xếp thư mục) | GĐ5 (Dễ đọc & Docs) | GĐ6 (Hoàn thành) |
 |---|---|---|---|---|---|---|---|
-| **Tổng số file .dart (lib/)** | 130 | 128 | 120 | 110 | 114 | 114 | - |
-| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | 19,226 | 19,122 | 19,133 | 19,313 | - |
-| **File dài nhất (dòng)** | 316 | 316 | 350 | 379 | 379 | 381 | - |
-| **Số test vượt qua (passed)** | 182 | 178 | 178 | 178 | 178 | 178 | - |
-| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | 0 | 0 | 0 | 0 | - |
-| **Kết quả flutter analyze** | No issues found | No issues found | No issues found | No issues found | No issues found | No issues found | - |
-| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | - |
+| **Tổng số file .dart (lib/)** | 130 | 128 | 120 | 110 | 114 | 114 | **114 (-16 file)** |
+| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | 19,226 | 19,122 | 19,133 | 19,313 | **19,313** |
+| **File dài nhất (dòng)** | 316 | 316 | 350 | 379 | 379 | 381 | **381 (<= 400)** |
+| **Số test vượt qua (passed)** | 182 | 178 | 178 | 178 | 178 | 178 | **178/178 (100%)** |
+| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | 0 | 0 | 0 | 0 | **4 (mã server cũ)** |
+| **Kết quả flutter analyze** | No issues found | No issues found | No issues found | No issues found | No issues found | No issues found | **No issues found** |
+| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | **76.4 MB (80,069,461 B)** |
 
 ---
 
@@ -132,6 +132,20 @@ Nhánh: `testrutgoncode`
   - **Tổng dòng lib:** `19,313` (tăng nhẹ do thêm chú thích tiếng Việt chất lượng cao)
   - **Số file .dart:** `114`
   - **File dài nhất:** 381 dòng (`customer_repository.dart` - hoàn toàn dưới ngưỡng 400 dòng)
+
+### GĐ6: Kiểm Thử Toàn Diện, Đóng Gói Release APK & Nghiệm Thu
+- **Quy trình thực thi:**
+  1. `flutter pub get`: Tải và đồng bộ toàn bộ dependencies thành công.
+  2. `flutter analyze`: Phân tích tĩnh đạt `No issues found! (ran in 2.3s)`.
+  3. `flutter test`: Toàn bộ `178/178 passed` (100% green).
+  4. `flutter build apk --release`: Đóng gói Release APK thành công (`165.3s`).
+     - Tệp xuất xưởng: `mobile_app/build/app/outputs/flutter-apk/app-release.apk`
+     - Kích thước: `80,069,461 bytes` (~`76.4 MB`).
+  5. Kiểm tra an toàn secrets / credentials:
+     - Lệnh: `git ls-files | Select-String "\.env$|\.zip$|\.jks|\.keystore|key\.properties$|\.apk$"`
+     - Kết quả: Không có bất kỳ tệp nhạy cảm nào bị đưa vào git tracking.
+  6. Đồng bộ tài liệu kỹ thuật: Cập nhật [docs/BRAIN.md](docs/BRAIN.md), [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) và [docs/CODE_STRUCTURE.md](docs/CODE_STRUCTURE.md).
+
 
 
 
