@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/features/map/crosshair_location_picker_view.dart';
-import 'package:delivery_marker_mobile/shared_widgets/bulk_paste_phone_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/bulk_paste_phone_sheet.dart';
 import 'package:delivery_marker_mobile/core/services/map_tile_cache_service.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_map_header.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_map_controls.dart';

@@ -4,7 +4,7 @@ import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/features/profile/account_profile_view.dart';
 import 'package:delivery_marker_mobile/features/directory/customer_directory_view.dart';
 import 'package:delivery_marker_mobile/features/map/main_map_view.dart';
-import 'package:delivery_marker_mobile/features/onboarding_lock/pin_lock_screen.dart';
+import 'package:delivery_marker_mobile/features/onboarding_lock/pin_lock_view.dart';
 import 'package:delivery_marker_mobile/features/shifts/shift_list_view.dart';
 
 /// Màn hình Khung chứa Điều hướng Chính (Home Shell View)

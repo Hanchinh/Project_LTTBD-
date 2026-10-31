@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/core/services/map_navigation_service.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
-import 'package:delivery_marker_mobile/shared_widgets/point_detail_bottom_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/point_detail_bottom_sheet.dart';
 
 /// Thẻ xem chi tiết vị trí đã lưu trên bản đồ chính
 class SavedLocationDetailCard extends StatelessWidget {

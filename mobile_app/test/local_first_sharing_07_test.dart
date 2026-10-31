@@ -17,7 +17,7 @@ import 'package:delivery_marker_mobile/core/utils/share_crypto_utils.dart';
 import 'package:delivery_marker_mobile/features/profile/account_profile_view.dart';
 import 'package:delivery_marker_mobile/features/sharing/data_share_qr_view.dart';
 import 'package:delivery_marker_mobile/features/sharing/data_share_send_sheet.dart';
-import 'package:delivery_marker_mobile/shared_widgets/point_detail_bottom_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/point_detail_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';

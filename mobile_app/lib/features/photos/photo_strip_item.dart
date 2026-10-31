@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
-import 'package:delivery_marker_mobile/shared_widgets/authenticated_image.dart';
+import 'package:delivery_marker_mobile/core/widgets/authenticated_image.dart';
 import 'package:delivery_marker_mobile/features/photos/fullscreen_image_viewer.dart';
 
 class PhotoStripItem extends StatelessWidget {

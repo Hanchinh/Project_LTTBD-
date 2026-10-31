@@ -13,7 +13,7 @@ import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/data/backup/backup_service.dart';
 import 'package:delivery_marker_mobile/core/utils/pin_crypto_utils.dart';
 import 'package:delivery_marker_mobile/features/profile/account_profile_view.dart';
-import 'package:delivery_marker_mobile/features/onboarding_lock/pin_lock_screen.dart';
+import 'package:delivery_marker_mobile/features/onboarding_lock/pin_lock_view.dart';
 import 'package:delivery_marker_mobile/features/onboarding_lock/welcome_onboarding_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

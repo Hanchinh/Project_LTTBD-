@@ -6,13 +6,13 @@ Nhánh: `testrutgoncode`
 
 | Chỉ số | GĐ0 (Mốc ban đầu) | GĐ1 (Gỡ server code) | GĐ2 (Gọn tầng data) | GĐ3 (Gộp widget) | GĐ4 (Sắp xếp thư mục) | GĐ5 (Dễ đọc & Docs) | GĐ6 (Hoàn thành) |
 |---|---|---|---|---|---|---|---|
-| **Tổng số file .dart (lib/)** | 130 | 128 | 120 | 110 | - | - | - |
-| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | 19,226 | 19,122 | - | - | - |
-| **File dài nhất (dòng)** | 316 | 316 | 350 | 379 | - | - | - |
-| **Số test vượt qua (passed)** | 182 | 178 | 178 | 178 | - | - | - |
-| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | 0 | 0 | - | - | - |
-| **Kết quả flutter analyze** | No issues found | No issues found | No issues found | No issues found | - | - | - |
-| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | - | - | - |
+| **Tổng số file .dart (lib/)** | 130 | 128 | 120 | 110 | 114 | - | - |
+| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | 19,226 | 19,122 | 19,133 | - | - |
+| **File dài nhất (dòng)** | 316 | 316 | 350 | 379 | 379 | - | - |
+| **Số test vượt qua (passed)** | 182 | 178 | 178 | 178 | 178 | - | - |
+| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | 0 | 0 | 0 | - | - |
+| **Kết quả flutter analyze** | No issues found | No issues found | No issues found | No issues found | No issues found | - | - |
+| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | - | - |
 
 ---
 
@@ -105,4 +105,19 @@ Nhánh: `testrutgoncode`
   - **Flutter test:** `178 passed` (100% passed)
   - **Tổng dòng lib:** `19,122`
   - **Số file .dart:** `110` (giảm 10 file so với GĐ2, giảm 20 file so với GĐ0)
+
+### GĐ4: Sắp Xếp Thư Mục (Folder Cleanliness & Restructure)
+- **Tổ chức lại gốc thư mục `lib/` thành chuẩn sạch:**
+  - `lib/main.dart`: Chỉ còn là entry point gọi `runApp(const DeliveryLocationMarkerApp())` và export ứng dụng.
+  - `lib/app/`: Khung 3 tab (`home_shell_view.dart`), màn hình khởi động (`auth_splash_view.dart`), ứng dụng gốc (`app.dart`), và theme (`theme/app_theme.dart`, `theme/app_buttons.dart`).
+  - `lib/core/widgets/`: Di chuyển toàn bộ các widget dùng chung từ `shared_widgets/` về `core/widgets/` (`bulk_paste_phone_sheet.dart`, `point_detail_bottom_sheet.dart`, `quick_add_customer_sheet.dart`, `authenticated_image.dart`, và các thư mục con). Xóa bỏ hoàn toàn thư mục `shared_widgets/`.
+  - Cập nhật tự động đường dẫn import từ `package:delivery_marker_mobile/shared_widgets/` sang `package:delivery_marker_mobile/core/widgets/` trên toàn bộ lib và test mà không thay đổi bất kỳ logic hay assert nào.
+  - `lib/features/onboarding_lock/`: Đổi tên `pin_lock_screen.dart` -> `pin_lock_view.dart` (kèm typedef tương thích) đồng bộ với chuẩn hậu tố `_view`.
+  - Giữ tên thư mục `directory` cho tính năng Danh bạ khách hàng (Customer Directory) để đồng nhất với domain model `CustomerDirectoryModel` và giữ ổn định mã nguồn.
+- **Kết quả sau GĐ4:**
+  - **Flutter analyze:** `No issues found! (ran in 2.8s)`
+  - **Flutter test:** `178 passed` (100% passed)
+  - **Tổng dòng lib:** `19,133`
+  - **Số file .dart:** `114`
+
 

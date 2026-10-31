@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';
-import 'package:delivery_marker_mobile/home_shell_view.dart';
+import 'package:delivery_marker_mobile/app/home_shell_view.dart';
 
 /// Màn hình chào mừng khi mở ứng dụng lần đầu tiên (Local-First)
 class WelcomeOnboardingView extends StatefulWidget {

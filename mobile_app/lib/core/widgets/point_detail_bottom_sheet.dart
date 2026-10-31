@@ -5,7 +5,7 @@ import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 import 'package:delivery_marker_mobile/core/services/map_navigation_service.dart';
 import 'package:delivery_marker_mobile/features/photos/customer_photos_strip_widget.dart';
 import 'package:delivery_marker_mobile/features/sharing/data_share_send_sheet.dart';
-import 'package:delivery_marker_mobile/shared_widgets/point_detail/point_detail_action_buttons.dart';
+import 'package:delivery_marker_mobile/core/widgets/point_detail/point_detail_action_buttons.dart';
 
 /// Thẻ chi tiết điểm giao / vị trí đã lưu thiết kế công thái học cho Shipper
 class PointDetailBottomSheet extends StatefulWidget {

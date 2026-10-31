@@ -207,3 +207,7 @@ class _PinLockScreenState extends State<PinLockScreen> {
     ),
   );
 }
+
+/// Bí danh chuẩn hậu tố _view cho PinLockScreen
+typedef PinLockView = PinLockScreen;
+

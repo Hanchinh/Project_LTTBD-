@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/home_shell_view.dart';
+import 'package:delivery_marker_mobile/app/home_shell_view.dart';
 
 void main() {
   group('MAP-FIRST-ARCHITECTURE-005: Model & Selection Logic Tests', () {

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/create_shift_dialog.dart';
-import 'package:delivery_marker_mobile/shared_widgets/bulk_paste_phone_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/bulk_paste_phone_sheet.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

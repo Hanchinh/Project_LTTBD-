@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delivery_marker_mobile/features/map/main_map_view.dart';
-import 'package:delivery_marker_mobile/shared_widgets/point_detail_bottom_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/point_detail_bottom_sheet.dart';
 import 'package:delivery_marker_mobile/features/shifts/shift_map_view.dart';
 
 void main() {

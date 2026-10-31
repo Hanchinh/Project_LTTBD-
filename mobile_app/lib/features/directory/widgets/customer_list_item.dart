@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/shared_widgets/authenticated_image.dart';
+import 'package:delivery_marker_mobile/core/widgets/authenticated_image.dart';
 
 /// Dòng hiển thị khách hàng trong danh bạ chuẩn công thái học thực địa (Industrial Field Utility)
 class CustomerListItemWidget extends StatelessWidget {

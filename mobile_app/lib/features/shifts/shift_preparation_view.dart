@@ -8,8 +8,8 @@ import 'package:delivery_marker_mobile/features/shifts/widgets/shift_point_card.
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_prep_filter_bar.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_prep_phone_input_header.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_prep_bottom_action_bar.dart';
-import 'package:delivery_marker_mobile/shared_widgets/quick_add_customer_sheet.dart';
-import 'package:delivery_marker_mobile/shared_widgets/bulk_paste_phone_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/quick_add_customer_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/bulk_paste_phone_sheet.dart';
 
 class ShiftPreparationView extends StatefulWidget {
   final ShiftModel shift;

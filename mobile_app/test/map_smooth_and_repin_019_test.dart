@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:delivery_marker_mobile/core/services/map_tile_cache_service.dart';
 import 'package:delivery_marker_mobile/features/map/main_map_view.dart';
-import 'package:delivery_marker_mobile/shared_widgets/point_detail_bottom_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/point_detail_bottom_sheet.dart';
 import 'package:delivery_marker_mobile/features/map/crosshair_location_picker_view.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 

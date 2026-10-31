@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
-import 'package:delivery_marker_mobile/shared_widgets/point_detail_bottom_sheet.dart';
-import 'package:delivery_marker_mobile/shared_widgets/bulk_paste_phone_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/point_detail_bottom_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/bulk_paste_phone_sheet.dart';
 import 'package:delivery_marker_mobile/features/directory/customer_directory_view.dart';
 
 void main() {

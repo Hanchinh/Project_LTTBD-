@@ -4,9 +4,9 @@ import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
-import 'package:delivery_marker_mobile/shared_widgets/bulk_paste/bulk_paste_directory_result_view.dart';
-import 'package:delivery_marker_mobile/shared_widgets/bulk_paste/bulk_paste_input_view.dart';
-import 'package:delivery_marker_mobile/shared_widgets/bulk_paste/bulk_paste_shift_result_view.dart';
+import 'package:delivery_marker_mobile/core/widgets/bulk_paste/bulk_paste_directory_result_view.dart';
+import 'package:delivery_marker_mobile/core/widgets/bulk_paste/bulk_paste_input_view.dart';
+import 'package:delivery_marker_mobile/core/widgets/bulk_paste/bulk_paste_shift_result_view.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/create_shift_dialog.dart';
 
 /// BottomSheet dán danh sách số điện thoại hàng loạt vào ca hoặc danh bạ

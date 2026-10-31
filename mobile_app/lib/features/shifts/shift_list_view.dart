@@ -3,7 +3,7 @@ import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/create_shift_dialog.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_dialogs.dart';
-import 'package:delivery_marker_mobile/shared_widgets/bulk_paste_phone_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/bulk_paste_phone_sheet.dart';
 import 'package:delivery_marker_mobile/features/shifts/shift_preparation_view.dart';
 import 'package:delivery_marker_mobile/features/shifts/shift_map_view.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_card.dart';

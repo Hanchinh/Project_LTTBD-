@@ -13,7 +13,7 @@ import 'package:delivery_marker_mobile/data/locations/location_repository.dart';
 import 'package:delivery_marker_mobile/data/photos/photo_repository.dart';
 import 'package:delivery_marker_mobile/data/shifts/shift_repository.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';
-import 'package:delivery_marker_mobile/shared_widgets/authenticated_image.dart';
+import 'package:delivery_marker_mobile/core/widgets/authenticated_image.dart';
 import 'package:delivery_marker_mobile/features/photos/customer_photos_strip_widget.dart';
 import 'package:delivery_marker_mobile/features/photos/fullscreen_image_viewer.dart';
 

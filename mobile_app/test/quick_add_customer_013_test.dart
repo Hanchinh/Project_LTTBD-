@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';
-import 'package:delivery_marker_mobile/shared_widgets/quick_add_customer_sheet.dart';
+import 'package:delivery_marker_mobile/core/widgets/quick_add_customer_sheet.dart';
 
 void main() {
   setUp(() {
