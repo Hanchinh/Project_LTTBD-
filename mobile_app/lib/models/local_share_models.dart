@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 
 class SharedPointPayload {
   final String phoneNumber, timestamp;
@@ -118,4 +119,43 @@ class ShareImportResult {
     this.photosAdded = 0, this.photosSkipped = 0, this.createdShiftId, this.createdShiftName,
     required this.message,
   });
+}
+
+class SharedLocationPointModel {
+  final String id, customerId, customerCode, customerName, customerPhone, customerAddress, areaId, areaName, identificationNotes, sharedByName, shareId;
+  final double latitude, longitude, gpsAccuracy;
+  final String? imageUrl;
+  final int photoCount;
+  final List<CustomerPhotoModel> photos;
+
+  SharedLocationPointModel({
+    required this.id, required this.customerId, required this.customerCode,
+    required this.customerName, required this.customerPhone, required this.customerAddress,
+    required this.areaId, required this.areaName, required this.latitude,
+    required this.longitude, required this.gpsAccuracy, required this.identificationNotes,
+    this.imageUrl, this.photoCount = 0, this.photos = const [],
+    required this.sharedByName, required this.shareId,
+  });
+
+  factory SharedLocationPointModel.fromJson(Map<String, dynamic> j) {
+    final rawPhotos = j['photos'] as List? ?? [];
+    return SharedLocationPointModel(
+      id: j['id']?.toString() ?? '', customerId: j['customerId']?.toString() ?? j['customer_id']?.toString() ?? '',
+      customerCode: j['customerCode']?.toString() ?? j['customer_code']?.toString() ?? '',
+      customerName: j['customerName']?.toString() ?? j['customer_name']?.toString() ?? '',
+      customerPhone: j['customerPhone']?.toString() ?? j['customer_phone']?.toString() ?? '',
+      customerAddress: j['customerAddress']?.toString() ?? j['customer_address']?.toString() ?? '',
+      areaId: j['areaId']?.toString() ?? j['area_id']?.toString() ?? '',
+      areaName: j['areaName']?.toString() ?? j['area_name']?.toString() ?? '',
+      latitude: (j['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (j['longitude'] as num?)?.toDouble() ?? 0.0,
+      gpsAccuracy: (j['gpsAccuracy'] as num?)?.toDouble() ?? (j['gps_accuracy'] as num?)?.toDouble() ?? 0.0,
+      identificationNotes: j['identificationNotes']?.toString() ?? j['identification_notes']?.toString() ?? '',
+      imageUrl: j['imageUrl']?.toString() ?? j['image_url']?.toString(),
+      photoCount: (j['photoCount'] as num?)?.toInt() ?? (j['photo_count'] as num?)?.toInt() ?? 0,
+      photos: rawPhotos.map((p) => CustomerPhotoModel.fromJson(p as Map<String, dynamic>, defaultCustomerId: j['customerId']?.toString() ?? '')).toList(),
+      sharedByName: j['sharedByName']?.toString() ?? j['shared_by_name']?.toString() ?? 'Shipper',
+      shareId: j['shareId']?.toString() ?? j['share_id']?.toString() ?? '',
+    );
+  }
 }

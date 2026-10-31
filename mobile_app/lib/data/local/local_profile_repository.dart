@@ -1,7 +1,7 @@
 import 'package:delivery_marker_mobile/core/utils/pin_crypto_utils.dart';
 import 'package:delivery_marker_mobile/data/local/app_database.dart';
 import 'package:delivery_marker_mobile/data/repositories/profile_repository.dart';
-import 'package:delivery_marker_mobile/models/user_model.dart';
+import 'package:delivery_marker_mobile/models/user_profile.dart';
 
 class PinVerifyResult {
   final bool success;
@@ -31,17 +31,15 @@ class LocalProfileRepository implements ProfileRepository {
   static const _keyOnboardingDone = 'onboarding_completed';
 
   @override
-  Future<UserModel?> getCurrentUser() async {
+  Future<UserProfile?> getCurrentUser() async {
     final profile = await _appDb.getAppProfile();
     final name = (profile?['display_name'] as String?)?.trim();
-    return UserModel(
+    return UserProfile(
       id: 'local_shipper_1',
       fullName: (name != null && name.isNotEmpty) ? name : 'Người giao hàng',
       phoneNumber: '',
       role: 'SHIPPER',
-      assignedAreaIds: const [],
-      token: 'local_token',
-    );
+                );
   }
 
   @override
@@ -157,10 +155,6 @@ class LocalProfileRepository implements ProfileRepository {
   }
 
   @override
-  Future<UserModel?> login(String phoneNumber, String password) => getCurrentUser();
-  @override
-  Future<void> logout() async {}
-  @override
   Future<List<Map<String, dynamic>>> getMyAreas() async => const [];
   @override
   Future<String?> getPreferredAreaId() async => null;
@@ -168,9 +162,4 @@ class LocalProfileRepository implements ProfileRepository {
   Future<void> setPreferredAreaId(String areaId) async {}
   @override
   Future<void> clearPreferredAreaId() async {}
-  @override
-  Future<Map<String, dynamic>> changePassword({required String currentPassword, required String newPassword, String? confirmPassword}) =>
-      throw UnsupportedError('Chế độ Local-First hoạt động không cần tài khoản máy chủ hay mật khẩu.');
-  @override
-  Future<String?> getSavedLoginPhone() async => null;
 }

@@ -15,7 +15,6 @@ import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
 import 'package:delivery_marker_mobile/data/local/app_database.dart';
 import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/sharing_repository.dart';
-import 'package:delivery_marker_mobile/models/data_share_model.dart';
 import 'package:delivery_marker_mobile/models/local_share_models.dart';
 
 part 'sharing_export_helpers.dart';
@@ -168,33 +167,7 @@ class LocalSharingRepository implements SharingRepository {
   // 4. CÁC HÀM TƯƠNG THÍCH MÁY CHỦ (Stubs cho local-first)
   // ===========================================================================
   @override
-  Future<List<DataShareModel>> getOutgoingShares() async => [];
-
-  @override
-  Future<List<DataShareModel>> getIncomingShares() async => [];
-
-  @override
   Future<Map<String, dynamic>> getSharedLocations() async => {'shares': []};
-
-  @override
-  Future<DataShareModel> createShare({
-    required String recipientPhone,
-    required String scope,
-    String? shiftId,
-    bool includePhotos = false,
-    int? expiresInDays,
-  }) async {
-    throw UnsupportedError('Chế độ cục bộ sử dụng xuất tệp .dshare và mã QR');
-  }
-
-  @override
-  Future<void> acceptShare(String shareId) async {}
-
-  @override
-  Future<void> declineShare(String shareId) async {}
-
-  @override
-  Future<void> revokeShare(String shareId) async {}
 
   @override
   Future<Map<String, dynamic>> importSharedLocations(

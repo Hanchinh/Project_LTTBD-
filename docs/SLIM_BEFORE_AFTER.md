@@ -6,13 +6,13 @@ Nhánh: `testrutgoncode`
 
 | Chỉ số | GĐ0 (Mốc ban đầu) | GĐ1 (Gỡ server code) | GĐ2 (Gọn tầng data) | GĐ3 (Gộp widget) | GĐ4 (Sắp xếp thư mục) | GĐ5 (Dễ đọc & Docs) | GĐ6 (Hoàn thành) |
 |---|---|---|---|---|---|---|---|
-| **Tổng số file .dart (lib/)** | 130 | - | - | - | - | - | - |
-| **Tổng số dòng code (lib/)** | 19,104 | - | - | - | - | - | - |
-| **File dài nhất (dòng)** | 316 | - | - | - | - | - | - |
-| **Số test vượt qua (passed)** | 182 | - | - | - | - | - | - |
-| **Số test bị xóa (lý do)** | 0 | - | - | - | - | - | - |
-| **Kết quả flutter analyze** | No issues found | - | - | - | - | - | - |
-| **Kích thước APK release** | (Đo tại GĐ6) | - | - | - | - | - | - |
+| **Tổng số file .dart (lib/)** | 130 | 128 | - | - | - | - | - |
+| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | - | - | - | - | - |
+| **File dài nhất (dòng)** | 316 | 316 | - | - | - | - | - |
+| **Số test vượt qua (passed)** | 182 | 178 | - | - | - | - | - |
+| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | - | - | - | - | - |
+| **Kết quả flutter analyze** | No issues found | No issues found | - | - | - | - | - |
+| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | - | - | - | - | - |
 
 ---
 
@@ -46,3 +46,21 @@ Nhánh: `testrutgoncode`
 - **Flutter test:** `182 passed`
 - **Tổng dòng lib:** `19,104`
 - **Số file .dart:** `130`
+
+### GĐ1: Gỡ Mã Bản Máy Chủ Trong mobile_app
+- **Các file và model đã gỡ:**
+  - `mobile_app/lib/models/order_model.dart`: Gỡ bỏ hoàn toàn.
+  - `mobile_app/lib/models/data_share_model.dart`: Gỡ bỏ (`SharedLocationPointModel` chuyển sang `local_share_models.dart`).
+  - `mobile_app/lib/models/user_model.dart`: Gỡ bỏ, thay thế bằng `user_profile.dart` gọn nhẹ cho local-first.
+  - `mobile_app/lib/core/utils/map_navigation_helper.dart`: Chuyển sang `mobile_app/lib/core/services/map_navigation_service.dart`.
+  - Gỡ các phương thức server cũ không dùng trong `ProfileRepository` (`login`, `logout`, `changePassword`, `getSavedLoginPhone`) và `SharingRepository` (`getOutgoingShares`, `getIncomingShares`, `createShare`, `acceptShare`, `declineShare`, `revokeShare`) và `ShiftRepository` (`getMyShiftOrders`, `addOrderToShift`).
+- **Danh sách 4 automated test bị gỡ (thuộc mã server cũ):**
+  1. `widget_test.dart`: `OrderModel deserializes correctly with customer and location data` (Kiểm thử serialization của OrderModel máy chủ cũ)
+  2. `widget_test.dart`: `Order filtering correctly separates verified location vs unlocated orders` (Kiểm thử logic lọc OrderModel máy chủ)
+  3. `widget_test.dart`: `Shift Order Deduplication logic detects existing customer order` (Kiểm thử trùng lặp OrderModel máy chủ)
+  4. `local_first_shift_bulk_04_test.dart`: `15. Compatibility: getMyShiftOrders và addOrderToShift ánh xạ mượt mà từ SQLite sang OrderModel` (Kiểm thử 2 hàm adapter tương thích máy chủ)
+- **Kết quả sau GĐ1:**
+  - **Flutter analyze:** `No issues found! (ran in 2.2s)`
+  - **Flutter test:** `178 passed` (182 - 4 = 178, đúng 100%)
+  - **Tổng dòng lib:** `18,862` (giảm 242 dòng)
+  - **Số file .dart:** `128` (giảm 2 file)

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/models/order_model.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/data/repositories/customer_repository.dart';
 import 'package:delivery_marker_mobile/data/repositories/location_repository.dart';
@@ -90,16 +89,6 @@ class FakeShiftRepository implements ShiftRepository {
 
   @override
   Future<void> removePointFromShift(String shiftId, String pointId) async {}
-
-  @override
-  Future<List<OrderModel>> getMyShiftOrders() async => [];
-
-  @override
-  Future<Map<String, dynamic>> addOrderToShift(
-          {required String customerId,
-          bool allowMultiple = false,
-          String? idempotencyKey}) async =>
-      throw UnimplementedError();
 
   @override
   Future<void> verifyPointLocation(String shiftId, String pointId) async =>

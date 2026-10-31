@@ -1,7 +1,7 @@
 import 'package:url_launcher/url_launcher.dart';
 
-/// Tiện ích hỗ trợ mở ứng dụng bản đồ dẫn đường bên ngoài (Google Maps, Apple Maps...)
-class MapNavigationHelper {
+/// Dịch vụ hỗ trợ mở ứng dụng bản đồ dẫn đường bên ngoài (Google Maps, Apple Maps...)
+class MapNavigationService {
   /// Mở ứng dụng chỉ đường ngoài tới tọa độ [lat], [lng].
   /// Ưu tiên intent ứng dụng Google Maps native; nếu thất bại sẽ mở qua trình duyệt web.
   static Future<void> openExternalNavigation(double lat, double lng) async {
@@ -22,3 +22,5 @@ class MapNavigationHelper {
   }
 }
 
+/// Bí danh tương thích
+typedef MapNavigationHelper = MapNavigationService;

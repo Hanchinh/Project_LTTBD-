@@ -42,21 +42,6 @@ class ShiftRowMapper {
     locationNotes: r['identification_notes'] as String?,
     createdAt: DateTime.tryParse(r['created_at']?.toString() ?? ''), updatedAt: DateTime.tryParse(r['updated_at']?.toString() ?? ''),
   );
-
-  static List<OrderModel> mapPointsToOrders(List<Map<String, dynamic>> points, String defaultAreaName) {
-    return points.map((p) {
-      final custId = p['customer_id'] as String;
-      final hasSaved = p['saved_lat'] != null && p['saved_lng'] != null;
-      return OrderModel(
-        orderId: p['id'] as String, orderCode: 'ORD-${(p['id'] as String).substring(0, 8).toUpperCase()}',
-        orderStatus: (p['delivery_status'] as String?) ?? 'PENDING', areaName: defaultAreaName,
-        customerId: custId, customerName: (p['customer_name'] as String?) ?? 'Khách hàng',
-        customerPhone: (p['customer_phone'] as String?) ?? '', customerAddress: (p['customer_address'] as String?) ?? '',
-        hasSavedLocation: hasSaved,
-        savedLocation: hasSaved ? SavedLocationModel(customerId: custId, latitude: (p['saved_lat'] as num).toDouble(), longitude: (p['saved_lng'] as num).toDouble(), gpsAccuracy: 0.0, identificationNotes: (p['saved_notes'] as String?) ?? '') : null,
-      );
-    }).toList();
-  }
 }
 
 extension _ShiftPointOps on LocalShiftRepository {
@@ -146,38 +131,6 @@ extension _ShiftPointOps on LocalShiftRepository {
     final db = await _appDb.database;
     final c = await db.delete('shift_delivery_points', where: 'shift_id = ? AND id = ?', whereArgs: [shiftId, pointId]);
     if (c > 0) await _appDb.logActivity(action: 'REMOVE_POINT_FROM_SHIFT', entity: 'shift_delivery_points', entityId: pointId, details: {'shiftId': shiftId});
-  }
-
-  Future<List<OrderModel>> _getMyShiftOrders() async {
-    final db = await _appDb.database;
-    final shifts = await db.query('shifts', where: "status IN ('IN_PROGRESS', 'PREPARING')", orderBy: "CASE status WHEN 'IN_PROGRESS' THEN 1 WHEN 'PREPARING' THEN 2 ELSE 3 END, created_at DESC", limit: 1);
-    if (shifts.isEmpty) return [];
-
-    final points = await db.rawQuery('''
-      SELECT sdp.*, c.full_name AS customer_name, c.phone_number AS customer_phone, c.address_text AS customer_address,
-             sl.latitude AS saved_lat, sl.longitude AS saved_lng, sl.identification_notes AS saved_notes
-      FROM shift_delivery_points sdp JOIN customers c ON sdp.customer_id = c.id
-      LEFT JOIN saved_locations sl ON sdp.customer_id = sl.customer_id
-      WHERE sdp.shift_id = ? ORDER BY sdp.delivery_order_index ASC, sdp.created_at ASC
-    ''', [shifts.first['id'] as String]);
-    return ShiftRowMapper.mapPointsToOrders(points, LocalShiftRepository.defaultAreaName);
-  }
-
-  Future<Map<String, dynamic>> _addOrderToShift({required String customerId, bool allowMultiple = false, String? idempotencyKey}) async {
-    final db = await _appDb.database;
-    final shifts = await db.query('shifts', where: "status IN ('IN_PROGRESS', 'PREPARING')", orderBy: "CASE status WHEN 'IN_PROGRESS' THEN 1 WHEN 'PREPARING' THEN 2 ELSE 3 END, created_at DESC", limit: 1);
-    final sId = shifts.isNotEmpty ? (shifts.first['id'] as String) : (await createShift()).id;
-    final res = await addPointToShift(sId, customerId: customerId);
-    final pt = res['point'] as ShiftDeliveryPointModel;
-    return {
-      'isExisting': res['isExisting'] ?? false, 'message': res['message'] ?? 'Thành công',
-      'order': OrderModel(
-        orderId: pt.id, orderCode: 'ORD-${pt.id.substring(0, 8).toUpperCase()}',
-        orderStatus: pt.deliveryStatus, areaName: LocalShiftRepository.defaultAreaName,
-        customerId: pt.customerId, customerName: pt.customerName, customerPhone: pt.customerPhone,
-        customerAddress: pt.customerAddress, hasSavedLocation: pt.locationStatus == LocationStatus.verified,
-      ),
-    };
   }
 
   Future<ShiftSummaryModel> _calculateSummary(DatabaseExecutor executor, String shiftId) async {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_marker_mobile/models/data_share_model.dart';
+import 'package:delivery_marker_mobile/models/local_share_models.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 import 'package:delivery_marker_mobile/features/photos/customer_photos_strip_widget.dart';
 

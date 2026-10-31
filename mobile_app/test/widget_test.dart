@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:delivery_marker_mobile/main.dart';
-import 'package:delivery_marker_mobile/models/order_model.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 
@@ -25,40 +24,6 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
     });
 
-    test('OrderModel deserializes correctly with customer and location data', () {
-      final mockJson = {
-        'orderId': 'ord-101',
-        'orderCode': 'ORD-TEST-01',
-        'orderStatus': 'PENDING',
-        'area': {'id': 'area-1', 'name': 'Thủ Đức'},
-        'customer': {
-          'id': 'cust-1',
-          'customerCode': 'KH_01',
-          'fullName': 'Nguyễn Văn Test',
-          'phoneNumber': '0988000001',
-          'addressText': '124 Nguyễn Xiển',
-          'hasSavedLocation': true,
-          'savedLocation': {
-            'id': 'loc-1',
-            'latitude': 10.842215,
-            'longitude': 106.818123,
-            'gpsAccuracy': 4.5,
-            'identificationNotes': 'Cổng màu xanh',
-            'imageUrl': '/api/v1/photos/test.jpg',
-            'updatedAt': '2026-10-22T00:00:00Z',
-          },
-        },
-      };
-
-      final order = OrderModel.fromJson(mockJson);
-      expect(order.orderCode, 'ORD-TEST-01');
-      expect(order.hasSavedLocation, true);
-      expect(order.customerName, 'Nguyễn Văn Test');
-      expect(order.savedLocation, isNotNull);
-      expect(order.savedLocation!.latitude, 10.842215);
-      expect(order.savedLocation!.imageUrl, '/api/v1/photos/test.jpg');
-    });
-
     test('SavedLocationModel handles null and custom image URLs properly', () {
       final locWithImage = SavedLocationModel(
         customerId: 'cust-1',
@@ -77,48 +42,6 @@ void main() {
       expect(deserialized.identificationNotes, 'Gần cây xăng');
     });
 
-    test('Order filtering correctly separates verified location vs unlocated orders', () {
-      final orderWithLoc = OrderModel(
-        orderId: 'o-1',
-        orderCode: 'ORD-01',
-        orderStatus: 'PENDING',
-        areaName: 'Thủ Đức',
-        customerId: 'c-1',
-        customerName: 'Anh Minh',
-        customerPhone: '0901000001',
-        customerAddress: '123 Đặng Văn Bi',
-        hasSavedLocation: true,
-        savedLocation: SavedLocationModel(
-          customerId: 'c-1',
-          latitude: 10.85,
-          longitude: 106.77,
-          gpsAccuracy: 3.5,
-          identificationNotes: 'Nhà có cửa cuốn màu xám',
-        ),
-      );
-
-      final orderWithoutLoc = OrderModel(
-        orderId: 'o-2',
-        orderCode: 'ORD-02',
-        orderStatus: 'PENDING',
-        areaName: 'Thủ Đức',
-        customerId: 'c-2',
-        customerName: 'Chị Lan',
-        customerPhone: '0902000002',
-        customerAddress: '456 Võ Văn Ngân',
-        hasSavedLocation: false,
-      );
-
-      final orders = [orderWithLoc, orderWithoutLoc];
-      final located = orders.where((o) => o.hasSavedLocation && o.savedLocation != null).toList();
-      final unlocated = orders.where((o) => !o.hasSavedLocation || o.savedLocation == null).toList();
-
-      expect(located.length, 1);
-      expect(located.first.orderCode, 'ORD-01');
-      expect(unlocated.length, 1);
-      expect(unlocated.first.orderCode, 'ORD-02');
-    });
-
     test('Vietnamese Phone Normalization logic cleans formats correctly', () {
       String normalizePhone(String raw) {
         var clean = raw.replaceAll(RegExp(r'\D'), '');
@@ -134,31 +57,6 @@ void main() {
       expect(normalizePhone('0988-000-001'), '0988000001');
       expect(normalizePhone('0988.000.001'), '0988000001');
       expect(normalizePhone('(0988) 000 001'), '0988000001');
-    });
-
-    test('Shift Order Deduplication logic detects existing customer order', () {
-      final existingOrders = [
-        OrderModel(
-          orderId: 'ord-101',
-          orderCode: 'ORD-20261023-01',
-          orderStatus: 'PENDING',
-          areaName: 'Thủ Đức',
-          customerId: 'cust-uuid-1',
-          customerName: 'Nguyễn Văn A',
-          customerPhone: '0988000001',
-          customerAddress: '123 Đặng Văn Bi',
-          hasSavedLocation: true,
-        ),
-      ];
-
-      // Customer 1 already in shift
-      final match1 = existingOrders.where((o) => o.customerId == 'cust-uuid-1').toList();
-      expect(match1.isNotEmpty, true);
-      expect(match1.first.orderCode, 'ORD-20261023-01');
-
-      // Customer 2 not in shift
-      final match2 = existingOrders.where((o) => o.customerId == 'cust-uuid-2').toList();
-      expect(match2.isEmpty, true);
     });
 
     test('BUG-MAP-PHOTO-008: ShiftDeliveryPointModel parses photoUrl and imageUrl identically', () {

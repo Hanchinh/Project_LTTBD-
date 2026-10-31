@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:delivery_marker_mobile/data/local/app_database.dart';
-import 'package:delivery_marker_mobile/models/user_model.dart';
+import 'package:delivery_marker_mobile/models/user_profile.dart';
 import 'package:delivery_marker_mobile/data/local/local_customer_repository.dart';
 import 'package:delivery_marker_mobile/data/local/local_location_repository.dart';
 import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
@@ -326,7 +326,7 @@ void main() {
       await tester.pump();
 
       expect(startFinished, isTrue);
-      UserModel? user;
+      UserProfile? user;
       await tester.runAsync(() async {
         user = await profileRepo.getCurrentUser();
       });

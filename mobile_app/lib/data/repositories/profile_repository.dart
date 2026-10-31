@@ -1,11 +1,7 @@
-import 'package:delivery_marker_mobile/models/user_model.dart';
+import 'package:delivery_marker_mobile/models/user_profile.dart';
 
 abstract class ProfileRepository {
-  Future<UserModel?> login(String phoneNumber, String password);
-
-  Future<void> logout();
-
-  Future<UserModel?> getCurrentUser();
+  Future<UserProfile?> getCurrentUser();
 
   Future<Map<String, int>> getMyStats();
 
@@ -16,12 +12,4 @@ abstract class ProfileRepository {
   Future<void> setPreferredAreaId(String areaId);
 
   Future<void> clearPreferredAreaId();
-
-  Future<Map<String, dynamic>> changePassword({
-    required String currentPassword,
-    required String newPassword,
-    String? confirmPassword,
-  });
-
-  Future<String?> getSavedLoginPhone();
 }

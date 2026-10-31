@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_marker_mobile/models/user_model.dart';
+import 'package:delivery_marker_mobile/models/user_profile.dart';
 
 class ProfileHeaderCard extends StatelessWidget {
-  final UserModel? user;
+  final UserProfile? user;
   final bool isLocal;
   final VoidCallback onEditName;
 

@@ -1,5 +1,4 @@
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/models/order_model.dart';
 
 abstract class ShiftRepository {
   Future<List<ShiftModel>> getShifts();
@@ -40,14 +39,6 @@ abstract class ShiftRepository {
 
   Future<void> removePointFromShift(String shiftId, String pointId);
 
-  Future<List<OrderModel>> getMyShiftOrders();
-
-  Future<Map<String, dynamic>> addOrderToShift({
-    required String customerId,
-    bool allowMultiple = false,
-    String? idempotencyKey,
-  });
-
   /// Xác minh vị trí trong ca (Đã ngừng hoạt động theo LOCATION-RULES-012, chỉ dùng luồng Danh bạ)
   Future<void> verifyPointLocation(String shiftId, String pointId) async {
     throw UnsupportedError(
@@ -55,4 +46,3 @@ abstract class ShiftRepository {
     );
   }
 }
-

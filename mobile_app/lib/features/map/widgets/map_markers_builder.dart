@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:delivery_marker_mobile/models/data_share_model.dart';
+import 'package:delivery_marker_mobile/models/local_share_models.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/marker_cluster_helper.dart';
 

@@ -383,27 +383,5 @@ void main() {
       );
     });
 
-    test('15. Compatibility: getMyShiftOrders và addOrderToShift ánh xạ mượt mà từ SQLite sang OrderModel', () async {
-      final s = await shiftRepo.createShift(shiftDate: '2026-10-27');
-      await shiftRepo.updateShiftStatus(s.id, ShiftStatus.inProgress);
-
-      final c = await customerRepo.createCustomer(phoneNumber: '0912999888', fullName: 'Chú Bảy');
-      await locationRepo.saveCustomerLocation(
-        SavedLocationModel(customerId: c.id, latitude: 10.82, longitude: 106.68, gpsAccuracy: 3.5, identificationNotes: 'Cổng gỗ'),
-      );
-
-      // Gọi addOrderToShift
-      final orderRes = await shiftRepo.addOrderToShift(customerId: c.id);
-      expect(orderRes['isExisting'], isFalse);
-      final order = orderRes['order'];
-      expect(order.customerPhone, equals('0912999888'));
-      expect(order.hasSavedLocation, isTrue);
-
-      // Gọi getMyShiftOrders
-      final orders = await shiftRepo.getMyShiftOrders();
-      expect(orders.length, equals(1));
-      expect(orders.first.customerId, equals(c.id));
-      expect(orders.first.customerName, equals('Chú Bảy'));
-    });
   });
 }

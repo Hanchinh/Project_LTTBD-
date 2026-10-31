@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:delivery_marker_mobile/models/user_model.dart';
+import 'package:delivery_marker_mobile/models/user_profile.dart';
 import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
 import 'package:delivery_marker_mobile/data/local/backup_service.dart';
 import 'package:delivery_marker_mobile/data/local/app_storage_service.dart';
@@ -20,7 +20,7 @@ class AccountProfileView extends StatefulWidget {
 }
 
 class _AccountProfileViewState extends State<AccountProfileView> {
-  UserModel? _user;
+  UserProfile? _user;
   Map<String, int> _myStats = {'savedLocationsCount': 0, 'createdShiftsCount': 0, 'uploadedPhotosCount': 0};
   AppStorageStats? _storageStats;
   bool _isLoading = true;

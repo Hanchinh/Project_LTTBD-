@@ -8,8 +8,6 @@ import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
 import 'package:delivery_marker_mobile/data/local/shift_bulk_helpers.dart';
 import 'package:delivery_marker_mobile/data/repositories/shift_repository.dart';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
-import 'package:delivery_marker_mobile/models/location_model.dart';
-import 'package:delivery_marker_mobile/models/order_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 
 part 'shift_point_ops.dart';
@@ -166,13 +164,6 @@ class LocalShiftRepository implements ShiftRepository {
 
   @override
   Future<void> removePointFromShift(String shiftId, String pointId) => _removePointFromShift(shiftId, pointId);
-
-  @override
-  Future<List<OrderModel>> getMyShiftOrders() => _getMyShiftOrders();
-
-  @override
-  Future<Map<String, dynamic>> addOrderToShift({required String customerId, bool allowMultiple = false, String? idempotencyKey}) =>
-      _addOrderToShift(customerId: customerId, allowMultiple: allowMultiple, idempotencyKey: idempotencyKey);
 
   @override
   Future<void> verifyPointLocation(String shiftId, String pointId) async {
