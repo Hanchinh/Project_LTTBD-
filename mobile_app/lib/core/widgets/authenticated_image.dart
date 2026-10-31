@@ -1,3 +1,5 @@
+// Widget hiển thị ảnh thực địa an toàn, hỗ trợ ảnh cục bộ và ảnh từ xa.
+// Tự động quản lý kích thước bộ nhớ đệm và hiển thị ảnh giữ chỗ khi tải.
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

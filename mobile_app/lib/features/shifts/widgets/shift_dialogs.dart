@@ -1,3 +1,5 @@
+// Tập hợp các hộp thoại quản lý ca làm việc: đổi tên ca và xác nhận xóa ca an toàn.
+// Đảm bảo việc xóa ca không làm mất dữ liệu khách hàng và vị trí đã lưu.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';

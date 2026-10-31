@@ -1,3 +1,5 @@
+// Khung giao diện chính (Home Shell) điều hướng 4 tab ứng dụng.
+// Điều phối luồng giữa Bản đồ, Danh bạ, Ca làm việc và Cá nhân.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

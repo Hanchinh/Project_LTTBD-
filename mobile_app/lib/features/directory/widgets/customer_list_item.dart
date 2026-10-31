@@ -1,3 +1,5 @@
+// Thành phần hiển thị một dòng thông tin khách hàng trong danh sách danh bạ.
+// Hiển thị ảnh đại diện, chấm trạng thái, thao tác gọi điện và thêm vào ca.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';

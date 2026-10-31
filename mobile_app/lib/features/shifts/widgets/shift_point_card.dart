@@ -1,3 +1,5 @@
+// Thẻ hiển thị một mốc giao trong danh sách chuẩn bị ca làm việc.
+// Cho phép kéo thả thay đổi thứ tự, xem tọa độ, gán vị trí và xóa mốc khỏi ca.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';

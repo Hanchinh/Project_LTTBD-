@@ -1,3 +1,5 @@
+// Thẻ hiển thị thông tin tài xế và phiên bản ứng dụng trên đầu tab Cá nhân.
+// Cho phép chỉnh sửa tên hiển thị và xem định danh thiết bị cục bộ.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/user_profile.dart';
 

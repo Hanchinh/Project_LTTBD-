@@ -1,3 +1,5 @@
+// Bộ hỗ trợ xử lý và hiển thị thông tin điểm giao được chia sẻ từ đồng nghiệp.
+// Kiểm tra tính hợp lệ và hỗ trợ lưu điểm vào cơ sở dữ liệu máy.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/local_share_models.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

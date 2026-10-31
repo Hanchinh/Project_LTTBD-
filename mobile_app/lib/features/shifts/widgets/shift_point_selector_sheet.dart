@@ -1,3 +1,5 @@
+// Bottom sheet danh sách cuộn các mốc giao bên dưới màn hình bản đồ ca.
+// Cho phép tài xế duyệt nhanh danh sách và chọn mốc để bản đồ tập trung tới.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 

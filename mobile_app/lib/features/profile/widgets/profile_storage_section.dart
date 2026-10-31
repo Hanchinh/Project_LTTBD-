@@ -1,3 +1,5 @@
+// Widget quản lý dung lượng lưu trữ cục bộ: CSDL SQLite và thư mục ảnh thực địa.
+// Cho phép dọn dẹp các tệp ảnh mồ côi và xóa bộ nhớ đệm bản đồ tạm.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/data/backup/app_storage_service.dart';
 

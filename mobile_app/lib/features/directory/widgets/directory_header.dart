@@ -1,3 +1,5 @@
+// Thanh tiêu đề và thanh công cụ tìm kiếm của màn hình danh bạ khách hàng.
+// Tích hợp ô tìm kiếm tức thì, nút thêm nhanh và công cụ dán SĐT hàng loạt.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 

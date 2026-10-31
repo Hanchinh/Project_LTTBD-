@@ -1,3 +1,5 @@
+// Màn hình danh sách ca làm việc của tài xế (Tab Ca làm việc).
+// Hiển thị ca đang thực hiện, lịch sử các ca cũ và nút tạo ca mới.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

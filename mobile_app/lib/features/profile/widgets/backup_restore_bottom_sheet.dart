@@ -1,3 +1,5 @@
+// Bottom sheet quản lý sao lưu và phục hồi dữ liệu ứng dụng dạng gói ZIP.
+// Cho phép xuất file sao lưu kèm ảnh và nhập lại dữ liệu an toàn khi đổi máy.
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';

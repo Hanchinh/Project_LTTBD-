@@ -1,3 +1,5 @@
+// Widget dải ảnh ngang hiển thị các góc chụp thực địa mặt tiền nhà khách hàng.
+// Hỗ trợ chụp ảnh trực tiếp từ camera, chọn ảnh từ thư viện và mở xem phóng to.
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';

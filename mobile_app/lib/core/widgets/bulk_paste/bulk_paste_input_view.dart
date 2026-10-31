@@ -1,3 +1,5 @@
+// Giao diện nhập văn bản thô để trích xuất danh sách số điện thoại.
+// Cung cấp ô nhập liệu lớn và nút phân tích cú pháp tự động.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 

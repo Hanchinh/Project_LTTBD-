@@ -1,3 +1,5 @@
+// Nhóm widget hiển thị số liệu thống kê hoạt động của tài xế trên máy.
+// Thống kê tổng số khách hàng, số điểm đã xác thực và tổng số ca làm việc.
 import 'package:flutter/material.dart';
 
 /// Dải đo lường thực địa (Telemetry Strip) hiển thị số liệu vị trí, ca làm và ảnh đã tải

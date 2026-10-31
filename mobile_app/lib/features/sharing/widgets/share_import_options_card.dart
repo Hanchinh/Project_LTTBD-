@@ -1,3 +1,5 @@
+// Thẻ cấu hình tùy chọn khi tiếp nhận gói dữ liệu chia sẻ.
+// Cho phép người dùng chọn ghi đè điểm cũ, tạo ca mới hoặc chỉ lưu danh bạ.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/local_share_models.dart';
 

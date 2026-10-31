@@ -1,3 +1,5 @@
+// Bottom sheet hiển thị thông tin chi tiết gói dữ liệu điểm giao nhận được.
+// Cho phép xem trước tọa độ, số điện thoại và quyết định tiếp nhận vào máy.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/local_share_models.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';

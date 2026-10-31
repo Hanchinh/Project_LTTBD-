@@ -1,3 +1,5 @@
+// Màn hình tâm ngắm ghim vị trí thực địa chuẩn xác trên bản đồ.
+// Cho phép tài xế di chuyển tâm ngắm, tìm kiếm địa chỉ và xác nhận tọa độ.
 import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';

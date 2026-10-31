@@ -1,3 +1,5 @@
+// Thanh tab lọc danh bạ nhanh theo trạng thái vị trí và khu vực phụ trách.
+// Cho phép tài xế nhanh chóng chuyển đổi danh sách cần giao hoặc kiểm tra.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 

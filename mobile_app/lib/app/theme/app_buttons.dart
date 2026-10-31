@@ -1,3 +1,5 @@
+// Định nghĩa quy chuẩn thiết kế các nút bấm (Button Styles) trong ứng dụng.
+// Cung cấp style đồng nhất cho nút chính, nút phụ và nút nguy hiểm.
 import 'package:flutter/material.dart';
 
 /// Bộ phong cách nút hành động tập trung của toàn app (TASK: DIRECTORY-BULK-SHIFT-NAME-BLACK-BUTTONS-022A)

@@ -1,3 +1,5 @@
+// Xử lý các thao tác quản lý danh sách mốc giao trong ca làm việc.
+// Hỗ trợ sắp xếp thứ tự lộ trình, gán vị trí và cập nhật trạng thái điểm.
 part of 'shift_repository.dart';
 
 class ShiftCodeHelpers {

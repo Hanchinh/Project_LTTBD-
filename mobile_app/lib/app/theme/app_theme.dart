@@ -1,3 +1,5 @@
+// Cấu hình chủ đề giao diện Material 3 toàn ứng dụng (Light & Dark theme).
+// Quản lý màu sắc thương hiệu, font chữ và phong cách hiển thị thích ứng.
 import 'package:flutter/material.dart';
 
 /// Hệ thống Token màu và Chủ đề (Theme) chuẩn Material 3 của ứng dụng

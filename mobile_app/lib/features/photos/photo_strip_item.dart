@@ -1,3 +1,5 @@
+// Thành phần hiển thị một ảnh thu nhỏ (thumbnail) trong dải ảnh thực địa.
+// Xử lý tải ảnh nhanh từ bộ nhớ máy và bắt sự kiện chạm để xem chi tiết.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 import 'package:delivery_marker_mobile/core/widgets/authenticated_image.dart';

@@ -1,3 +1,5 @@
+// Thẻ hiển thị tóm tắt thông tin vị trí đã ghim của khách hàng.
+// Cung cấp trạng thái ghim, tọa độ GPS, ghi chú nhận diện và nút mở bản đồ.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 

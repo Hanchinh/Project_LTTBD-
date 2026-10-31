@@ -1,3 +1,5 @@
+// Bottom sheet chọn nhanh ca làm việc đang hoạt động trực tiếp từ Bản đồ Chính.
+// Cho phép tài xế chuyển đổi qua lại giữa các ca làm việc trong ngày.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

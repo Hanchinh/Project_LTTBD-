@@ -1,3 +1,5 @@
+// Màn hình khóa mã PIN bảo vệ ứng dụng dành cho tài xế.
+// Hỗ trợ bàn phím số tùy biến, khóa lũy tiến khi nhập sai và tự động mở khóa.
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

@@ -1,3 +1,5 @@
+// Repository quản lý vòng đời ca làm việc (tạo mới, đổi tên, xóa và chốt ca).
+// Điều phối lộ trình giao hàng và tương tác với cơ sở dữ liệu SQLite cục bộ.
 import 'package:sqflite/sqflite.dart';
 
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';

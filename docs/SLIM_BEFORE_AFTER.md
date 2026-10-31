@@ -6,13 +6,13 @@ Nhánh: `testrutgoncode`
 
 | Chỉ số | GĐ0 (Mốc ban đầu) | GĐ1 (Gỡ server code) | GĐ2 (Gọn tầng data) | GĐ3 (Gộp widget) | GĐ4 (Sắp xếp thư mục) | GĐ5 (Dễ đọc & Docs) | GĐ6 (Hoàn thành) |
 |---|---|---|---|---|---|---|---|
-| **Tổng số file .dart (lib/)** | 130 | 128 | 120 | 110 | 114 | - | - |
-| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | 19,226 | 19,122 | 19,133 | - | - |
-| **File dài nhất (dòng)** | 316 | 316 | 350 | 379 | 379 | - | - |
-| **Số test vượt qua (passed)** | 182 | 178 | 178 | 178 | 178 | - | - |
-| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | 0 | 0 | 0 | - | - |
-| **Kết quả flutter analyze** | No issues found | No issues found | No issues found | No issues found | No issues found | - | - |
-| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | - | - |
+| **Tổng số file .dart (lib/)** | 130 | 128 | 120 | 110 | 114 | 114 | - |
+| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | 19,226 | 19,122 | 19,133 | 19,313 | - |
+| **File dài nhất (dòng)** | 316 | 316 | 350 | 379 | 379 | 381 | - |
+| **Số test vượt qua (passed)** | 182 | 178 | 178 | 178 | 178 | 178 | - |
+| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | 0 | 0 | 0 | 0 | - |
+| **Kết quả flutter analyze** | No issues found | No issues found | No issues found | No issues found | No issues found | No issues found | - |
+| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | - |
 
 ---
 
@@ -119,5 +119,19 @@ Nhánh: `testrutgoncode`
   - **Flutter test:** `178 passed` (100% passed)
   - **Tổng dòng lib:** `19,133`
   - **Số file .dart:** `114`
+
+### GĐ5: Dễ Đọc & Đồng Bộ Tài Liệu (Readability & Docs)
+- **Tối ưu hóa mã nguồn & loại bỏ code thừa:**
+  - Chạy `dart fix --apply`: Toàn bộ các import thừa, biến thừa đã được dọn sạch (`Nothing to fix!`).
+  - Toàn bộ 90 tệp tin có độ dài > 100 dòng trong `lib/` đều được bổ sung từ 2-3 dòng chú thích tiếng Việt ở dòng 1 giải thích rõ ràng vai trò và nhiệm vụ của tệp.
+  - Toàn bộ các thư mục con trong `lib/features/*` (7 thư mục) và `lib/data/*` (8 thư mục) đều có tệp `README.md` với độ dài ≤ 15 dòng liệt kê đầy đủ danh sách các tệp và chức năng.
+  - Biên soạn lại hoàn chỉnh tài liệu kiến trúc [docs/CODE_STRUCTURE.md](docs/CODE_STRUCTURE.md): Sơ đồ cây thư mục chi tiết, sơ đồ Mermaid luồng dữ liệu tính năng mẫu (Ghim vị trí: View -> Repository -> Database -> History Trigger), quy ước đặt tên và bảng hướng dẫn tra cứu "Muốn sửa X thì mở file nào".
+- **Kết quả sau GĐ5:**
+  - **Flutter analyze:** `No issues found! (ran in 3.3s)`
+  - **Flutter test:** `178 passed` (100% passed)
+  - **Tổng dòng lib:** `19,313` (tăng nhẹ do thêm chú thích tiếng Việt chất lượng cao)
+  - **Số file .dart:** `114`
+  - **File dài nhất:** 381 dòng (`customer_repository.dart` - hoàn toàn dưới ngưỡng 400 dòng)
+
 
 

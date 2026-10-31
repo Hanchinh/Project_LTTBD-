@@ -1,3 +1,5 @@
+// Bottom sheet tạo gói chia sẻ điểm giao hàng gửi cho tài xế khác.
+// Cho phép chọn danh sách điểm, cài đặt mật khẩu bảo vệ và xuất file .dshare.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

@@ -1,3 +1,5 @@
+// Cụm trường nhập liệu bổ sung và bộ chọn khu vực khi thêm nhanh khách hàng.
+// Cho phép điền tên, địa chỉ chi tiết và ghi chú nhận diện thực địa.
 import 'package:flutter/material.dart';
 
 Future<Map<String, dynamic>?> showAreaSelectionDialog({

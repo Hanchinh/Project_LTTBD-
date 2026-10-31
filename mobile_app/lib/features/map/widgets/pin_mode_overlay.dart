@@ -1,3 +1,5 @@
+// Lớp phủ hướng dẫn và cảnh báo khi ứng dụng đang ở chế độ ghim vị trí mới.
+// Nhắc nhở tài xế căn chỉnh tâm ngắm chính xác vào nóc nhà hoặc cổng khách hàng.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/address_search_result.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';

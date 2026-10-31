@@ -1,3 +1,5 @@
+// Repository quản lý nghiệp vụ danh bạ khách hàng trong kiến trúc Local-First.
+// Cung cấp các phương thức CRUD, gắn vị trí và đồng bộ dữ liệu khách hàng.
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/vietnamese_utils.dart';

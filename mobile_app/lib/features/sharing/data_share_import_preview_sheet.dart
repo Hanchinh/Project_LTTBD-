@@ -1,3 +1,5 @@
+// Bottom sheet xem trước và chọn lọc các điểm giao trước khi nhập vào máy.
+// Hỗ trợ nhập mật khẩu giải mã gói và phân loại các điểm trùng lặp.
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/local_share_models.dart';

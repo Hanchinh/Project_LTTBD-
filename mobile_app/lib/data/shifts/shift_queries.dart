@@ -1,3 +1,5 @@
+// Tập hợp câu truy vấn SQLite chuyên biệt cho phân hệ ca làm việc.
+// Truy vấn danh sách ca, thông tin chi tiết mốc giao và đếm tiến độ hoàn thành.
 import 'package:delivery_marker_mobile/data/database/app_database.dart';
 
 /// Thao tác CSDL SQLite mức thấp cho Ca làm việc (Shifts) và Điểm giao.

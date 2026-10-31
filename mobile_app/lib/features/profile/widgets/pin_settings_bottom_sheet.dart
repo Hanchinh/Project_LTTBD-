@@ -1,3 +1,5 @@
+// Bottom sheet cài đặt và quản lý mã PIN bảo vệ ứng dụng.
+// Cho phép thiết lập mã PIN mới, đổi mã PIN, tắt mã PIN và chọn thời gian tự động khóa.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';
 

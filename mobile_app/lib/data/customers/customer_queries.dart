@@ -1,3 +1,5 @@
+// Tập hợp câu truy vấn SQLite thao tác với bảng khách hàng danh bạ.
+// Hỗ trợ tìm kiếm tiếng Việt không dấu, đối soát SĐT và chèn dữ liệu hàng loạt.
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/vietnamese_utils.dart';

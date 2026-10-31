@@ -1,3 +1,5 @@
+// Màn hình Splash khởi động ứng dụng định vị giao hàng.
+// Xử lý dọn ảnh tạm quá hạn, kiểm tra mở lần đầu và mở khóa mã PIN bảo mật.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/app/home_shell_view.dart';

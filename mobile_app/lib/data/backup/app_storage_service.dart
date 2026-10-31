@@ -1,3 +1,5 @@
+// Dịch vụ quản lý vùng lưu trữ tập tin cục bộ và thư mục ảnh của ứng dụng.
+// Cung cấp đường dẫn an toàn cho CSDL SQLite, ảnh chụp và file tạm.
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;

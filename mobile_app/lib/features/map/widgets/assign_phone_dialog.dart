@@ -1,3 +1,5 @@
+// Hộp thoại gán số điện thoại khách hàng khi ghim vị trí mới trực tiếp trên map.
+// Tự động đối soát với danh bạ hiện có để liên kết hoặc tạo khách hàng mới.
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';

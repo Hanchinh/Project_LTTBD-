@@ -1,3 +1,5 @@
+// Thành phần hiển thị một điểm giao trong danh sách xem trước gói chia sẻ.
+// Cho phép bật/tắt chọn điểm để tiếp nhận và xem thông tin tọa độ đối soát.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/local_share_models.dart';
 

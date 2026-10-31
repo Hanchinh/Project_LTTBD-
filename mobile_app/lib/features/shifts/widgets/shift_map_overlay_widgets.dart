@@ -1,3 +1,5 @@
+// Tập hợp các widget phủ trên bản đồ ca: thẻ chi tiết mốc ca và bộ tạo marker đánh số.
+// Hiển thị số thứ tự mốc giao và thông tin khách hàng khi được chọn.
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';

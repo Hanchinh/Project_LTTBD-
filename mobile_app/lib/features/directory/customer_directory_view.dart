@@ -1,3 +1,5 @@
+// Màn hình danh bạ khách hàng toàn diện (Tab Danh bạ).
+// Hỗ trợ tìm kiếm nhanh thời gian thực, lọc theo khu vực và thêm khách hàng mới.
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';

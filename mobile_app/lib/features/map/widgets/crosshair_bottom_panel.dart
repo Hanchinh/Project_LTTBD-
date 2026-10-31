@@ -1,3 +1,5 @@
+// Bảng điều khiển phía dưới màn hình trong chế độ tâm ngắm ghim vị trí.
+// Hiển thị tọa độ hiện tại, địa chỉ tham khảo và nút xác nhận ghim vị trí.
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';

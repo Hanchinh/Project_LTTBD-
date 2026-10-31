@@ -1,3 +1,5 @@
+// Xử lý các sự kiện tương tác và điều khiển logic trên màn hình Bản đồ Chính.
+// Bao gồm chuyển đổi chế độ ghim, chọn điểm, hiển thị bottom sheet và lọc vùng.
 part of 'main_map_view.dart';
 
 extension MainMapViewHandlers on MainMapViewState {

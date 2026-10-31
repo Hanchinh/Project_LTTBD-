@@ -1,3 +1,5 @@
+// Hộp thoại tạo ca làm việc mới với tên ca và ngày thực hiện.
+// Khởi tạo ca rỗng hoặc chuyển sang màn hình dán SĐT ngay lập tức.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

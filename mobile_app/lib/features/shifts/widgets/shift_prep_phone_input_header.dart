@@ -1,3 +1,5 @@
+// Khung nhập và dán số điện thoại nhanh trên đầu màn hình chuẩn bị ca.
+// Cho phép nhập trực tiếp số điện thoại để tra cứu và thêm ngay vào ca.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 

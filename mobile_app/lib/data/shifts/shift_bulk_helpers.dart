@@ -1,3 +1,5 @@
+// Các hàm tiện ích hỗ trợ phân loại và nạp hàng loạt điểm giao vào ca làm việc.
+// Đối soát số điện thoại với danh bạ và tự động gán tọa độ sẵn có.
 import 'package:sqflite/sqflite.dart';
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';

@@ -1,3 +1,5 @@
+// Lớp khởi tạo và quản lý phiên kết nối cơ sở dữ liệu SQLite của ứng dụng.
+// Thiết lập chế độ WAL, xử lý khóa luồng và thực thi transaction an toàn.
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;

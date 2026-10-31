@@ -1,3 +1,5 @@
+// Bottom sheet dán danh sách số điện thoại hàng loạt từ tin nhắn hoặc Zalo.
+// Tự động bóc tách số điện thoại và đối soát với danh bạ hoặc ca làm việc.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';

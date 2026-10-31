@@ -1,3 +1,5 @@
+// Nhóm các nút hành động cốt lõi trên tab Cá nhân: sao lưu ZIP và gửi/nhận chia sẻ P2P.
+// Cung cấp giao diện trực quan cho các thao tác an toàn dữ liệu ngoại tuyến.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 import 'package:delivery_marker_mobile/features/profile/widgets/backup_restore_bottom_sheet.dart';

@@ -1,3 +1,5 @@
+// Màn hình quét mã QR camera chuyên dụng để nhận dữ liệu chia sẻ P2P.
+// Quét các mảnh QR dung lượng cao và tự động ráp lại gói dữ liệu hoàn chỉnh.
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';

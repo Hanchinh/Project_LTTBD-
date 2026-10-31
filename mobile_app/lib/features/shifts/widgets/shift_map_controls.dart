@@ -1,3 +1,5 @@
+// Cụm nút điều khiển chuyên biệt trên màn hình bản đồ ca làm việc.
+// Bao gồm nút căn chỉnh toàn bộ lộ trình ca, nút vị trí GPS và nút danh sách mốc.
 import 'package:flutter/material.dart';
 
 class ShiftMapToolButtons extends StatelessWidget {

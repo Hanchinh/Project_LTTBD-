@@ -1,3 +1,5 @@
+// Thanh thông báo trạng thái và kết quả sau khi nạp hàng loạt số điện thoại vào ca.
+// Hiển thị số lượng mốc đã có vị trí sẵn sàng giao và số mốc cần ghim thêm.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 

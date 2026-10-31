@@ -1,3 +1,5 @@
+// Xử lý nghiệp vụ đóng gói và mã hóa dữ liệu điểm giao để chia sẻ P2P.
+// Xuất file định dạng .dshare được bảo vệ bằng mật khẩu và thuật toán AES-GCM.
 part of 'sharing_repository.dart';
 
 extension _SharingExportOps on SharingRepository {

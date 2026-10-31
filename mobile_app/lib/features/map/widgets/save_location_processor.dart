@@ -1,3 +1,5 @@
+// Bộ xử lý lưu trữ vị trí ghim và đồng bộ dữ liệu khách hàng sau khi xác nhận.
+// Thực hiện ghi tọa độ vào SQLite, chụp ảnh thực địa và cập nhật trạng thái.
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

@@ -1,3 +1,5 @@
+// Thẻ hiển thị tổng quan một ca làm việc đang thực hiện hoặc đã hoàn thành.
+// Hiển thị tiến độ giao hàng, số lượng điểm và các thao tác quản lý ca.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';

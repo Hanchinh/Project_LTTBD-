@@ -1,3 +1,5 @@
+// Tập hợp các widget phủ trên bản đồ chính: thẻ thông tin mốc, chú thích và cảnh báo.
+// Hiển thị tóm tắt điểm giao khi tài xế chạm vào marker trên bản đồ.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/core/services/map_navigation_service.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';

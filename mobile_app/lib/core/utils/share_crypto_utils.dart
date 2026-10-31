@@ -1,3 +1,5 @@
+// Tiện ích mã hóa và giải mã gói dữ liệu chia sẻ (.dshare) bằng AES-GCM.
+// Bảo vệ dữ liệu điểm giao khi chuyển giao giữa các thiết bị tài xế.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';

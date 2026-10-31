@@ -1,3 +1,5 @@
+// Modal hướng dẫn và chọn phương thức tiếp nhận gói chia sẻ từ đồng nghiệp.
+// Hỗ trợ mở tệp tin .dshare từ máy hoặc quét camera mã QR.
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';

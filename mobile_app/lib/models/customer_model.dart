@@ -1,3 +1,5 @@
+// Định nghĩa cấu trúc dữ liệu khách hàng danh bạ (CustomerDirectoryModel).
+// Ánh xạ dữ liệu từ bảng SQLite và cung cấp các trường tìm kiếm chuẩn hóa.
 import 'package:latlong2/latlong.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';

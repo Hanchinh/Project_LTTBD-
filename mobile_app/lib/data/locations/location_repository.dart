@@ -1,3 +1,5 @@
+// Repository quản lý nghiệp vụ tọa độ điểm ghim thực địa và lịch sử vị trí.
+// Lưu trữ tọa độ GPS, ghi chú nhận diện nhà và kích hoạt trigger lịch sử.
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
 import 'package:delivery_marker_mobile/data/database/app_database.dart';

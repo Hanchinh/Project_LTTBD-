@@ -1,3 +1,5 @@
+// Màn hình Bản đồ Chính (Tab trung tâm của ứng dụng).
+// Hiển thị vị trí thực tế của shipper, các điểm giao hàng và công cụ định vị.
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';

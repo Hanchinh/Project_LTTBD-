@@ -1,3 +1,5 @@
+// Màn hình hồ sơ cá nhân và cấu hình ứng dụng của tài xế (Tab Cá nhân).
+// Quản lý thông tin shipper, cài đặt mã PIN, sao lưu ZIP và chia sẻ dữ liệu P2P.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/user_profile.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

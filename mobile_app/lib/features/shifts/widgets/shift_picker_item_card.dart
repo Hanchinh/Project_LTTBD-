@@ -1,3 +1,5 @@
+// Thành phần hiển thị một ca làm việc trong bottom sheet chọn ca nhanh.
+// Hiển thị trạng thái ca và số lượng điểm giao của từng ca.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 

@@ -1,3 +1,5 @@
+// Repository quản lý hình ảnh mặt tiền nhà thực địa của khách hàng.
+// Thực hiện nén ảnh, tạo thumbnail, xóa mềm và tự động dọn rác sau 30 ngày.
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';

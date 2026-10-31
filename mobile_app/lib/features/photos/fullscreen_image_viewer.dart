@@ -1,3 +1,5 @@
+// Trình xem ảnh toàn màn hình với tính năng thu phóng đa điểm (pinch-to-zoom).
+// Cho phép vuốt chuyển qua lại giữa các ảnh trong album thực địa của khách.
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

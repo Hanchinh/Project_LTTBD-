@@ -1,3 +1,5 @@
+// Bộ sinh danh sách Marker hiển thị trên bản đồ flutter_map.
+// Tối ưu hóa vẽ vị trí shipper, điểm đã xác thực và điểm tạm thời.
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';

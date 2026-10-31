@@ -1,3 +1,5 @@
+// Định nghĩa cấu trúc dữ liệu ca làm việc và các mốc giao hàng trong ca.
+// Ánh xạ các bảng delivery_shifts và shift_points trong CSDL SQLite.
 import 'package:latlong2/latlong.dart';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 

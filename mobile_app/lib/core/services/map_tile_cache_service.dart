@@ -1,3 +1,5 @@
+// Dịch vụ tải và lưu trữ bộ nhớ đệm (cache) bản đồ ngoại tuyến.
+// Giúp ứng dụng hiển thị bản đồ mượt mà ngay cả khi mất sóng 4G/Wifi.
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';

@@ -1,3 +1,5 @@
+// Giao diện hiển thị kết quả phân tích số điện thoại khi dán vào Danh bạ.
+// Phân loại số mới, số đã có vị trí và cho phép chọn lưu hàng loạt.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';

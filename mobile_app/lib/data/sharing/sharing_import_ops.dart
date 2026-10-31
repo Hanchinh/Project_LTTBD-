@@ -1,3 +1,5 @@
+// Xử lý nghiệp vụ giải mã, đối soát và tiếp nhận gói chia sẻ điểm giao.
+// Nhập các điểm giao vào danh bạ và ca làm việc, xử lý xung đột dữ liệu.
 part of 'sharing_repository.dart';
 
 extension _SharingImportOps on SharingRepository {

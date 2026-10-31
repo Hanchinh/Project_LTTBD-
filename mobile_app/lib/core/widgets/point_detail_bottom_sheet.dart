@@ -1,3 +1,5 @@
+// Bottom sheet hiển thị chi tiết điểm giao hàng và vị trí đã ghim.
+// Cung cấp các thao tác gọi điện, chỉ đường ngoài, xem dải ảnh và chỉnh sửa.
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';

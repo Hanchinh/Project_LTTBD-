@@ -1,3 +1,5 @@
+// Thanh lọc mốc giao trong màn chuẩn bị ca theo trạng thái đã có/chưa có vị trí.
+// Giúp tài xế lọc nhanh các mốc chưa có tọa độ để ưu tiên ghim trước khi đi giao.
 import 'package:flutter/material.dart';
 
 /// Hàng lọc trạng thái điểm giao trong màn hình chuẩn bị ca

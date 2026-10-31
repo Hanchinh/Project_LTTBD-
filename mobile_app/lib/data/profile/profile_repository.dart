@@ -1,3 +1,5 @@
+// Repository quản lý thông tin tài xế, cấu hình ứng dụng và bảo mật mã PIN.
+// Lưu trữ trạng thái khóa ứng dụng, cấu hình tự động khóa và thống kê dữ liệu.
 import 'package:delivery_marker_mobile/core/utils/pin_crypto_utils.dart';
 import 'package:delivery_marker_mobile/data/database/app_database.dart';
 import 'package:delivery_marker_mobile/models/user_profile.dart';

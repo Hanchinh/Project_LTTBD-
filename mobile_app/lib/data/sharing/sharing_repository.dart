@@ -1,3 +1,5 @@
+// Repository điều phối luồng chia sẻ dữ liệu điểm giao hàng giữa các tài xế.
+// Hỗ trợ chia sẻ qua tệp tin mã hóa .dshare và quét mã QR ngoại tuyến.
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';

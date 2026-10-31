@@ -1,3 +1,5 @@
+// Tiện ích gom nhóm marker (Marker Clustering) khi thu phóng bản đồ ở mức rộng.
+// Giảm thiểu tải giao diện khi có hàng trăm điểm ghim trên cùng khu vực.
 import 'dart:math' as math;
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';

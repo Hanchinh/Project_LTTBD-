@@ -1,3 +1,5 @@
+// Tiện ích mã hóa một chiều mã PIN bằng PBKDF2/SHA-256 kèm muối ngẫu nhiên (salt).
+// Đảm bảo an toàn tuyệt đối cho mã bảo vệ ứng dụng của tài xế.
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';

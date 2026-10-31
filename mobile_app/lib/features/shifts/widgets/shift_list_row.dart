@@ -1,3 +1,5 @@
+// Dòng hiển thị tóm tắt một ca làm việc trong danh sách lịch sử ca cũ.
+// Cho phép chạm để xem lại lộ trình và thông tin các mốc giao trong ca.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 

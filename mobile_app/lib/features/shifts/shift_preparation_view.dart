@@ -1,3 +1,5 @@
+// Màn hình chuẩn bị ca làm việc trước khi bắt đầu lộ trình giao hàng.
+// Cho phép dán danh sách SĐT, sắp xếp thứ tự mốc giao và gán vị trí còn thiếu.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

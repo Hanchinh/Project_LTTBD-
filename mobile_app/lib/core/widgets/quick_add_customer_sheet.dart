@@ -1,3 +1,5 @@
+// Bottom sheet thêm nhanh khách hàng mới vào danh bạ và ca làm việc.
+// Hỗ trợ chuẩn hóa số điện thoại Việt Nam và gán khu vực phụ trách.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';

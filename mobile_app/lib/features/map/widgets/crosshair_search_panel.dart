@@ -1,3 +1,5 @@
+// Bảng tìm kiếm địa chỉ tích hợp gợi ý trên màn hình tâm ngắm định vị.
+// Hỗ trợ tìm kiếm địa danh và tự động di chuyển tâm ngắm đến kết quả chọn.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/address_search_result.dart';
 

@@ -1,3 +1,5 @@
+// Màn hình tạo và trình chiếu chuỗi mã QR động để chia sẻ dữ liệu điểm giao.
+// Chia nhỏ gói dữ liệu thành các mảnh QR để thiết bị khác quét ngoại tuyến.
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';

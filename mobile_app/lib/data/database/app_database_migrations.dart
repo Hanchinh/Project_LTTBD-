@@ -1,3 +1,5 @@
+// Quản lý tiến trình nâng cấp cấu trúc cơ sở dữ liệu SQLite (Database Migrations).
+// Thực thi các kịch bản chuyển đổi schema an toàn khi ứng dụng cập nhật phiên bản.
 import 'package:sqflite/sqflite.dart';
 
 /// Quản lý việc thực thi tạo bảng (v1) và nâng cấp phiên bản lược đồ CSDL (v2+)

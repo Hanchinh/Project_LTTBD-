@@ -1,3 +1,5 @@
+// Màn hình chào mừng và hướng dẫn thiết lập khi tài xế mở app lần đầu tiên.
+// Cho phép cài đặt tên hiển thị, giới thiệu các tính năng cốt lõi của hệ thống.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/app/home_shell_view.dart';

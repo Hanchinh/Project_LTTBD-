@@ -1,3 +1,5 @@
+// Định nghĩa cấu trúc dữ liệu gói chia sẻ ngoại tuyến P2P (SharePackagePayload).
+// Chứa danh sách điểm giao, mã băm bảo mật và metadata của gói chia sẻ.
 import 'dart:typed_data';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 

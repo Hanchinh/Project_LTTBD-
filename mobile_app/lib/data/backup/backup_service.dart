@@ -1,3 +1,5 @@
+// Dịch vụ tạo và khôi phục bản sao lưu dữ liệu toàn diện dạng file ZIP.
+// Đóng gói cơ sở dữ liệu SQLite và thư mục ảnh kèm mã băm kiểm tra tính toàn vẹn.
 import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';

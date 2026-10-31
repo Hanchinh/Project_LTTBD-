@@ -1,3 +1,5 @@
+// Màn hình xem chi tiết và chỉnh sửa thông tin khách hàng trong danh bạ.
+// Cho phép cập nhật tên, số điện thoại, địa chỉ và xem thông tin vị trí đã ghim.
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
