@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/local_share_models.dart';
-import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 import 'package:delivery_marker_mobile/features/sharing/widgets/share_point_item_card.dart';
 import 'package:delivery_marker_mobile/features/sharing/widgets/share_import_options_card.dart';

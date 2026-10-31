@@ -3,13 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
-import 'package:delivery_marker_mobile/data/repositories/customer_repository.dart';
-import 'package:delivery_marker_mobile/data/repositories/location_repository.dart';
-import 'package:delivery_marker_mobile/data/repositories/photo_repository.dart';
-import 'package:delivery_marker_mobile/data/repositories/profile_repository.dart';
-import 'package:delivery_marker_mobile/data/repositories/shift_repository.dart';
-import 'package:delivery_marker_mobile/data/local/local_sharing_repository.dart';
-import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/customers/customer_repository.dart';
+import 'package:delivery_marker_mobile/data/locations/location_repository.dart';
+import 'package:delivery_marker_mobile/data/photos/photo_repository.dart';
+import 'package:delivery_marker_mobile/data/profile/profile_repository.dart';
+import 'package:delivery_marker_mobile/data/shifts/shift_repository.dart';
+import 'package:delivery_marker_mobile/data/sharing/sharing_repository.dart';
+import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/create_shift_dialog.dart';
 
 /// Fake ShiftRepository để kiểm thử Dependency Injection

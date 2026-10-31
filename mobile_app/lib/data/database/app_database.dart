@@ -1,116 +1,147 @@
-part of 'app_database.dart';
+import 'dart:convert';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart' as p;
+import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
+import 'package:delivery_marker_mobile/data/database/app_database_migrations.dart';
 
-/// Các thao tác CRUD mức thấp cho Ca làm việc (Shifts), Điểm giao, Hồ sơ cá nhân và Cài đặt Meta
-extension AppDatabaseShiftOps on AppDatabase {
-  // --- Ca làm việc (Shifts & Points) ---
+export 'package:delivery_marker_mobile/data/database/app_database_schema.dart';
+export 'package:delivery_marker_mobile/data/database/app_database_migrations.dart';
+export 'package:delivery_marker_mobile/data/customers/customer_queries.dart';
+export 'package:delivery_marker_mobile/data/locations/location_queries.dart';
+export 'package:delivery_marker_mobile/data/shifts/shift_queries.dart';
 
-  /// Tạo ca làm việc mới
-  Future<String> createShift({
-    String? id,
-    required String shiftCode,
-    String? shiftName,
-    required String workDate,
-    String status = 'PREPARING',
-  }) async {
-    final db = await database;
-    final shiftId = id ?? AppDatabase.generateId();
-    final now = AppDatabase.currentIsoUtc();
+/// Quản lý kết nối cơ sở dữ liệu SQLite cục bộ cho kiến trúc Local-First.
+class AppDatabase {
+  static const String databaseFileName = 'local_data_v1.db';
+  static const int currentVersion = 2;
 
-    await db.insert('shifts', {
-      'id': shiftId,
-      'shift_code': shiftCode,
-      'shift_name': shiftName,
-      'work_date': workDate,
-      'status': status,
-      'started_at': null,
-      'completed_at': null,
-      'created_at': now,
-      'updated_at': now,
-    });
+  static AppDatabase? _instance;
+  static AppDatabase get instance => _instance ??= AppDatabase();
 
-    return shiftId;
+  Database? _db;
+  final String? _customPath;
+  final DatabaseFactory? _factory;
+
+  AppDatabase({String? customPath, DatabaseFactory? factory})
+      : _customPath = customPath,
+        _factory = factory;
+
+  /// Getter factory CSDL (nếu được truyền khi khởi tạo)
+  DatabaseFactory? get factory => _factory;
+
+  /// Lấy instance kết nối SQLite
+  Future<Database> get database async {
+    if (_db != null && _db!.isOpen) {
+      return _db!;
+    }
+    _db = await _open();
+    return _db!;
   }
 
-  /// Cập nhật trạng thái ca
-  Future<int> updateShiftStatus(String shiftId, String status) async {
-    final db = await database;
-    final now = AppDatabase.currentIsoUtc();
-    final Map<String, dynamic> updates = {
-      'status': status,
-      'updated_at': now,
-    };
-    if (status == 'IN_PROGRESS') {
-      updates['started_at'] = now;
-    } else if (status == 'COMPLETED') {
-      updates['completed_at'] = now;
+  /// Mở CSDL trong bộ nhớ phục vụ kiểm thử đơn vị
+  static Future<AppDatabase> openInMemory({DatabaseFactory? factory}) async {
+    final appDb = AppDatabase(
+      customPath: inMemoryDatabasePath,
+      factory: factory,
+    );
+    await appDb.database;
+    return appDb;
+  }
+
+  /// Mở CSDL tại đường dẫn chỉ định
+  static Future<AppDatabase> openAtPath(String path, {DatabaseFactory? factory}) async {
+    final appDb = AppDatabase(
+      customPath: path,
+      factory: factory,
+    );
+    await appDb.database;
+    return appDb;
+  }
+
+  /// Đóng kết nối CSDL
+  Future<void> close() async {
+    if (_db != null && _db!.isOpen) {
+      await _db!.close();
+      _db = null;
+    }
+  }
+
+  /// Reset singleton
+  static void reset() {
+    _instance = null;
+  }
+
+  /// Helper sinh chuỗi thời gian ISO-8601 UTC
+  static String currentIsoUtc() => DateTime.now().toUtc().toIso8601String();
+
+  /// Helper sinh UUID v4
+  static String generateId() => UuidUtils.generate();
+
+  /// Mở file SQLite với các cấu hình PRAGMA và migration
+  Future<Database> _open() async {
+    final effectiveFactory = _factory ?? databaseFactory;
+    final String path;
+    if (_customPath != null) {
+      path = _customPath!;
+    } else {
+      final dbFolder = await effectiveFactory.getDatabasesPath();
+      path = p.join(dbFolder, databaseFileName);
     }
 
-    return await db.update(
-      'shifts',
-      updates,
-      where: 'id = ?',
-      whereArgs: [shiftId],
+    return await effectiveFactory.openDatabase(
+      path,
+      options: OpenDatabaseOptions(
+        version: currentVersion,
+        onConfigure: (db) async {
+          await db.execute('PRAGMA foreign_keys = ON;');
+        },
+        onCreate: (db, version) async {
+          for (int v = 1; v <= version; v++) {
+            final migration = _migrations[v];
+            if (migration != null) {
+              await migration(db);
+            }
+          }
+        },
+        onUpgrade: (db, oldVersion, newVersion) async {
+          for (int v = oldVersion + 1; v <= newVersion; v++) {
+            final migration = _migrations[v];
+            if (migration != null) {
+              await migration(db);
+            }
+          }
+        },
+        onOpen: (db) async {
+          try {
+            await db.rawQuery('PRAGMA journal_mode = WAL;');
+          } catch (_) {}
+        },
+      ),
     );
   }
 
-  /// Xóa ca làm việc (Chỉ cascade xóa điểm giao trong ca, không xóa khách hay vị trí)
-  Future<int> deleteShift(String shiftId) async {
+  static final Map<int, Future<void> Function(DatabaseExecutor db)> _migrations = {
+    1: migrationV1,
+    2: migrationV2,
+  };
+
+  /// Lược đồ CSDL v1
+  static Future<void> migrationV1(DatabaseExecutor db) =>
+      AppDatabaseMigrations.migrationV1(db);
+
+  /// Lược đồ CSDL v2
+  static Future<void> migrationV2(DatabaseExecutor db) =>
+      AppDatabaseMigrations.migrationV2(db);
+
+  /// Thực thi giao dịch (Transaction)
+  Future<T> transaction<T>(Future<T> Function(Transaction txn) action) async {
     final db = await database;
-    return await db.delete(
-      'shifts',
-      where: 'id = ?',
-      whereArgs: [shiftId],
-    );
+    return await db.transaction(action);
   }
 
-  /// Thêm điểm giao vào ca
-  Future<String> addShiftDeliveryPoint({
-    String? id,
-    required String shiftId,
-    required String customerId,
-    int deliveryOrderIndex = 0,
-    String locationStatus = 'NO_LOCATION',
-    double? latitude,
-    double? longitude,
-    double? gpsAccuracy,
-    String? identificationNotes,
-  }) async {
-    final db = await database;
-    final pointId = id ?? AppDatabase.generateId();
-    final now = AppDatabase.currentIsoUtc();
-
-    await db.insert('shift_delivery_points', {
-      'id': pointId,
-      'shift_id': shiftId,
-      'customer_id': customerId,
-      'delivery_order_index': deliveryOrderIndex,
-      'location_status': locationStatus,
-      'latitude': latitude,
-      'longitude': longitude,
-      'gps_accuracy': gpsAccuracy,
-      'identification_notes': identificationNotes,
-      'created_at': now,
-      'updated_at': now,
-    });
-
-    return pointId;
-  }
-
-  /// Lấy danh sách điểm giao trong một ca kèm thông tin khách hàng
-  Future<List<Map<String, dynamic>>> getShiftDeliveryPoints(String shiftId) async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT sdp.*, c.full_name, c.phone_number, c.address_text,
-             sl.latitude AS saved_latitude, sl.longitude AS saved_longitude
-      FROM shift_delivery_points sdp
-      JOIN customers c ON sdp.customer_id = c.id
-      LEFT JOIN saved_locations sl ON c.id = sl.customer_id
-      WHERE sdp.shift_id = ?
-      ORDER BY sdp.delivery_order_index ASC
-    ''', [shiftId]);
-  }
-
-  // --- Hồ sơ ứng dụng & Meta (App Profile & Meta) ---
+  // ===========================================================================
+  // HỒ SƠ ỨNG DỤNG & CÀI ĐẶT META (App Profile & Meta)
+  // ===========================================================================
 
   /// Cập nhật hồ sơ ứng dụng (duy nhất id = 1)
   Future<void> setAppProfile({
@@ -237,7 +268,9 @@ extension AppDatabaseShiftOps on AppDatabase {
     return rows.isNotEmpty ? rows.first['value'] as String? : null;
   }
 
-  // --- Nhật ký hoạt động (Activity Log) ---
+  // ===========================================================================
+  // NHẬT KÝ HOẠT ĐỘNG (Activity Log)
+  // ===========================================================================
 
   /// Ghi nhật ký hoạt động (không ghi mật khẩu hay thông tin nhạy cảm)
   Future<String> logActivity({
@@ -251,7 +284,6 @@ extension AppDatabaseShiftOps on AppDatabase {
     final logId = AppDatabase.generateId();
     final now = AppDatabase.currentIsoUtc();
 
-    // Lọc bỏ các trường nhạy cảm nếu có
     final safeDetails = details != null ? Map<String, dynamic>.from(details) : null;
     if (safeDetails != null) {
       safeDetails.remove('password');

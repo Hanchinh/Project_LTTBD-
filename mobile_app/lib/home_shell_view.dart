@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/features/profile/account_profile_view.dart';
 import 'package:delivery_marker_mobile/features/directory/customer_directory_view.dart';
 import 'package:delivery_marker_mobile/features/map/main_map_view.dart';

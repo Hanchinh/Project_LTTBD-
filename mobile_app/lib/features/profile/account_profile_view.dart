@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/user_profile.dart';
-import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
-import 'package:delivery_marker_mobile/data/local/backup_service.dart';
-import 'package:delivery_marker_mobile/data/local/app_storage_service.dart';
+import 'package:delivery_marker_mobile/data/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/backup/backup_service.dart';
+import 'package:delivery_marker_mobile/data/backup/app_storage_service.dart';
 import 'package:delivery_marker_mobile/features/profile/widgets/backup_restore_bottom_sheet.dart';
 import 'package:delivery_marker_mobile/features/profile/widgets/profile_dialogs.dart';
 import 'package:delivery_marker_mobile/features/profile/widgets/profile_stats_section.dart';

@@ -3,9 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:delivery_marker_mobile/data/local/app_database.dart';
-import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
-import 'package:delivery_marker_mobile/data/local/map_tile_cache_service.dart';
+
+import 'package:delivery_marker_mobile/core/services/map_tile_cache_service.dart';
+import 'package:delivery_marker_mobile/data/database/app_database.dart';
+import 'package:delivery_marker_mobile/data/photos/photo_repository.dart';
 
 /// Thống kê dung lượng ứng dụng chi tiết
 class AppStorageStats {
@@ -27,18 +28,18 @@ class AppStorageStats {
   String get totalSizeFormatted => AppStorageService.formatBytes(totalSizeBytes);
 }
 
-/// Dịch vụ quản lý và dọn dẹp dung lượng bộ nhớ ứng dụng (TASK: LOCAL-FIRST-09)
+/// Dịch vụ quản lý và dọn dẹp dung lượng bộ nhớ ứng dụng.
 class AppStorageService {
   final AppDatabase _appDb;
-  final LocalPhotoRepository _photoRepo;
+  final PhotoRepository _photoRepo;
   final Directory? _customTempDir;
 
   AppStorageService({
     AppDatabase? appDb,
-    LocalPhotoRepository? photoRepo,
+    PhotoRepository? photoRepo,
     Directory? customTempDir,
   })  : _appDb = appDb ?? AppDatabase.instance,
-        _photoRepo = photoRepo ?? LocalPhotoRepository(appDb: appDb ?? AppDatabase.instance),
+        _photoRepo = photoRepo ?? PhotoRepository(appDb: appDb ?? AppDatabase.instance),
         _customTempDir = customTempDir;
 
   Future<Directory> _getTempDirectory() async {
@@ -167,4 +168,3 @@ class AppStorageService {
     return '${gb.toStringAsFixed(2)} GB';
   }
 }
-

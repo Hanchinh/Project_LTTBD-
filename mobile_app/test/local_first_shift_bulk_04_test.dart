@@ -1,12 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
-import 'package:delivery_marker_mobile/data/local/app_database.dart';
+import 'package:delivery_marker_mobile/data/database/app_database.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/data/local/local_customer_repository.dart';
-import 'package:delivery_marker_mobile/data/local/local_location_repository.dart';
-import 'package:delivery_marker_mobile/data/local/local_shift_repository.dart';
-import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/customers/customer_repository.dart';
+import 'package:delivery_marker_mobile/data/locations/location_repository.dart';
+import 'package:delivery_marker_mobile/data/shifts/shift_repository.dart';
+import 'package:delivery_marker_mobile/data/repository_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

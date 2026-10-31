@@ -6,13 +6,13 @@ Nhánh: `testrutgoncode`
 
 | Chỉ số | GĐ0 (Mốc ban đầu) | GĐ1 (Gỡ server code) | GĐ2 (Gọn tầng data) | GĐ3 (Gộp widget) | GĐ4 (Sắp xếp thư mục) | GĐ5 (Dễ đọc & Docs) | GĐ6 (Hoàn thành) |
 |---|---|---|---|---|---|---|---|
-| **Tổng số file .dart (lib/)** | 130 | 128 | - | - | - | - | - |
-| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | - | - | - | - | - |
-| **File dài nhất (dòng)** | 316 | 316 | - | - | - | - | - |
-| **Số test vượt qua (passed)** | 182 | 178 | - | - | - | - | - |
-| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | - | - | - | - | - |
-| **Kết quả flutter analyze** | No issues found | No issues found | - | - | - | - | - |
-| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | - | - | - | - | - |
+| **Tổng số file .dart (lib/)** | 130 | 128 | 120 | - | - | - | - |
+| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | 19,226 | - | - | - | - |
+| **File dài nhất (dòng)** | 316 | 316 | 350 | - | - | - | - |
+| **Số test vượt qua (passed)** | 182 | 178 | 178 | - | - | - | - |
+| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | 0 | - | - | - | - |
+| **Kết quả flutter analyze** | No issues found | No issues found | No issues found | - | - | - | - |
+| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | - | - | - | - |
 
 ---
 
@@ -64,3 +64,23 @@ Nhánh: `testrutgoncode`
   - **Flutter test:** `178 passed` (182 - 4 = 178, đúng 100%)
   - **Tổng dòng lib:** `18,862` (giảm 242 dòng)
   - **Số file .dart:** `128` (giảm 2 file)
+
+### GĐ2: Tầng Dữ Liệu Gọn (Domain-Driven Structure)
+- **Tổ chức lại thư mục theo miền nghiệp vụ:**
+  - `data/database/`: `app_database.dart`, `app_database_schema.dart`, `app_database_migrations.dart`.
+  - `data/customers/`: `customer_repository.dart` (hợp nhất interface + local implementation), `customer_queries.dart` (gộp customer ops, customer query helpers, customer bulk helpers).
+  - `data/locations/`: `location_repository.dart` (hợp nhất interface + local implementation), `location_queries.dart`.
+  - `data/shifts/`: `shift_repository.dart` (giữ interface cho Fake trong test), `shift_queries.dart` (thao tác CSDL AppDatabase), `shift_point_ops.dart`, `shift_bulk_helpers.dart`.
+  - `data/photos/`: `photo_repository.dart` (hợp nhất interface + local implementation).
+  - `data/backup/`: `backup_service.dart` (gộp backup_service và backup_zip_helpers), `app_storage_service.dart`.
+  - `data/sharing/`: `sharing_repository.dart`, `sharing_export_ops.dart`, `sharing_import_ops.dart`.
+  - `data/profile/`: `profile_repository.dart`.
+  - `data/repository_provider.dart`: Cung cấp quyền truy cập toàn cục tới các repository, giữ tương thích `useLocalData`.
+  - `core/services/map_tile_cache_service.dart`: Chuyển dịch vụ cache bản đồ về core services.
+- **Xóa bỏ các thư mục cũ:** Đã xóa hoàn toàn `data/local/` và `data/repositories/` (loại bỏ 30 file cũ phân tán).
+- **Rà soát giới hạn độ dài:** Không có bất kỳ file nào > 400 dòng (file dài nhất là `customer_repository.dart` với 350 dòng).
+- **Kết quả sau GĐ2:**
+  - **Flutter analyze:** `No issues found! (ran in 2.3s)`
+  - **Flutter test:** `178 passed` (100% passed)
+  - **Tổng dòng lib:** `19,226`
+  - **Số file .dart:** `120` (giảm 8 file so với GĐ1, giảm 10 file so với GĐ0)

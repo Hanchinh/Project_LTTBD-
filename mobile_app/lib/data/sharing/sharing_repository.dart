@@ -12,28 +12,26 @@ import 'package:sqflite/sqflite.dart';
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/share_crypto_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
-import 'package:delivery_marker_mobile/data/local/app_database.dart';
-import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
-import 'package:delivery_marker_mobile/data/repositories/sharing_repository.dart';
+import 'package:delivery_marker_mobile/data/database/app_database.dart';
+import 'package:delivery_marker_mobile/data/photos/photo_repository.dart';
 import 'package:delivery_marker_mobile/models/local_share_models.dart';
 
-part 'sharing_export_helpers.dart';
-part 'sharing_import_helpers.dart';
+part 'sharing_export_ops.dart';
+part 'sharing_import_ops.dart';
 
-/// Triển khai SharingRepository cục bộ (Local-First Peer-to-Peer Sharing).
-/// Cho phép xuất/nhập điểm qua file .dshare và chuỗi mã QR nhiều mảnh.
-/// Toàn quyền chạy offline, không gửi dữ liệu lên máy chủ ngoài.
-class LocalSharingRepository implements SharingRepository {
+/// Kho lưu trữ chia sẻ dữ liệu cục bộ (Local-First Peer-to-Peer Sharing).
+/// Cho phép xuất/nhập điểm qua file .dshare và chuỗi mã QR nhiều mảnh hoàn toàn offline.
+class SharingRepository {
   final AppDatabase _appDb;
-  final LocalPhotoRepository _photoRepo;
+  final PhotoRepository _photoRepo;
   final Directory? _customBaseDir;
 
-  LocalSharingRepository({
+  SharingRepository({
     AppDatabase? appDb,
-    LocalPhotoRepository? photoRepo,
+    PhotoRepository? photoRepo,
     Directory? customBaseDir,
   })  : _appDb = appDb ?? AppDatabase.instance,
-        _photoRepo = photoRepo ?? LocalPhotoRepository(appDb: appDb ?? AppDatabase.instance, baseDirectory: customBaseDir),
+        _photoRepo = photoRepo ?? PhotoRepository(appDb: appDb ?? AppDatabase.instance, baseDirectory: customBaseDir),
         _customBaseDir = customBaseDir;
 
   static const int maxFileSizeBytes = 50 * 1024 * 1024; // 50MB
@@ -164,17 +162,19 @@ class LocalSharingRepository implements SharingRepository {
       );
 
   // ===========================================================================
-  // 4. CÁC HÀM TƯƠNG THÍCH MÁY CHỦ (Stubs cho local-first)
+  // 4. TƯƠNG THÍCH NỘI BỘ
   // ===========================================================================
-  @override
-  Future<Map<String, dynamic>> getSharedLocations() async => {'shares': []};
 
-  @override
+  Future<Map<String, dynamic>> getSharedLocations() async => {};
+
   Future<Map<String, dynamic>> importSharedLocations(
     String shareId, {
     List<String>? customerIds,
     bool all = true,
     bool replaceExisting = false,
   }) async =>
-      {'importedCount': 0};
+      {};
 }
+
+/// Giữ bí danh LocalSharingRepository cho tương thích ngược
+typedef LocalSharingRepository = SharingRepository;

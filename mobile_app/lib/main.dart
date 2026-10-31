@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/core/theme/app_theme.dart';
-import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
-import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/home_shell_view.dart';
 import 'package:delivery_marker_mobile/features/onboarding_lock/pin_lock_screen.dart';
 import 'package:delivery_marker_mobile/features/onboarding_lock/welcome_onboarding_view.dart';
@@ -50,9 +49,7 @@ class _AuthSplashScreenState extends State<AuthSplashScreen> {
   Future<void> _checkAuthState() async {
     try {
       final photoRepo = RepositoryProvider.photo;
-      if (photoRepo is LocalPhotoRepository) {
-        photoRepo.purgeDeletedPhotosOlderThan().catchError((_) => 0);
-      }
+      photoRepo.purgeDeletedPhotosOlderThan().catchError((_) => 0);
 
       // 1. Kiểm tra lần đầu mở app -> Màn chào WelcomeOnboardingView
       final isFirst = await RepositoryProvider.localProfile.isFirstOpen();

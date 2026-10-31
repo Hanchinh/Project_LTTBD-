@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/repository_provider.dart';
 
 class PinLockScreen extends StatefulWidget {
   final VoidCallback? onSuccess;

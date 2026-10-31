@@ -1,23 +1,23 @@
-import 'package:delivery_marker_mobile/data/local/app_database.dart';
+import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
+import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
+import 'package:delivery_marker_mobile/data/database/app_database.dart';
+import 'package:delivery_marker_mobile/data/photos/photo_repository.dart';
 import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
-import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
-import 'package:delivery_marker_mobile/data/repositories/location_repository.dart';
-import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
 
-class LocalLocationRepository implements LocationRepository {
+/// Kho dữ liệu quản lý Vị trí mốc giao hàng cục bộ (Local-First)
+class LocationRepository {
   final AppDatabase _appDb;
-  final LocalPhotoRepository _photoRepo;
+  final PhotoRepository _photoRepo;
 
-  LocalLocationRepository({AppDatabase? appDb, LocalPhotoRepository? photoRepo})
-      : _appDb = appDb ?? AppDatabase.instance, _photoRepo = photoRepo ?? LocalPhotoRepository(appDb: appDb ?? AppDatabase.instance);
+  LocationRepository({AppDatabase? appDb, PhotoRepository? photoRepo})
+      : _appDb = appDb ?? AppDatabase.instance,
+        _photoRepo = photoRepo ?? PhotoRepository(appDb: appDb ?? AppDatabase.instance);
 
   static const String defaultAreaId = 'local-area-default';
   static const String defaultAreaName = 'Của tôi';
 
-  @override
   Future<List<MasterSavedLocationModel>> getMySavedLocations() async {
     final db = await _appDb.database;
     final rows = await db.rawQuery('SELECT sl.*, c.customer_code, c.full_name, c.phone_number, c.address_text FROM saved_locations sl JOIN customers c ON sl.customer_id = c.id WHERE c.deleted_at IS NULL ORDER BY sl.updated_at DESC');
@@ -25,7 +25,6 @@ class LocalLocationRepository implements LocationRepository {
     return rows.map((r) => _mapToMasterSavedLocation(r, summaries[r['customer_id'] as String])).toList();
   }
 
-  @override
   Future<List<MasterSavedLocationModel>> getSavedLocationsInBounds({required double minLat, required double maxLat, required double minLng, required double maxLng}) async {
     final db = await _appDb.database;
     final rows = await db.rawQuery('SELECT sl.*, c.customer_code, c.full_name, c.phone_number, c.address_text FROM saved_locations sl JOIN customers c ON sl.customer_id = c.id WHERE c.deleted_at IS NULL AND sl.latitude BETWEEN ? AND ? AND sl.longitude BETWEEN ? AND ? ORDER BY sl.updated_at DESC', [minLat, maxLat, minLng, maxLng]);
@@ -33,7 +32,6 @@ class LocalLocationRepository implements LocationRepository {
     return rows.map((r) => _mapToMasterSavedLocation(r, summaries[r['customer_id'] as String])).toList();
   }
 
-  @override
   Future<bool> saveCustomerLocation(SavedLocationModel location, {String? imageBase64}) async {
     final res = await updateCustomerLocationAndPhoto(
       customerId: location.customerId, latitude: location.latitude, longitude: location.longitude,
@@ -42,7 +40,6 @@ class LocalLocationRepository implements LocationRepository {
     return res['success'] == true;
   }
 
-  @override
   Future<Map<String, dynamic>> updateCustomerLocationAndPhoto({
     required String customerId, required double latitude, required double longitude,
     double? gpsAccuracy, required String identificationNotes, String? imageBase64, bool? deletePhoto,
@@ -62,7 +59,7 @@ class LocalLocationRepository implements LocationRepository {
             resCustId = UuidUtils.generate();
             final now = AppDatabase.currentIsoUtc();
             await txn.insert('customers', {
-              'id': resCustId, 'customer_code': 'CUST-${cleanPhone.substring(cleanPhone.length - 4)}',
+              'id': resCustId, 'customer_code': 'CUST-${cleanPhone.length >= 4 ? cleanPhone.substring(cleanPhone.length - 4) : cleanPhone}',
               'full_name': 'Khách $cleanPhone', 'phone_number': cleanPhone, 'address_text': 'Chưa cập nhật địa chỉ',
               'created_at': now, 'updated_at': now, 'deleted_at': null,
             });
@@ -93,7 +90,6 @@ class LocalLocationRepository implements LocationRepository {
     });
   }
 
-  @override
   Future<void> deleteCustomerLocation(String customerId) async {
     await _appDb.transaction((txn) async {
       await txn.delete('saved_locations', where: 'customer_id = ?', whereArgs: [customerId]);
@@ -105,7 +101,6 @@ class LocalLocationRepository implements LocationRepository {
     });
   }
 
-  @override
   Future<ShiftDeliveryPointModel> updateTemporaryLocation(String shiftId, String pointId, {required double latitude, required double longitude, String? locationNotes, String? identificationNotes}) async {
     if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) throw ArgumentError('Tọa độ không hợp lệ (-90..90, -180..180)');
     final db = await _appDb.database, now = AppDatabase.currentIsoUtc(), notes = identificationNotes ?? locationNotes;
@@ -138,13 +133,10 @@ class LocalLocationRepository implements LocationRepository {
     );
   }
 
-  @override
   Future<int> getPendingSyncCount() async => 0;
 
-  @override
   Future<void> syncOfflineQueue() async {}
 
-  @override
   Future<List<Map<String, dynamic>>> getLocationHistory(String customerId) => _appDb.getLocationHistory(customerId);
 
   MasterSavedLocationModel _mapToMasterSavedLocation(Map<String, dynamic> r, [Map<String, dynamic>? photoSummary]) => MasterSavedLocationModel(
@@ -158,3 +150,5 @@ class LocalLocationRepository implements LocationRepository {
     createdAt: DateTime.tryParse(r['created_at']?.toString() ?? ''), updatedAt: DateTime.tryParse(r['updated_at']?.toString() ?? ''),
   );
 }
+
+typedef LocalLocationRepository = LocationRepository;

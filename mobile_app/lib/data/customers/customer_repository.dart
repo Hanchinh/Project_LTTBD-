@@ -1,22 +1,68 @@
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/vietnamese_utils.dart';
-import 'package:delivery_marker_mobile/data/local/app_database.dart';
-import 'package:delivery_marker_mobile/data/local/customer_bulk_helpers.dart';
-import 'package:delivery_marker_mobile/data/local/customer_query_helpers.dart';
-import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
-import 'package:delivery_marker_mobile/data/repositories/customer_repository.dart';
+import 'package:delivery_marker_mobile/data/database/app_database.dart';
+import 'package:delivery_marker_mobile/data/photos/photo_repository.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
+
+abstract class CustomerRepository {
+  Future<List<CustomerDirectoryModel>> getCustomers({
+    String? query,
+    String? status,
+    bool? hasPhoto,
+    int? limit,
+    int? offset,
+  });
+
+  Future<CustomerDirectoryResponse> getCustomersResponse({
+    String? query,
+    String? status,
+    bool? hasPhoto,
+    int? limit,
+    int? offset,
+  });
+
+  Future<CustomerDirectoryModel> getCustomerDetail(String customerId);
+
+  Future<CustomerDirectoryModel> createCustomer({
+    required String phoneNumber,
+    String? fullName,
+    String? addressText,
+    String? areaId,
+    double? latitude,
+    double? longitude,
+    double? gpsAccuracy,
+    String? identificationNotes,
+    String? imageBase64,
+  });
+
+  Future<BulkCreateCustomersResult> createBulkCustomers({
+    String? rawText,
+    List<String>? phones,
+    String? areaId,
+  });
+
+  Future<Map<String, dynamic>> updateCustomer({
+    required String customerId,
+    required String fullName,
+    required String phoneNumber,
+    String? addressText,
+  });
+
+  Future<Map<String, dynamic>?> lookupCustomerLocationByPhone(String phoneNumber);
+
+  Future<bool> deleteCustomer(String customerId);
+}
 
 /// Triển khai CustomerRepository cục bộ bằng SQLite (Local-First).
 class LocalCustomerRepository implements CustomerRepository {
   final AppDatabase _appDb;
-  final LocalPhotoRepository _photoRepo;
+  final PhotoRepository _photoRepo;
 
-  LocalCustomerRepository({AppDatabase? appDb, LocalPhotoRepository? photoRepo})
+  LocalCustomerRepository({AppDatabase? appDb, PhotoRepository? photoRepo})
       : _appDb = appDb ?? AppDatabase.instance,
-        _photoRepo = photoRepo ?? LocalPhotoRepository(appDb: appDb ?? AppDatabase.instance);
+        _photoRepo = photoRepo ?? PhotoRepository(appDb: appDb ?? AppDatabase.instance);
 
   static const String defaultAreaId = 'local-area-default';
   static const String defaultAreaName = 'Của tôi';
@@ -164,9 +210,9 @@ class LocalCustomerRepository implements CustomerRepository {
       }
 
       final newId = UuidUtils.generate();
+      final now = AppDatabase.currentIsoUtc();
       final name = (fullName != null && fullName.trim().isNotEmpty) ? fullName.trim() : 'Khách $cleanPhone';
       final addr = (addressText != null && addressText.trim().isNotEmpty) ? addressText.trim() : 'Chưa cập nhật địa chỉ';
-      final now = AppDatabase.currentIsoUtc();
       final searchText = buildCustomerSearchText(fullName: name, phoneNumber: cleanPhone, addressText: addr);
 
       await txn.insert('customers', {
@@ -175,17 +221,16 @@ class LocalCustomerRepository implements CustomerRepository {
         'full_name': name,
         'phone_number': cleanPhone,
         'address_text': addr,
+        'notes': null,
         'search_text': searchText,
         'created_at': now,
         'updated_at': now,
+        'deleted_at': null,
       });
 
-      String? savedLocationId;
       bool hasLocation = false;
+      String? savedLocationId;
       if (latitude != null && longitude != null) {
-        if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-          throw ArgumentError('Tọa độ không hợp lệ (-90..90, -180..180)');
-        }
         savedLocationId = UuidUtils.generate();
         await txn.insert('saved_locations', {
           'id': savedLocationId,

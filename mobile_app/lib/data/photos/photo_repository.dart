@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:delivery_marker_mobile/data/local/app_database.dart';
-import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
+
 import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
-import 'package:delivery_marker_mobile/data/repositories/photo_repository.dart';
+import 'package:delivery_marker_mobile/data/database/app_database.dart';
+import 'package:delivery_marker_mobile/models/customer_photo_model.dart';
 
 class CompressedImageData {
   final Uint8List fullBytes, thumbBytes;
@@ -31,12 +31,14 @@ CompressedImageData compressAndGenerateThumbnailTask(Uint8List rawBytes) {
   );
 }
 
-class LocalPhotoRepository implements PhotoRepository {
+/// Kho dữ liệu quản lý hình ảnh mốc giao hàng cục bộ (Local-First).
+class PhotoRepository {
   final AppDatabase _appDb;
   final Directory? _baseDirectory;
 
-  LocalPhotoRepository({AppDatabase? appDb, Directory? baseDirectory})
-      : _appDb = appDb ?? AppDatabase.instance, _baseDirectory = baseDirectory;
+  PhotoRepository({AppDatabase? appDb, Directory? baseDirectory})
+      : _appDb = appDb ?? AppDatabase.instance,
+        _baseDirectory = baseDirectory;
 
   Future<Directory> getBaseDirectory() async {
     if (_baseDirectory != null) return _baseDirectory!;
@@ -76,7 +78,6 @@ class LocalPhotoRepository implements PhotoRepository {
     return base64Decode(c.replaceAll(RegExp(r'\s+'), ''));
   }
 
-  @override
   Future<CustomerPhotoModel> addCustomerPhoto(String customerId, String imageBase64) async {
     final bytes = decodeBase64Image(imageBase64);
     if (detectMimeType(bytes) == null) throw ArgumentError('Định dạng ảnh không hợp lệ (chỉ hỗ trợ JPG, PNG, WEBP)');
@@ -101,11 +102,27 @@ class LocalPhotoRepository implements PhotoRepository {
     try {
       final nowIso = AppDatabase.currentIsoUtc();
       await db.insert('customer_photos', {
-        'id': photoId, 'customer_id': customerId, 'file_name': fileName,
-        'thumb_file_name': thumbFileName, 'created_at': nowIso, 'deleted_at': null,
+        'id': photoId,
+        'customer_id': customerId,
+        'file_name': fileName,
+        'thumb_file_name': thumbFileName,
+        'created_at': nowIso,
+        'deleted_at': null,
       });
-      await _appDb.logActivity(action: 'ADD_CUSTOMER_PHOTO', entity: 'customer_photos', entityId: photoId, details: {'customerId': customerId, 'fileName': fileName, 'fileSize': compressed.fullBytes.lengthInBytes});
-      return CustomerPhotoModel(id: photoId, customerId: customerId, imageUrl: fullFile.path, createdAt: DateTime.tryParse(nowIso));
+
+      await _appDb.logActivity(
+        action: 'ADD_CUSTOMER_PHOTO',
+        entity: 'customer_photos',
+        entityId: photoId,
+        details: {'customerId': customerId, 'fileName': fileName, 'fileSize': compressed.fullBytes.lengthInBytes},
+      );
+
+      return CustomerPhotoModel(
+        id: photoId,
+        customerId: customerId,
+        imageUrl: fullFile.path,
+        createdAt: DateTime.tryParse(nowIso),
+      );
     } catch (_) {
       if (await fullFile.exists()) await fullFile.delete();
       if (await thumbFile.exists()) await thumbFile.delete();
@@ -113,19 +130,39 @@ class LocalPhotoRepository implements PhotoRepository {
     }
   }
 
-  @override
   Future<List<CustomerPhotoModel>> getCustomerPhotos(String customerId) async {
     final db = await _appDb.database;
-    final rows = await db.query('customer_photos', where: 'customer_id = ? AND deleted_at IS NULL', whereArgs: [customerId], orderBy: 'created_at DESC');
+    final rows = await db.query(
+      'customer_photos',
+      where: 'customer_id = ? AND deleted_at IS NULL',
+      whereArgs: [customerId],
+      orderBy: 'created_at DESC',
+    );
     final pDir = await getPhotosDirectory();
-    return rows.map((r) => CustomerPhotoModel(id: r['id'] as String, customerId: r['customer_id'] as String, imageUrl: p.join(pDir.path, r['file_name'] as String), createdAt: DateTime.tryParse(r['created_at']?.toString() ?? ''))).toList();
+    return rows.map((r) => CustomerPhotoModel(
+      id: r['id'] as String,
+      customerId: customerId,
+      imageUrl: p.join(pDir.path, r['file_name'] as String),
+      createdAt: DateTime.tryParse(r['created_at']?.toString() ?? ''),
+    )).toList();
   }
 
-  @override
   Future<void> deleteCustomerPhoto(String customerId, String photoId) async {
     final db = await _appDb.database;
-    final count = await db.update('customer_photos', {'deleted_at': AppDatabase.currentIsoUtc()}, where: 'id = ? AND customer_id = ?', whereArgs: [photoId, customerId]);
-    if (count > 0) await _appDb.logActivity(action: 'DELETE_CUSTOMER_PHOTO', entity: 'customer_photos', entityId: photoId, details: {'customerId': customerId});
+    final count = await db.update(
+      'customer_photos',
+      {'deleted_at': AppDatabase.currentIsoUtc()},
+      where: 'id = ? AND customer_id = ? AND deleted_at IS NULL',
+      whereArgs: [photoId, customerId],
+    );
+    if (count > 0) {
+      await _appDb.logActivity(
+        action: 'DELETE_CUSTOMER_PHOTO',
+        entity: 'customer_photos',
+        entityId: photoId,
+        details: {'customerId': customerId},
+      );
+    }
   }
 
   Future<int> purgeDeletedPhotosOlderThan({Duration olderThan = const Duration(days: 30)}) async {
@@ -143,16 +180,25 @@ class LocalPhotoRepository implements PhotoRepository {
         final f = File(p.join(pDir.path, r['file_name'] as String));
         if (await f.exists()) await f.delete();
         final thumb = r['thumb_file_name'] as String?;
-        if (thumb != null) { final tf = File(p.join(tDir.path, thumb)); if (await tf.exists()) await tf.delete(); }
+        if (thumb != null) {
+          final tf = File(p.join(tDir.path, thumb));
+          if (await tf.exists()) await tf.delete();
+        }
         await db.delete('customer_photos', where: 'id = ?', whereArgs: [r['id']]);
         purged++;
       }
     }
-    if (purged > 0) await _appDb.logActivity(action: 'PURGE_EXPIRED_PHOTOS', entity: 'customer_photos', entityId: 'batch', details: {'purgedCount': purged});
+    if (purged > 0) {
+      await _appDb.logActivity(
+        action: 'PURGE_EXPIRED_PHOTOS',
+        entity: 'customer_photos',
+        entityId: 'batch',
+        details: {'purgedCount': purged},
+      );
+    }
     return purged;
   }
 
-  @override
   Future<Map<String, String>> getPhotoAuthInfo(String photoPath, {int? cacheVersion, bool bustCache = false}) async {
     final clean = photoPath.trim();
     if (clean.isEmpty) return {'url': '', 'token': '', 'isLocal': 'false'};
@@ -209,3 +255,5 @@ class LocalPhotoRepository implements PhotoRepository {
     return res;
   }
 }
+
+typedef LocalPhotoRepository = PhotoRepository;

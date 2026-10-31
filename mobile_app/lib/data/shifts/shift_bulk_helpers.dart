@@ -2,7 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/uuid_utils.dart';
 import 'package:delivery_marker_mobile/core/utils/vietnamese_utils.dart';
-import 'package:delivery_marker_mobile/data/local/app_database.dart';
+import 'package:delivery_marker_mobile/data/database/app_database.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 
 /// Helper thực thi thêm hàng loạt số điện thoại vào ca làm việc (Bulk Add Points)

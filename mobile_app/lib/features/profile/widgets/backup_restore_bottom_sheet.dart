@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:delivery_marker_mobile/data/local/backup_service.dart';
+import 'package:delivery_marker_mobile/data/backup/backup_service.dart';
 
 class BackupRestoreBottomSheet extends StatefulWidget {
   final VoidCallback? onRestored;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
-import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/features/directory/widgets/customer_detail_location_card.dart';
 import 'package:delivery_marker_mobile/features/photos/customer_photos_strip_widget.dart';
 import 'package:delivery_marker_mobile/features/sharing/data_share_send_sheet.dart';

@@ -6,16 +6,16 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_map_tile_config.dart';
-import 'package:delivery_marker_mobile/data/local/app_database.dart';
-import 'package:delivery_marker_mobile/data/local/local_customer_repository.dart';
-import 'package:delivery_marker_mobile/data/local/local_photo_repository.dart';
-import 'package:delivery_marker_mobile/data/local/map_tile_cache_service.dart';
-import 'package:delivery_marker_mobile/data/local/app_storage_service.dart';
-import 'package:delivery_marker_mobile/data/local/backup_service.dart';
+import 'package:delivery_marker_mobile/data/database/app_database.dart';
+import 'package:delivery_marker_mobile/data/customers/customer_repository.dart';
+import 'package:delivery_marker_mobile/data/photos/photo_repository.dart';
+import 'package:delivery_marker_mobile/core/services/map_tile_cache_service.dart';
+import 'package:delivery_marker_mobile/data/backup/app_storage_service.dart';
+import 'package:delivery_marker_mobile/data/backup/backup_service.dart';
 import 'package:delivery_marker_mobile/models/location_model.dart';
 import 'package:delivery_marker_mobile/features/map/main_map_view.dart';
 import 'package:delivery_marker_mobile/features/profile/account_profile_view.dart';
-import 'package:delivery_marker_mobile/data/repositories/repository_provider.dart';
+import 'package:delivery_marker_mobile/data/repository_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

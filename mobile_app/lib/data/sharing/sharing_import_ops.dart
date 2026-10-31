@@ -1,13 +1,19 @@
-part of 'local_sharing_repository.dart';
+part of 'sharing_repository.dart';
 
-extension _SharingImportOps on LocalSharingRepository {
+extension _SharingImportOps on SharingRepository {
   Future<SharePackagePreview> _inspectPackageFile(File file, {String? password}) async {
     if (!file.existsSync()) throw ArgumentError('Tệp chia sẻ không tồn tại: ${file.path}');
-    if (file.lengthSync() > LocalSharingRepository.maxFileSizeBytes) throw const FormatException('Gói chia sẻ vượt quá dung lượng cho phép (tối đa 50MB)');
+    if (file.lengthSync() > SharingRepository.maxFileSizeBytes) {
+      throw const FormatException('Gói chia sẻ vượt quá dung lượng cho phép (tối đa 50MB)');
+    }
 
     final bytes = await file.readAsBytes();
     Archive archive;
-    try { archive = ZipDecoder().decodeBytes(bytes); } catch (_) { throw const FormatException('Tệp không đúng định dạng zip/dshare hoặc đã bị hỏng'); }
+    try {
+      archive = ZipDecoder().decodeBytes(bytes);
+    } catch (_) {
+      throw const FormatException('Tệp không đúng định dạng zip/dshare hoặc đã bị hỏng');
+    }
 
     for (final f in archive) {
       final n = f.name.replaceAll('\\', '/');
@@ -23,7 +29,7 @@ extension _SharingImportOps on LocalSharingRepository {
     if (manifest.schemaVersion > AppDatabase.currentVersion) {
       throw FormatException('Gói chia sẻ từ phiên bản ứng dụng mới hơn (v${manifest.schemaVersion} > v${AppDatabase.currentVersion}). Vui lòng cập nhật ứng dụng.');
     }
-    if (manifest.pointsCount > LocalSharingRepository.maxPointsAllowed) {
+    if (manifest.pointsCount > SharingRepository.maxPointsAllowed) {
       throw const FormatException('Gói chia sẻ chứa quá nhiều điểm (tối đa 2000 điểm)');
     }
 
@@ -42,7 +48,9 @@ extension _SharingImportOps on LocalSharingRepository {
       if (encFile == null) throw const FormatException('Thiếu tệp dữ liệu mã hóa points.enc');
       final decBytes = ShareCryptoUtils.decryptBytes(
         cipherBytes: Uint8List.fromList(encFile.content as List<int>),
-        password: password!.trim(), saltHex: manifest.salt ?? '', ivHex: manifest.iv ?? '',
+        password: password!.trim(),
+        saltHex: manifest.salt ?? '',
+        ivHex: manifest.iv ?? '',
       );
       points = (jsonDecode(utf8.decode(decBytes)) as List).map((e) => SharedPointPayload.fromJson(e as Map<String, dynamic>)).toList();
     } else {
@@ -51,14 +59,24 @@ extension _SharingImportOps on LocalSharingRepository {
       points = (jsonDecode(utf8.decode(pFile.content as List<int>)) as List).map((e) => SharedPointPayload.fromJson(e as Map<String, dynamic>)).toList();
     }
 
-    if (points.length > LocalSharingRepository.maxPointsAllowed) throw const FormatException('Gói chia sẻ chứa quá nhiều điểm (tối đa 2000 điểm)');
+    if (points.length > SharingRepository.maxPointsAllowed) {
+      throw const FormatException('Gói chia sẻ chứa quá nhiều điểm (tối đa 2000 điểm)');
+    }
 
     final photos = <String, Uint8List>{};
     for (final f in archive) {
-      if (f.name.startsWith('photos/') && !f.isDirectory) photos[f.name.substring('photos/'.length)] = Uint8List.fromList(f.content as List<int>);
+      if (f.name.startsWith('photos/') && !f.isDirectory) {
+        photos[f.name.substring('photos/'.length)] = Uint8List.fromList(f.content as List<int>);
+      }
     }
 
-    return SharePackagePreview(manifest: manifest, classifiedPoints: await _classifyPoints(points), photos: photos, filePath: file.path, isFromQr: false);
+    return SharePackagePreview(
+      manifest: manifest,
+      classifiedPoints: await _classifyPoints(points),
+      photos: photos,
+      filePath: file.path,
+      isFromQr: false,
+    );
   }
 
   Future<SharePackagePreview> _inspectQrPayload(String rawPayload, {String? password}) async {
@@ -71,22 +89,38 @@ extension _SharingImportOps on LocalSharingRepository {
       if (password?.trim().isNotEmpty != true) throw const FormatException('GÓI_YÊU_CẦU_MẬT_KHẨU');
       final dec = ShareCryptoUtils.decryptBytes(
         cipherBytes: Uint8List.fromList(base64.decode(j['data'] as String)),
-        password: password!.trim(), saltHex: j['salt'] as String, ivHex: j['iv'] as String,
+        password: password!.trim(),
+        saltHex: j['salt'] as String,
+        ivHex: j['iv'] as String,
       );
       points = (jsonDecode(utf8.decode(dec)) as List).map((e) => SharedPointPayload.fromJson(e as Map<String, dynamic>)).toList();
     } else {
       points = (j['points'] as List? ?? []).map((e) => SharedPointPayload.fromJson(e as Map<String, dynamic>)).toList();
     }
 
-    if (points.length > LocalSharingRepository.maxPointsAllowed) throw const FormatException('Gói chia sẻ chứa quá nhiều điểm (tối đa 2000 điểm)');
+    if (points.length > SharingRepository.maxPointsAllowed) {
+      throw const FormatException('Gói chia sẻ chứa quá nhiều điểm (tối đa 2000 điểm)');
+    }
 
     final manifest = SharePackageManifest(
-      formatVersion: 1, type: 'dshare-qr', appVersion: '1.0.0+1', schemaVersion: AppDatabase.currentVersion,
-      createdAt: ts, senderDisplayName: j['sender']?.toString() ?? 'Shipper',
-      pointsCount: points.length, photosCount: 0, isEncrypted: isEnc, checksums: {},
+      formatVersion: 1,
+      type: 'dshare-qr',
+      appVersion: '1.0.0+1',
+      schemaVersion: AppDatabase.currentVersion,
+      createdAt: ts,
+      senderDisplayName: j['sender']?.toString() ?? 'Shipper',
+      pointsCount: points.length,
+      photosCount: 0,
+      isEncrypted: isEnc,
+      checksums: {},
     );
 
-    return SharePackagePreview(manifest: manifest, classifiedPoints: await _classifyPoints(points), photos: const {}, isFromQr: true);
+    return SharePackagePreview(
+      manifest: manifest,
+      classifiedPoints: await _classifyPoints(points),
+      photos: const {},
+      isFromQr: true,
+    );
   }
 
   Future<List<ClassifiedSharePoint>> _classifyPoints(List<SharedPointPayload> points) async {
@@ -123,7 +157,15 @@ extension _SharingImportOps on LocalSharingRepository {
 
       final curLat = (locs.first['latitude'] as num).toDouble(), curLng = (locs.first['longitude'] as num).toDouble();
       final dist = Geolocator.distanceBetween(curLat, curLng, pt.latitude, pt.longitude);
-      list.add(ClassifiedSharePoint(point: pt, classification: SharePointClassification.existingWithLocation, existingCustomerId: cId, existingCustomerName: cName, existingLatitude: curLat, existingLongitude: curLng, distanceMeters: dist));
+      list.add(ClassifiedSharePoint(
+        point: pt,
+        classification: SharePointClassification.existingWithLocation,
+        existingCustomerId: cId,
+        existingCustomerName: cName,
+        existingLatitude: curLat,
+        existingLongitude: curLng,
+        distanceMeters: dist,
+      ));
     }
     return list;
   }
@@ -131,13 +173,16 @@ extension _SharingImportOps on LocalSharingRepository {
   bool _isValidImageBytes(Uint8List b) {
     if (b.length < 12) return false;
     return (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) ||
-           (b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) ||
-           (b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46);
+        (b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) ||
+        (b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46);
   }
 
   Future<ShareImportResult> _importPackage({
-    required SharePackagePreview preview, required ShareImportMode mode,
-    required Set<int> selectedIndexes, bool createShift = false, String? shiftName,
+    required SharePackagePreview preview,
+    required ShareImportMode mode,
+    required Set<int> selectedIndexes,
+    bool createShift = false,
+    String? shiftName,
   }) async {
     final db = await _appDb.database;
     final nowIso = AppDatabase.currentIsoUtc(), nowUtc = DateTime.now().toUtc();
@@ -145,7 +190,8 @@ extension _SharingImportOps on LocalSharingRepository {
     String pad(int n) => n.toString().padLeft(2, '0');
     final workDate = nowIso.split('T').first;
 
-    final pDir = await _photoRepo.getPhotosDirectory(), tDir = await _photoRepo.getThumbsDirectory();
+    final pDir = await _photoRepo.getPhotosDirectory();
+    final tDir = await _photoRepo.getThumbsDirectory();
     final List<File> writtenFiles = [];
 
     int added = 0, replaced = 0, skipped = 0, errors = 0, photosAdded = 0, photosSkipped = 0;
@@ -157,13 +203,24 @@ extension _SharingImportOps on LocalSharingRepository {
         if (createShift) {
           shiftId = UuidUtils.generate();
           finalShiftName = shiftName ?? 'Từ ${preview.manifest.senderDisplayName} ${pad(vn.day)}/${pad(vn.month)}';
-          await txn.insert('shifts', {'id': shiftId, 'shift_code': 'SHIFT-${DateTime.now().millisecondsSinceEpoch % 10000}', 'shift_name': finalShiftName, 'work_date': workDate, 'status': 'PREPARING', 'created_at': nowIso, 'updated_at': nowIso});
+          await txn.insert('shifts', {
+            'id': shiftId,
+            'shift_code': 'SHIFT-${DateTime.now().millisecondsSinceEpoch % 10000}',
+            'shift_name': finalShiftName,
+            'work_date': workDate,
+            'status': 'PREPARING',
+            'created_at': nowIso,
+            'updated_at': nowIso,
+          });
         }
 
         for (int i = 0; i < preview.classifiedPoints.length; i++) {
           if (!selectedIndexes.contains(i)) continue;
           final item = preview.classifiedPoints[i];
-          if (item.classification == SharePointClassification.invalid) { errors++; continue; }
+          if (item.classification == SharePointClassification.invalid) {
+            errors++;
+            continue;
+          }
 
           final pt = item.point, norm = normalizeCustomerPhone(pt.phoneNumber);
           String custId;
@@ -173,40 +230,72 @@ extension _SharingImportOps on LocalSharingRepository {
             custId = UuidUtils.generate();
             final code = 'CUST-${norm.substring(norm.length > 4 ? norm.length - 4 : 0)}';
             await txn.insert('customers', {
-              'id': custId, 'customer_code': code, 'full_name': pt.fullName ?? 'Khách hàng', 'phone_number': norm,
-              'address_text': pt.addressText ?? '', 'search_text': '${pt.fullName ?? ''} $norm ${pt.addressText ?? ''}'.toLowerCase(),
-              'created_at': nowIso, 'updated_at': nowIso,
+              'id': custId,
+              'customer_code': code,
+              'full_name': pt.fullName ?? 'Khách hàng',
+              'phone_number': norm,
+              'address_text': pt.addressText ?? '',
+              'search_text': '${pt.fullName ?? ''} $norm ${pt.addressText ?? ''}'.toLowerCase(),
+              'created_at': nowIso,
+              'updated_at': nowIso,
             });
             await txn.insert('saved_locations', {
-              'id': UuidUtils.generate(), 'customer_id': custId, 'latitude': pt.latitude, 'longitude': pt.longitude,
-              'gps_accuracy': pt.gpsAccuracy, 'identification_notes': pt.identificationNotes, 'created_at': nowIso, 'updated_at': nowIso,
+              'id': UuidUtils.generate(),
+              'customer_id': custId,
+              'latitude': pt.latitude,
+              'longitude': pt.longitude,
+              'gps_accuracy': pt.gpsAccuracy,
+              'identification_notes': pt.identificationNotes,
+              'created_at': nowIso,
+              'updated_at': nowIso,
             });
-            added++; addPhotos = true;
+            added++;
+            addPhotos = true;
           } else if (item.classification == SharePointClassification.existingWithoutLocation) {
             custId = item.existingCustomerId!;
             await txn.insert('saved_locations', {
-              'id': UuidUtils.generate(), 'customer_id': custId, 'latitude': pt.latitude, 'longitude': pt.longitude,
-              'gps_accuracy': pt.gpsAccuracy, 'identification_notes': pt.identificationNotes, 'created_at': nowIso, 'updated_at': nowIso,
+              'id': UuidUtils.generate(),
+              'customer_id': custId,
+              'latitude': pt.latitude,
+              'longitude': pt.longitude,
+              'gps_accuracy': pt.gpsAccuracy,
+              'identification_notes': pt.identificationNotes,
+              'created_at': nowIso,
+              'updated_at': nowIso,
             });
-            added++; addPhotos = true;
+            added++;
+            addPhotos = true;
           } else {
             custId = item.existingCustomerId!;
             if (mode == ShareImportMode.replaceExisting) {
               await txn.update('saved_locations', {
-                'latitude': pt.latitude, 'longitude': pt.longitude, 'gps_accuracy': pt.gpsAccuracy,
-                'identification_notes': pt.identificationNotes, 'updated_at': nowIso,
+                'latitude': pt.latitude,
+                'longitude': pt.longitude,
+                'gps_accuracy': pt.gpsAccuracy,
+                'identification_notes': pt.identificationNotes,
+                'updated_at': nowIso,
               }, where: 'customer_id = ?', whereArgs: [custId]);
-              replaced++; addPhotos = true;
+              replaced++;
+              addPhotos = true;
             } else {
-              skipped++; addPhotos = false;
+              skipped++;
+              addPhotos = false;
             }
           }
 
           if (createShift && shiftId != null) {
             await txn.insert('shift_delivery_points', {
-              'id': UuidUtils.generate(), 'shift_id': shiftId, 'customer_id': custId, 'delivery_order_index': orderIdx++,
-              'location_status': 'VERIFIED', 'latitude': pt.latitude, 'longitude': pt.longitude,
-              'gps_accuracy': pt.gpsAccuracy, 'identification_notes': pt.identificationNotes, 'created_at': nowIso, 'updated_at': nowIso,
+              'id': UuidUtils.generate(),
+              'shift_id': shiftId,
+              'customer_id': custId,
+              'delivery_order_index': orderIdx++,
+              'location_status': 'VERIFIED',
+              'latitude': pt.latitude,
+              'longitude': pt.longitude,
+              'gps_accuracy': pt.gpsAccuracy,
+              'identification_notes': pt.identificationNotes,
+              'created_at': nowIso,
+              'updated_at': nowIso,
             });
           }
 
@@ -216,30 +305,66 @@ extension _SharingImportOps on LocalSharingRepository {
 
             for (final pName in pt.photoFileNames) {
               final pBytes = preview.photos[pName];
-              if (pBytes == null || pBytes.lengthInBytes > LocalSharingRepository.maxPhotoSizeBytes || !_isValidImageBytes(pBytes) || curPhotos >= 10) {
-                photosSkipped++; continue;
+              if (pBytes == null || pBytes.lengthInBytes > SharingRepository.maxPhotoSizeBytes || !_isValidImageBytes(pBytes) || curPhotos >= 10) {
+                photosSkipped++;
+                continue;
               }
-              final photoId = UuidUtils.generate(), targetName = '$custId-$photoId.jpg';
-              final fullF = File(p.join(pDir.path, targetName)), thumbF = File(p.join(tDir.path, targetName));
-              await fullF.writeAsBytes(pBytes, flush: true); writtenFiles.add(fullF);
-              await thumbF.writeAsBytes(pBytes, flush: true); writtenFiles.add(thumbF);
+              final photoId = UuidUtils.generate();
+              final targetName = '$custId-$photoId.jpg';
+              final fullF = File(p.join(pDir.path, targetName));
+              final thumbF = File(p.join(tDir.path, targetName));
+              await fullF.writeAsBytes(pBytes, flush: true);
+              writtenFiles.add(fullF);
+              await thumbF.writeAsBytes(pBytes, flush: true);
+              writtenFiles.add(thumbF);
 
-              await txn.insert('customer_photos', {'id': photoId, 'customer_id': custId, 'file_name': targetName, 'thumb_file_name': targetName, 'created_at': nowIso, 'deleted_at': null});
-              photosAdded++; curPhotos++;
+              await txn.insert('customer_photos', {
+                'id': photoId,
+                'customer_id': custId,
+                'file_name': targetName,
+                'thumb_file_name': targetName,
+                'created_at': nowIso,
+                'deleted_at': null,
+              });
+              photosAdded++;
+              curPhotos++;
             }
           }
         }
       });
     } catch (_) {
-      for (final f in writtenFiles) { try { if (f.existsSync()) f.deleteSync(); } catch (_) {} }
+      for (final f in writtenFiles) {
+        try {
+          if (f.existsSync()) f.deleteSync();
+        } catch (_) {}
+      }
       rethrow;
     }
 
-    await _appDb.logActivity(action: 'IMPORT_SHARED_DATA', entity: 'sharing', details: {'addedCount': added, 'replacedCount': replaced, 'skippedCount': skipped, 'errorCount': errors, 'photosAdded': photosAdded, 'photosSkipped': photosSkipped, 'createdShift': createShift, 'mode': mode.toString()});
+    await _appDb.logActivity(
+      action: 'IMPORT_SHARED_DATA',
+      entity: 'sharing',
+      details: {
+        'addedCount': added,
+        'replacedCount': replaced,
+        'skippedCount': skipped,
+        'errorCount': errors,
+        'photosAdded': photosAdded,
+        'photosSkipped': photosSkipped,
+        'createdShift': createShift,
+        'mode': mode.toString(),
+      },
+    );
 
     return ShareImportResult(
-      addedCount: added, replacedCount: replaced, skippedCount: skipped, errorCount: errors,
-      photosAdded: photosAdded, photosSkipped: photosSkipped, createdShiftId: shiftId, createdShiftName: finalShiftName,
+      addedCount: added,
+      replacedCount: replaced,
+      skippedCount: skipped,
+      errorCount: errors,
+      photosAdded: photosAdded,
+      photosSkipped: photosSkipped,
+      createdShiftId: shiftId,
+      createdShiftName: finalShiftName,
       message: 'Nhập thành công: $added điểm mới, $replaced đã thay, $skipped bỏ qua, $photosAdded ảnh',
     );
   }
