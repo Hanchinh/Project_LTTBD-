@@ -11,8 +11,7 @@ import 'package:delivery_marker_mobile/core/services/map_tile_cache_service.dart
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_map_header.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_map_controls.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_point_selector_sheet.dart';
-import 'package:delivery_marker_mobile/features/shifts/widgets/shift_map_markers_builder.dart';
-import 'package:delivery_marker_mobile/features/shifts/widgets/shift_point_detail_card.dart';
+import 'package:delivery_marker_mobile/features/shifts/widgets/shift_map_overlay_widgets.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_map_tile_config.dart';
 
 class ShiftMapView extends StatefulWidget {

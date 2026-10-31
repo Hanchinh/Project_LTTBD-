@@ -24,3 +24,4 @@ class MapNavigationService {
 
 /// Bí danh tương thích
 typedef MapNavigationHelper = MapNavigationService;
+

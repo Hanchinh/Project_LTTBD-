@@ -20,13 +20,11 @@ import 'package:delivery_marker_mobile/features/map/widgets/assign_phone_dialog.
 import 'package:delivery_marker_mobile/features/map/widgets/control_column.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/import_shared_point_helper.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/main_map_top_bar.dart';
-import 'package:delivery_marker_mobile/features/map/widgets/map_legend.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/map_markers_builder.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/marker_cluster_helper.dart';
-import 'package:delivery_marker_mobile/features/map/widgets/out_of_area_banner.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/pin_mode_overlay.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/save_location_processor.dart';
-import 'package:delivery_marker_mobile/features/map/widgets/saved_location_detail_card.dart';
+import 'package:delivery_marker_mobile/features/map/widgets/map_overlay_widgets.dart';
 import 'package:delivery_marker_mobile/features/map/widgets/shared_point_detail_sheet.dart';
 import 'package:delivery_marker_mobile/features/shifts/widgets/shift_map_tile_config.dart';
 import 'package:delivery_marker_mobile/features/shifts/shift_map_view.dart';

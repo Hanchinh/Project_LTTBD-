@@ -89,3 +89,4 @@ extension LocationDatabaseOps on AppDatabase {
     );
   }
 }
+

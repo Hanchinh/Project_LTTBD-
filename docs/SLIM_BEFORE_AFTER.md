@@ -6,13 +6,13 @@ Nhánh: `testrutgoncode`
 
 | Chỉ số | GĐ0 (Mốc ban đầu) | GĐ1 (Gỡ server code) | GĐ2 (Gọn tầng data) | GĐ3 (Gộp widget) | GĐ4 (Sắp xếp thư mục) | GĐ5 (Dễ đọc & Docs) | GĐ6 (Hoàn thành) |
 |---|---|---|---|---|---|---|---|
-| **Tổng số file .dart (lib/)** | 130 | 128 | 120 | - | - | - | - |
-| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | 19,226 | - | - | - | - |
-| **File dài nhất (dòng)** | 316 | 316 | 350 | - | - | - | - |
-| **Số test vượt qua (passed)** | 182 | 178 | 178 | - | - | - | - |
-| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | 0 | - | - | - | - |
-| **Kết quả flutter analyze** | No issues found | No issues found | No issues found | - | - | - | - |
-| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | - | - | - | - |
+| **Tổng số file .dart (lib/)** | 130 | 128 | 120 | 110 | - | - | - |
+| **Tổng số dòng code (lib/)** | 19,104 | 18,862 | 19,226 | 19,122 | - | - | - |
+| **File dài nhất (dòng)** | 316 | 316 | 350 | 379 | - | - | - |
+| **Số test vượt qua (passed)** | 182 | 178 | 178 | 178 | - | - | - |
+| **Số test bị xóa (lý do)** | 0 | 4 (mã server cũ) | 0 | 0 | - | - | - |
+| **Kết quả flutter analyze** | No issues found | No issues found | No issues found | No issues found | - | - | - |
+| **Kích thước APK release** | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | (Đo tại GĐ6) | - | - | - |
 
 ---
 
@@ -84,3 +84,25 @@ Nhánh: `testrutgoncode`
   - **Flutter test:** `178 passed` (100% passed)
   - **Tổng dòng lib:** `19,226`
   - **Số file .dart:** `120` (giảm 8 file so với GĐ1, giảm 10 file so với GĐ0)
+
+### GĐ3: Gộp Widget Lặp / Nhỏ (Widget Consolidation)
+- **Các thành phần widget đã gộp và xóa gọn:**
+  1. `profile_about_section.dart` (78 dòng) -> Gộp trực tiếp vào `features/profile/account_profile_view.dart`. Xóa file rời.
+  2. `profile_stats_card.dart` (83 dòng) -> Đã kiểm tra qua `git grep` chứng minh không còn nơi nào sử dụng (dead code) -> Xóa bỏ an toàn.
+  3. `directory_state_views.dart` (76 dòng) -> Gộp trực tiếp vào `features/directory/customer_directory_view.dart`. Xóa file rời.
+  4. `fixed_crosshair_target.dart` (49 dòng) -> Gộp trực tiếp vào `features/map/crosshair_location_picker_view.dart`. Xóa file rời.
+  5. `saved_location_detail_card.dart`, `out_of_area_banner.dart`, `map_legend.dart` (tổng 150 dòng) -> Gộp thành `features/map/widgets/map_overlay_widgets.dart`. Xóa 3 file cũ.
+  6. `share_password_dialog.dart` (61 dòng) -> Gộp trực tiếp vào `features/sharing/data_share_import_preview_sheet.dart` (duy nhất một nơi sử dụng). Xóa file rời.
+  7. `shift_delete_dialog.dart` và `shift_rename_dialog.dart` (tổng 110 dòng) -> Gộp thành `features/shifts/widgets/shift_dialogs.dart`. Xóa 2 file cũ.
+  8. `shift_point_detail_card.dart` và `shift_map_markers_builder.dart` (tổng 151 dòng) -> Gộp thành `features/shifts/widgets/shift_map_overlay_widgets.dart`. Xóa 2 file cũ.
+  9. `bulk_paste_section_header.dart` (39 dòng) -> Đưa về `core/widgets/bulk_section_header.dart` (dùng chung cho danh bạ & ca). Xóa file cũ trong shared_widgets.
+  10. `quick_add_area_selector.dart` và `quick_add_optional_fields.dart` (tổng 193 dòng) -> Gộp thành `shared_widgets/quick_add/quick_add_form_fields.dart`. Xóa 2 file cũ.
+- **Rà soát độ dài & tính toàn vẹn:**
+  - Không có file nào vượt quá 400 dòng (file dài nhất hiện tại là `customer_repository.dart` với 379 dòng, `customer_directory_view.dart` với 376 dòng).
+  - Không đổi Key widget, không sửa assert.
+- **Kết quả sau GĐ3:**
+  - **Flutter analyze:** `No issues found! (ran in 2.7s)`
+  - **Flutter test:** `178 passed` (100% passed)
+  - **Tổng dòng lib:** `19,122`
+  - **Số file .dart:** `110` (giảm 10 file so với GĐ2, giảm 20 file so với GĐ0)
+

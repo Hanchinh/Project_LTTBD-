@@ -178,3 +178,4 @@ class SharingRepository {
 
 /// Giữ bí danh LocalSharingRepository cho tương thích ngược
 typedef LocalSharingRepository = SharingRepository;
+

@@ -12,3 +12,4 @@ class UserProfile {
     this.role = 'LOCAL',
   });
 }
+

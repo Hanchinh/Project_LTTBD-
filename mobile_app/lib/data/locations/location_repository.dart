@@ -152,3 +152,4 @@ class LocationRepository {
 }
 
 typedef LocalLocationRepository = LocationRepository;
+

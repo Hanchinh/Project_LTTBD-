@@ -226,3 +226,4 @@ extension _ShiftPointOps on LocalShiftRepository {
     );
   }
 }
+

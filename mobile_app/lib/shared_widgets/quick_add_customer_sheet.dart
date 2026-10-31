@@ -3,8 +3,8 @@ import 'package:delivery_marker_mobile/models/customer_model.dart';
 import 'package:delivery_marker_mobile/data/repository_provider.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
 import 'package:delivery_marker_mobile/core/utils/phone_utils.dart';
-import 'package:delivery_marker_mobile/shared_widgets/quick_add/quick_add_optional_fields.dart';
-import 'package:delivery_marker_mobile/shared_widgets/quick_add/quick_add_area_selector.dart';
+import 'package:delivery_marker_mobile/shared_widgets/quick_add/quick_add_form_fields.dart';
+
 
 export 'package:delivery_marker_mobile/core/utils/phone_utils.dart' show normalizeCustomerPhone;
 

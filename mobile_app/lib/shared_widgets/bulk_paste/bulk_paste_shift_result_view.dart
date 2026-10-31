@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:delivery_marker_mobile/models/shift_model.dart';
 import 'package:delivery_marker_mobile/core/theme/app_buttons.dart';
-import 'package:delivery_marker_mobile/shared_widgets/bulk_paste/bulk_paste_section_header.dart';
+import 'package:delivery_marker_mobile/core/widgets/bulk_section_header.dart';
 
 /// Giao diện kết quả dán SĐT cho ca làm việc (Shift Mode)
 class BulkPasteShiftResultView extends StatelessWidget {
